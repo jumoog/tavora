@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.64",
+    date: "2026-11-14",
+    title: "Your saved data stays safe",
+    notes: [
+      "If some saved data can't be opened, Tavora keeps a copy and tells you, instead of starting over on top of it.",
+    ],
+    prs: [
+      { number: 795, title: "Keep every saved file safe from older and broken reads" },
+    ],
+    tags: ["accounts", "ai-usage", "cloud-copy", "discord", "hotkeys", "modules", "overlays", "privacy", "system-monitor", "updates", "website", "workspace"],
+  },
+  {
     version: "0.24.63",
     date: "2026-11-14",
     title: "Overlays stay on with the cloud copy",
