@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.63",
+    date: "2026-11-14",
+    title: "Overlays stay on with the cloud copy",
+    notes: [
+      "Game overlays, hotkeys and stream overlays in OBS keep working while the cloud copy syncs.",
+    ],
+    prs: [
+      { number: 797, title: "Cloud copy saves without shutting down overlays, hotkeys and OBS" },
+    ],
+    tags: ["cloud-copy", "overlays", "privacy", "website"],
+  },
+  {
     version: "0.24.62",
     date: "2026-11-14",
     title: "Updates signed by Tavora",
