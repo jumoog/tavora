@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.66",
+    date: "2026-11-14",
+    title: "Move panels with the keyboard",
+    notes: [
+      "Focus a panel's tab and press Ctrl+M to move it.",
+      "The arrow keys pick a place and show where it lands. Enter puts it there, Esc cancels.",
+      "Screen readers read out each place as you go.",
+    ],
+    prs: [
+      { number: 800, title: "Move dock panels with the keyboard" },
+    ],
+    tags: ["hotkeys", "workspace"],
+  },
+  {
     version: "0.24.65",
     date: "2026-11-14",
     title: "Steadier dragging",
