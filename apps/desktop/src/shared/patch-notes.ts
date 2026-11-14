@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.69",
+    date: "2026-11-15",
+    title: "Shortcuts in the hints",
+    notes: [
+      "Buttons with a shortcut show its keys beside their hint: Back, Forward, New tab and Exit full screen in the Browser panel, Undo and Redo on the Overlays page, and the rail's collapse button.",
+      "Settings > Shortcuts now lists Undo and Redo for Overlays too.",
+    ],
+    prs: [
+      { number: 799, title: "Shortcuts come from one table" },
+    ],
+    tags: ["hotkeys", "onboarding", "overlays", "rail", "ui-kit", "workspace"],
+  },
+  {
     version: "0.24.68",
     date: "2026-11-15",
     title: "Fields that explain themselves",
