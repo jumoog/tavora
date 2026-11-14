@@ -4,7 +4,7 @@ import { t } from "./i18n";
 // What Settings > Keyboard shortcuts (Ctrl+/) lists. The Tavora-wide ones are
 // caught in main/shortcuts.ts; keep both in step.
 
-const MAC = navigator.platform.startsWith("Mac");
+export const MAC = navigator.platform.startsWith("Mac");
 /** The modifier key's name: Cmd on a Mac, otherwise Ctrl (Strg in German). */
 export const MOD = (): string => (MAC ? "Cmd" : t("shortcuts.ctrl"));
 /** A label with its shortcut after it, as a tooltip shows it: "Undo (Ctrl+Z)", "Undo (Cmd+Z)" on a Mac. */
@@ -35,6 +35,17 @@ export function shortcutGroups(): { title: string; rows: ShortcutRow[] }[] {
         { action: t("shortcuts.openWorkspace"), keys: [mod, "1–9"] },
         { action: t("shortcuts.nextTab"), keys: [t("shortcuts.ctrl"), "Tab"] },
         { action: t("shortcuts.previousTab"), keys: [t("shortcuts.ctrl"), "Shift", "Tab"] },
+      ],
+    },
+    {
+      // Only while a panel's tab has focus (dock-preview.ts), so not caught in main.
+      title: t("shortcuts.group.panels"),
+      rows: [
+        { action: t("shortcuts.movePanel"), keys: [mod, "M"] },
+        { action: t("shortcuts.pickPlace"), keys: ["←", "↑", "↓", "→"] },
+        { action: t("shortcuts.everyPlace"), keys: ["Tab"] },
+        { action: t("shortcuts.dropPanel"), keys: ["Enter"] },
+        { action: t("shortcuts.cancelMove"), keys: ["Esc"] },
       ],
     },
     {
