@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.71",
+    date: "2026-11-15",
+    title: "Menus wait for slow actions",
+    notes: [
+      "A menu entry that takes a moment keeps the menu open and pulses until it's done, then the menu closes. If it fails, a message says so.",
+      "Settings > Modules > More > Reload and Whiteboard's Copy as picture work this way.",
+      "Ctrl+K: adding a game keeps the search open until the game is ready.",
+    ],
+    prs: [
+      { number: 803, title: "Kit menus: entries that wait for their action" },
+    ],
+    tags: ["settings", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.24.70",
     date: "2026-11-15",
     title: "Steadier dialogs",
