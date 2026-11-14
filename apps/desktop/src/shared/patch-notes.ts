@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.70",
+    date: "2026-11-15",
+    title: "Steadier dialogs",
+    notes: [
+      "While a dialog is busy, its close button is greyed out, so you can see it can't close yet.",
+    ],
+    prs: [
+      { number: 804, title: "Kit dialogs: dismissible, busy and dismiss-attempt" },
+    ],
+    tags: ["cloud-copy", "publishing", "ui-kit"],
+  },
+  {
     version: "0.24.69",
     date: "2026-11-15",
     title: "Shortcuts in the hints",
