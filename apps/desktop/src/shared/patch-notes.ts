@@ -28,6 +28,30 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.68",
+    date: "2026-11-15",
+    title: "Fields that explain themselves",
+    notes: [
+      "Screen readers read a field's name and hint with it, starting with your developer name and AI accounts in Settings.",
+    ],
+    prs: [
+      { number: 802, title: "Kit: Field (label, hint, error) and ARIA pattern checks" },
+    ],
+    tags: ["accessibility", "publishing", "settings", "ui-kit"],
+  },
+  {
+    version: "0.24.67",
+    date: "2026-11-15",
+    title: "Nothing lost when you close a panel",
+    notes: [
+      "What you typed just before closing a panel, switching workspaces or quitting Tavora is saved.",
+    ],
+    prs: [
+      { number: 801, title: "A closed panel's last typing is saved before its page goes" },
+    ],
+    tags: ["modules", "privacy", "website", "workspace"],
+  },
+  {
     version: "0.24.66",
     date: "2026-11-14",
     title: "Move panels with the keyboard",
