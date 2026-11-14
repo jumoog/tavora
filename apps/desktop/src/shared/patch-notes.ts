@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.72",
+    date: "2026-11-15",
+    title: "Focus stays put after a delete",
+    notes: [
+      "Delete something in a list with the keyboard and the focus moves to the next row, not off the page.",
+      "Undo puts the focus back on what came back.",
+    ],
+    prs: [
+      { number: 805, title: "Kit: focus stays in a list after a delete (useFocusRecovery)" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "settings", "todos", "ui-kit"],
+  },
+  {
     version: "0.24.71",
     date: "2026-11-15",
     title: "Menus wait for slow actions",
