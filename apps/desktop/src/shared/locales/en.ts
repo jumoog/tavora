@@ -749,6 +749,8 @@ export const en = {
   "shortcuts.cancelMove": "Cancel the move",
   "settings.patchNotes.intro": "What's new, newest first.",
   "settings.patchNotes.installed": "Installed",
+  "settings.patchNotes.catalogTitle": "Tavora 1.0",
+  "settings.patchNotes.catalogIntro": "The first public version. Here is everything Tavora can do.",
   "settings.trash.empty": "Trash is empty.",
   "settings.trash.deleteOn": "Deleted for good on {date}",
   "settings.trash.restore": "Restore",
