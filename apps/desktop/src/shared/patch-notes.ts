@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.74",
+    date: "2026-11-15",
+    title: "Friendlier texts",
+    notes: [
+      "Error messages are shorter and friendlier.",
+      "The Delete key shown in menus follows your language.",
+    ],
+    prs: [
+      { number: 809, title: "Text and docs fixes from the final check" },
+    ],
+    tags: ["clock-counter", "games", "privacy", "website"],
+  },
+  {
     version: "0.24.73",
     date: "2026-11-15",
     title: "Safer saved data",
