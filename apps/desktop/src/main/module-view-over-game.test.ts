@@ -114,6 +114,45 @@ describe("closing a panel", () => {
       vi.useRealTimers();
     }
   });
+
+  it("stays silent and does not throw when its page is already gone", async () => {
+    vi.useFakeTimers();
+    try {
+      const statuses: string[] = [];
+      const view = make({ onStatus: (status: string) => statuses.push(status) });
+      const inner = view as unknown as { view: { webContents?: unknown }; setStatus(status: string): void; hideUntilSettled(): void };
+      // Electron drops a closed view's page.
+      inner.view.webContents = undefined;
+      await expect(view.dispose()).resolves.toBeUndefined();
+      expect(() => {
+        inner.setStatus("failed");
+        inner.setStatus("crashed");
+        inner.hideUntilSettled();
+        view.noteGesture();
+        view.reload();
+        view.leaveGame();
+        vi.advanceTimersByTime(5 * 60_000);
+      }).not.toThrow();
+      expect(statuses).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not fail when its page goes while a change over the game is still queued", async () => {
+    vi.useFakeTimers();
+    try {
+      const view = make({ onStatus: () => undefined });
+      view.enterGame(() => false);
+      view.setGameOpacity(50);
+      // Electron drops the page before the queued steps run.
+      (view as unknown as { view: { webContents?: unknown } }).view.webContents = undefined;
+      view.leaveGame();
+      await expect(vi.runAllTimersAsync()).resolves.not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("one press", () => {
