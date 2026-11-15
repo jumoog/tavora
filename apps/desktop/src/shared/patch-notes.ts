@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.73",
+    date: "2026-11-15",
+    title: "Safer saved data",
+    notes: [
+      "If your library can't be opened, your modules' and Browser panel's saved data waits until you bring it back from a backup.",
+      "Installing two modules at once remembers who made both.",
+      "Modules can't give a document a name that would mix it up with another file.",
+    ],
+    prs: [
+      { number: 807, title: "Keep saved data safe after a lost library, parallel installs and odd document ids" },
+    ],
+    tags: ["cloud-copy", "modules", "privacy", "updates", "website", "workspace"],
+  },
+  {
     version: "0.24.72",
     date: "2026-11-15",
     title: "Focus stays put after a delete",
