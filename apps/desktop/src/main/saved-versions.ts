@@ -6,8 +6,22 @@
 //   wrote is copied aside (`<file>.from-version-<n>`) before this one can write over it; one that can't be read is set
 //   aside (`<file>.corrupt-<time>`) before starting fresh, and the user is told. Caches, derived files and logs have
 //   neither (they are listed at the end).
-// - Raise a file's version for any new field, and for any change an older Tavora could misread. Never rename or
-//   restructure what is saved in one step: add to it, and read both forms.
+// - These records keep the fields they don't know when they save (json.ts unknownFields), so a new field on them needs
+//   no new version: library.json's top level, each workspace entry and each folder; workspace.json's top level, each
+//   workspace, each panel and each snapshot; storage.json's top level (not inside `entries`); a panel-state file's top
+//   level. Raise their version only for a change an older Tavora could misread. Everything nested in them is still
+//   rebuilt from the fields this Tavora knows: a new field in a layout, a panel's `content`, a workspace's `icon`, the
+//   library's `rail`, `theme`, `browser`, `profileRanks`, `dialogFolders`, `moduleFolders` or root items, or a new
+//   workspace `kind`, raises the version like any other file.
+// - An older Tavora writes its own version with the newer fields still in: a migration expects them there, as the
+//   newer Tavora last wrote them (a snapshot's may describe a layout the older one replaced since), and a field name
+//   once retired is never used again. A new setting that belongs to one PC goes inside the library's `pc`, never at its
+//   top level: an older Tavora keeps an unknown top-level field another PC's cloud copy brought, but puts back this
+//   PC's own `pc` as a whole (PC_SETTINGS).
+// - Every other file: raise its version for any new field, and for any change an older Tavora could misread. Never
+//   rename or restructure what is saved in one step: add to it, and read both forms.
+// - saved-samples/ holds each file as Tavora wrote it, at every version still read; saved-samples.test.ts opens them
+//   all. A new format adds its sample, and no later Tavora may stop opening one.
 
 /**
  * The files in the data folder itself, with the version this Tavora writes. SavedData.keepNewerFiles copies aside, at
