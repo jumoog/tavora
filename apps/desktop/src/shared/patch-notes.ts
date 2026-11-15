@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.75",
+    date: "2026-11-15",
+    title: "Steadier closing",
+    notes: [
+      "Closing a panel, or the whole window, while a page is still going away no longer causes errors.",
+    ],
+    prs: [
+      { number: 810, title: "Guard module view dispose; recheck bans and limits after publish scan" },
+    ],
+    tags: ["catalog", "modules", "service"],
+  },
+  {
     version: "0.24.74",
     date: "2026-11-15",
     title: "Friendlier texts",
