@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.79",
+    date: "2026-11-16",
+    title: "Settings line up",
+    notes: [
+      "The close button in Settings sits in line with the page below it.",
+    ],
+    prs: [
+      { number: 814, title: "Settings: the close button lines up with the page" },
+    ],
+    tags: ["settings"],
+  },
+  {
     version: "0.24.78",
     date: "2026-11-16",
     title: "Your font over the game too",
