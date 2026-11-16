@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.78",
+    date: "2026-11-16",
+    title: "Your font over the game too",
+    notes: [
+      "Overlays over the game and in OBS use the font you pick in Settings > Appearance.",
+      "In To-Dos and Clock & Counter, the Tavora font follows it too.",
+    ],
+    prs: [
+      { number: 813, title: "Overlay pages follow the interface font, in game and in OBS" },
+    ],
+    tags: ["clock-counter", "fonts", "overlays", "sdk", "theme", "todos", "ui-kit", "website"],
+  },
+  {
     version: "0.24.77",
     date: "2026-11-16",
     title: "Pick your font",
