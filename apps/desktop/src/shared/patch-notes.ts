@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.76",
+    date: "2026-11-16",
+    title: "One font everywhere",
+    notes: [
+      "Tooltips, the loading screen and the frames around game overlays now use Tavora's font, like the rest of the app.",
+      "The whiteboard's menus and toolbars do too.",
+      "In Notes, the Inter font is now called Tavora font.",
+    ],
+    prs: [
+      { number: 811, title: "Make the interface font a live theme value everywhere" },
+    ],
+    tags: ["calculator", "clock-counter", "fonts", "games", "modules", "notes", "overlays", "pdf-viewer", "publishing", "sdk", "system-monitor", "theme", "todos", "ui-kit", "website", "whiteboard", "workspace"],
+  },
+  {
     version: "0.24.75",
     date: "2026-11-15",
     title: "Steadier closing",
