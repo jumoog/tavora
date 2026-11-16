@@ -109,7 +109,8 @@ import {
   type WorkspaceIcon,
   type Library,
 } from "./library";
-import { MODULE_FONTS } from "./module-fonts";
+import { fontStylesheet } from "./module-fonts";
+import { uiFont } from "./ui-fonts";
 import { moduleBaseCss } from "./module-style";
 import { backupData, backupsDir } from "./backup";
 import { hasLibrary, loadLibrary, SavedData, WORKSPACE_FILE } from "./saved-data";
@@ -349,8 +350,8 @@ export interface HostOptions {
   devServer?: string | undefined;
 }
 
-/** Built on first use; it carries the module font, so it is not small. */
-let moduleCss: string | undefined;
+/** The same for every module page; the font and the colours come in stylesheets of their own. */
+const MODULE_CSS = moduleBaseCss();
 
 /**
  * Writes `data` to the file a save dialog gave, adding `.extension` when the name lacks it. The dialog asked before
@@ -785,7 +786,7 @@ export class Host {
         return{root:module.root,module:view.moduleId,name:this.shown(module.manifest).name,bounds};
       }});
     this.watchShortcuts(this.window.webContents);
-    this.cover = new PanelCover({ parent: this.window.contentView, emblem: () => this.emblem });
+    this.cover = new PanelCover({ parent: this.window.contentView, emblem: () => this.emblem, fontCss: (theme) => fontStylesheet(theme.font) });
     // Whatever is added to the window later (panels, the opening cover, the Overlay page) goes below the toasts.
     this.toastView = new ToastView({
       window: this.window,
@@ -1811,6 +1812,9 @@ export class Host {
     this.applyTitleBarOverlay();
     this.toastView.refresh();
     for (const view of this.nativePanels()) view.applyTheme(next);
+    // Each keeps its font when it is the same (InsertedCss), so only a new font costs a swap.
+    this.gameOverlays?.refreshFonts();
+    this.previews?.refreshFonts();
   }
 
   private async reloadThemes(): Promise<void> {
@@ -3959,7 +3963,8 @@ export class Host {
       devTools: this.options.devTools,
       getTheme: () => this.currentTheme,
       getLanguage: () => this.language,
-      baseCss: (moduleCss ??= moduleBaseCss(MODULE_FONTS)),
+      baseCss: MODULE_CSS,
+      fontCss: (theme) => fontStylesheet(theme.font),
       ...(this.options.moduleStorageLimit === undefined ? {} : { storageLimit: this.options.moduleStorageLimit }),
       onStorageOver: () => {
         // A page closed while it was measured needs no clearing.
@@ -4988,6 +4993,7 @@ export class Host {
       isDefault: theme.id === DEFAULT_THEME.id && this.library.followSystem && this.library.radius === null,
       followSystem: this.library.followSystem,
       radius: this.library.radius,
+      font: uiFont(this.currentTheme.font?.id),
       themes: themes.map(({ theme: item, provenance }) => ({
         id: item.id,
         name: item.name,
@@ -5384,6 +5390,7 @@ export class Host {
           this.pushStateSoon();
         },
         overGameChanged: (changed) => this.tellOverGameChanged(changed),
+        fontCss: () => fontStylesheet(this.currentTheme.font),
         saveLibrary: () => this.saveLibrary(),
         workspaceId: () => this.workspaceId,
         askConnector: (moduleId, connector) => this.askConnector(moduleId, connector),

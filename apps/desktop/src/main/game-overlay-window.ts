@@ -15,6 +15,7 @@ import { GAME_OVERLAY_SCHEME } from "./assets";
 import { dragRect, panelBounds, type Opacity, type Rect } from "./game-overlays";
 import { GAME_OVERLAY_FRAME_URL, GAME_OVERLAY_ORIGIN, serveGameOverlay, type GameOverlaySource } from "./game-overlay-page";
 import { GAME_OVERLAY_FRAME_DOCUMENT } from "../shared/game-overlay-frame";
+import { InsertedCss } from "./inserted-css";
 
 /** What the window needs of a panel it holds (implemented by ModuleView). */
 export interface OverlayPanel {
@@ -52,6 +53,8 @@ export interface GameOverlayWindowOptions {
   ended(): void;
   /** The name and the close button's label the frame shows. */
   frameText(): { name: string; closeLabel: string; layoutLabel: string };
+  /** The interface font's stylesheet for the frame (module-fonts.ts). */
+  fontCss?(): string;
   /** A panel to hold instead of an overlay page (lent by Panel views, which takes it back when GameOverlays returns the loan). */
   panel?: OverlayPanel;
 }
@@ -104,6 +107,9 @@ export class GameOverlayWindow {
   private readonly onQuit = () => {
     this.quitting = true;
   };
+
+  /** The interface font in the frame, swapped when the user picks another. */
+  private readonly frameFont = new InsertedCss(() => this.frame.webContents);
 
   constructor(private readonly options: GameOverlayWindowOptions) {
     // No "persist:" prefix: nothing of the page is kept on disk. Each overlay has a session of its own, kept for as long
@@ -180,11 +186,21 @@ export class GameOverlayWindow {
     }
     const frame = this.frame.webContents;
     lockContents(frame);
-    frame.on("did-finish-load", () => this.sendFrameText());
+    frame.on("did-finish-load", () => {
+      this.sendFrameText();
+      this.frameFont.forget();
+      this.refreshFont();
+    });
     void frame.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(GAME_OVERLAY_FRAME_DOCUMENT)}`).catch(() => {});
     frame.ipc.on("game-overlay:close", () => this.arranging && options.closeRequested());
     frame.ipc.on("game-overlay:layout", () => this.arranging && options.layoutRequested());
     frame.ipc.on("game-overlay:drag", (_event, phase: unknown, edge: unknown) => this.onDrag(phase, edge));
+  }
+
+  /** Puts the interface font the user has now into the frame; the same font again changes nothing. */
+  refreshFont(): void {
+    const css = this.options.fontCss?.();
+    if (css && !this.frame.webContents.isDestroyed()) void this.frameFont.replace(css);
   }
 
   private end(): void {

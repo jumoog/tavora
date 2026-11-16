@@ -29,6 +29,8 @@ import type { WorkspaceNames } from "./workspace-lookup";
 export interface OverlayHostPorts {
   shell: Shell;
   language(): Language;
+  /** The interface font's stylesheet for Tavora's own overlay chrome (module-fonts.ts). */
+  fontCss?(): string;
   /** Something the Settings page depends on changed. */
   changed(): void;
   /** Something the Settings page or the game watcher depends on changed (a game overlay was added, removed or toggled). */
@@ -124,7 +126,7 @@ export async function createOverlayServices(wiring: OverlayWiring): Promise<Over
       screen: () => screen.getPrimaryDisplay().bounds,
       // Any of Tavora's windows with the keyboard; the service tells its own overlay windows apart.
       tavoraInFront: () => BrowserWindow.getFocusedWindow() !== null,
-      openWindow: (request, panel) => overlayWindow(options, request, panel),
+      openWindow: (request, panel) => overlayWindow(options, ports.fontCss, request, panel),
       openVeil: () => new GameVeilWindow({ hidden: options.hidden }),
       shortcuts: globalShortcut,
     },
@@ -142,6 +144,7 @@ export async function createOverlayServices(wiring: OverlayWiring): Promise<Over
       new OverlayPreviewWindow(request, {
         hidden: options.hidden,
         labels: { dark: translate(ports.language(), "preview.dark"), light: translate(ports.language(), "preview.light"), checker: translate(ports.language(), "preview.checker") },
+        ...(ports.fontCss ? { fontCss: ports.fontCss } : {}),
       }),
   });
   const layout = overlayLayout(wiring, gameOverlays);
@@ -151,7 +154,7 @@ export async function createOverlayServices(wiring: OverlayWiring): Promise<Over
 }
 
 /** The window for an overlay's page, or (with `panel`) for a panel over its game: the panel's own view goes into it, and no copy is made. */
-function overlayWindow(options: OverlayWiringOptions, request: OverlayWindowRequest, panel?: OverlayPanel): GameOverlayWindow {
+function overlayWindow(options: OverlayWiringOptions, fontCss: (() => string) | undefined, request: OverlayWindowRequest, panel?: OverlayPanel): GameOverlayWindow {
   return new GameOverlayWindow({
     preload: path.join(path.dirname(options.modulePreload), "game-overlay.cjs"),
     hidden: options.hidden,
@@ -163,6 +166,8 @@ function overlayWindow(options: OverlayWiringOptions, request: OverlayWindowRequ
     layoutRequested: request.layoutRequested,
     ended: request.ended,
     frameText: request.frameText,
+    // The frame is Tavora's own chrome, in the font the user picked.
+    ...(fontCss ? { fontCss } : {}),
     ...(panel ? { panel } : {}),
   });
 }
