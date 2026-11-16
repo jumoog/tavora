@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.77",
+    date: "2026-11-16",
+    title: "Pick your font",
+    notes: [
+      "Settings > Appearance > Font: Inter, Allo, Mona Sans, Rubik, Nunito, Saira or Atkinson Hyperlegible Next.",
+      "It changes at once, in Tavora and in your panels. Panels with a font of their own keep it.",
+      "Every font is sized to match, so text stays as easy to read.",
+    ],
+    prs: [
+      { number: 812, title: "Pick the interface font in Settings > Appearance" },
+    ],
+    tags: ["fonts", "games", "modules", "settings", "theme"],
+  },
+  {
     version: "0.24.76",
     date: "2026-11-16",
     title: "One font everywhere",
