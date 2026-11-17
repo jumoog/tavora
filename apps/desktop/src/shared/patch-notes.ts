@@ -34,7 +34,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
     notes: [
       "Item cards show once, at their full size, instead of blinking or growing a moment later.",
       "Moving from one item to the next swaps the card without it vanishing in between.",
-      "A card near the edge opens beside its item, never on top of it.",
+      "A card near the edge opens beside its item, and stays off it wherever there is room.",
       "A hint on the header no longer closes and opens again.",
     ],
     prs: [
@@ -81,7 +81,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
     date: "2026-11-17",
     title: "Tighter safety",
     notes: [
-      "Tavora checks its app files each time it starts, so a changed copy won't run.",
+      "Tavora checks its main app files each time it starts, so a changed copy of them won't run.",
       "An OBS overlay stops at once when its module loses access or is removed.",
     ],
     prs: [
@@ -198,7 +198,7 @@ export const PATCH_NOTES: readonly PatchNote[] = [
     date: "2026-11-15",
     title: "Safer saved data",
     notes: [
-      "If your library can't be opened, your modules' and Browser panel's saved data waits until you bring it back from a backup.",
+      "If your library can't be opened, your modules' and Browser panel's saved data waits until you bring it back from a backup. In-game overlay placements aren't held this way.",
       "Installing two modules at once remembers who made both.",
       "Modules can't give a document a name that would mix it up with another file.",
     ],

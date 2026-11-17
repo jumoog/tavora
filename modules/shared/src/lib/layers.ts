@@ -12,7 +12,7 @@
 // and gone once its content is unmounted. Escape belongs to the top layer: Reka already hands it only to its highest one,
 // and a page's own keys ask `isModalOpen` before they act. Popovers, selects and context menus are not listed: they
 // don't wait on the user, and a key pressed inside one belongs to it.
-import { defineComponent, getCurrentInstance, inject, onMounted, onScopeDispose, onUnmounted, provide, shallowRef, watch, type InjectionKey, type Ref } from "vue"
+import { defineComponent, getCurrentInstance, inject, nextTick, onMounted, onScopeDispose, onUnmounted, provide, shallowRef, watch, type InjectionKey, type Ref } from "vue"
 import { inertBehind } from "./inert-behind"
 
 export type LayerKind = "dialog" | "menu"
@@ -73,9 +73,31 @@ function openLayer(id: number, kind: LayerKind, modal: boolean, name: string | u
   stack.value = [...stack.value.filter((layer) => layer.id !== id), { id, kind, modal, name, state: "open", element }]
 }
 
-/** It stays, leaving, while its content is on the page, and goes at once when it never got there. */
-function closeLayer(id: number): void {
+/** How long after a close a kept content gets to start its exit animation, and the longest it may take to end. */
+const ANIMATION_START_MS = 50
+const ANIMATION_MAX_MS = 1000
+
+/**
+ * It stays, leaving, while its content is on the page, and goes at once when it never got there. A content that stays on
+ * the page after it closed (`kept`: `forceMount`) never unmounts, so its LayerAnchor can't end the layer: it leaves once
+ * the content's own animations are over (at most ANIMATION_MAX_MS, so an endless one can't hold the page) and the
+ * content is still there. Any other content ends its layer itself, as it unmounts.
+ */
+function closeLayer(id: number, kept: boolean): void {
   updateLayer(id, (layer) => (layer.element ? { ...layer, state: "closing" } : null))
+  const element = stack.value.find((layer) => layer.id === id && layer.state === "closing")?.element
+  if (!element || !kept) return
+  // The exit animation starts a moment after the content is told to close (the next render and style pass), so the
+  // animations are read after that, not now.
+  void nextTick()
+    .then(() => new Promise((resolve) => setTimeout(resolve, ANIMATION_START_MS)))
+    .then(() =>
+      Promise.race([
+        Promise.all((element.getAnimations?.() ?? []).map((animation) => animation.finished.catch(() => undefined))),
+        new Promise((resolve) => setTimeout(resolve, ANIMATION_MAX_MS)),
+      ]),
+    )
+    .then(() => setTimeout(() => updateLayer(id, (layer) => (layer.state === "closing" && layer.element === element ? null : layer)), 0))
 }
 
 function removeLayer(id: number): void {
@@ -83,7 +105,8 @@ function removeLayer(id: number): void {
 }
 
 // Only the top modal layer holds the page inert. The next holder takes it before the last one lets go, so the page is
-// never reachable in between (inert-behind.ts counts holds).
+// never reachable in between (inert-behind.ts counts holds). The watch starts when the kit is first imported and is
+// never stopped, on purpose: it belongs to the page's one list and lives as long as the page does.
 let releaseInert: (() => void) | undefined
 watch(
   () => inertHolder(stack.value)?.element ?? null,
@@ -106,11 +129,11 @@ export interface LayerHandle {
  * For the content of a dialog or menu: lists it as a layer for as long as `open` is true (sync, so it counts before it is
  * drawn), as leaving after that until its `LayerAnchor` leaves the page. Put a `LayerAnchor` inside the content.
  */
-export function useLayer(kind: LayerKind, isOpen: Readonly<Ref<boolean>>, options: { modal?: () => boolean; name?: () => string | undefined } = {}): LayerHandle {
+export function useLayer(kind: LayerKind, isOpen: Readonly<Ref<boolean>>, options: { modal?: () => boolean; name?: () => string | undefined; kept?: () => boolean } = {}): LayerHandle {
   const id = nextId++
   const modal = options.modal ?? (() => true)
   provide(layerKey, id)
-  watch(isOpen, (value) => (value ? openLayer(id, kind, modal(), options.name?.()) : closeLayer(id)), { flush: "sync", immediate: true })
+  watch(isOpen, (value) => (value ? openLayer(id, kind, modal(), options.name?.()) : closeLayer(id, options.kept?.() ?? false)), { flush: "sync", immediate: true })
   watch(modal, (value) => updateLayer(id, (layer) => ({ ...layer, modal: value })), { flush: "sync" })
   onScopeDispose(() => removeLayer(id))
   return { isTop: () => topLayer()?.id === id }
