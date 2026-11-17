@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.86",
+    date: "2026-11-17",
+    title: "Fixes from the pre-1.0 review",
+    notes: [
+      "Copy as picture is off while a picture is saving in the Whiteboard, instead of doing nothing.",
+      "A panel you close for good no longer leaves its saved view behind.",
+      "A card from another panel never stays drawn over the next one.",
+      "Small fixes to German texts (\"noch mal\") and Tavora's safety checks.",
+    ],
+    prs: [
+      { number: 822, title: "Review fixes before 1.0" },
+    ],
+    tags: ["calculator", "catalog", "clock-counter", "hotkeys", "modules", "notes", "pdf-viewer", "privacy", "service", "system-monitor", "todos", "ui-kit", "website", "whiteboard", "workspace"],
+  },
+  {
     version: "0.24.85",
     date: "2026-11-17",
     title: "Calmer tooltips",
