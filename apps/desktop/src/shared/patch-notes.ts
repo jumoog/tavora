@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.87",
+    date: "2026-11-17",
+    title: "Updated parts under the hood",
+    notes: [
+      "Tavora and its modules run on newer versions of the parts they're built from.",
+    ],
+    prs: [
+      { number: 823, title: "Update dependencies before 1.0" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "publishing", "sdk", "system-monitor", "todos", "ui-kit", "website", "whiteboard"],
+  },
+  {
     version: "0.24.86",
     date: "2026-11-17",
     title: "Fixes from the pre-1.0 review",
