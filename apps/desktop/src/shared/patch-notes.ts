@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.88",
+    date: "2026-11-17",
+    title: "Licences and legal pages",
+    notes: [
+      "Settings > Updates & About has a new Legal group: Licences, Privacy, Terms and Imprint.",
+      "Licences lists everything Tavora is built from, with its licence. Search it by name or licence.",
+    ],
+    prs: [
+      { number: 824, title: "Ship third-party licence notices and show them in Settings" },
+    ],
+    tags: ["media", "publishing", "settings", "whiteboard"],
+  },
+  {
     version: "0.24.87",
     date: "2026-11-17",
     title: "Updated parts under the hood",
