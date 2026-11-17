@@ -7,6 +7,13 @@ import { TOOLTIP_DOCUMENT } from "../shared/tooltip-document";
 import { SkinStore } from "./tooltip-skin";
 import { InsertedCss } from "./inserted-css";
 import { fontStylesheet } from "./module-fonts";
+/** How long a card waits for its page to say it drew at its final size before it comes into sight anyway. */
+const REVEAL_WAIT_MS = 120;
+/**
+ * How long a card a module took away stays in sight. Modules hide the card when the pointer leaves an item and show the
+ * next on the next one (or hide it to show it pinned): a card asked for meanwhile takes its place without a blink.
+ */
+const CLOSE_LINGER_MS = 50;
 interface Source {
     root: string;
     /** The module's id: its skins are kept by it. */
@@ -40,6 +47,16 @@ export class TooltipWindow {
     private window: BrowserWindow | undefined;
     private ready = false;
     private size = { width: 520, height: 2000 };
+    /**
+     * `hidden` (no card), `unseen` (shown see-through while the card is laid out, placed and drawn at its final size),
+     * `seen`, or `closing` (a module took it away; it stays in sight for CLOSE_LINGER_MS, and a card that module asks for
+     * meanwhile is `seen` again). The next card takes the place of one in sight without the window being hidden between.
+     */
+    private sight: "hidden" | "unseen" | "seen" | "closing" = "hidden";
+    /** The panel whose card is `closing`, and the end of its stay. */
+    private closing: { owner: string; timer: ReturnType<typeof setTimeout> } | undefined;
+    /** Shows the card anyway if its page never says it drew. */
+    private revealTimer: ReturnType<typeof setTimeout> | undefined;
     // A pinned tooltip stays when Tavora loses focus, so a screen capture (Win+Shift+S) can still take it. It belongs to the
     // Tavora window, so it never floats above other apps; a hover tooltip still closes.
     private onParentBlur = () => { setImmediate(() => { if (!this.state.current?.request.pinned && !this.options.parent.isDestroyed() && !this.options.parent.isFocused() && !this.window?.isFocused())
@@ -62,15 +79,29 @@ export class TooltipWindow {
             return false;
         if (previous && (previous.owner !== owner || previous.request.id !== request.id))
             this.options.closed(previous.owner, previous.request.id);
+        // The card its panel just took away is still in sight: this one takes its place. Another panel's starts unseen.
+        if (this.sight === "closing")
+            this.sight = this.closing?.owner === owner ? "seen" : "hidden";
+        this.endClosing();
         const w = this.ensureWindow();
-        w.hide();
-        w.setIgnoreMouseEvents(!request.pinned || this.options.hidden, { forward: true });
-        w.setFocusable(!!request.pinned && !this.options.hidden);
-        this.size = { width: 520, height: 2000 };
         const content = await withBundleImages(source.root, request.content);
         if (this.state.current !== open)
             return false;
         open.request = { ...open.request, content };
+        if (this.sight !== "seen") {
+            // Beside the new anchor and see-through before it is shown: the page may still hold the last card's frame.
+            clearTimeout(this.revealTimer);
+            this.place();
+            w.setOpacity(0);
+            // Unseen, it takes no clicks or keys: a pinned card becomes one you can use once it is in sight.
+            w.setIgnoreMouseEvents(true, { forward: true });
+            w.setFocusable(false);
+            if (!w.isVisible())
+                w.showInactive();
+            this.sight = "unseen";
+        }
+        else
+            this.takeInput(open);
         if (this.ready)
             this.render(open);
         return true;
@@ -94,14 +125,35 @@ export class TooltipWindow {
         if (sent.length && this.window && !this.window.isDestroyed())
             this.window.webContents.send("tooltip:skin-drop", sent);
     }
-    move(owner: string, id: string, at: TooltipRequest["at"]) { if (this.state.move(owner, id, at))
+    move(owner: string, id: string, at: TooltipRequest["at"], box?: TooltipRequest["box"]) { if (this.state.move(owner, id, at, box))
         this.place(); }
-    close(owner?: string, id?: string, hoverOnly = false) {
+    /** `linger`: a module took the card away; it stays in sight a moment, in case the module shows its next one. */
+    close(owner?: string, id?: string, hoverOnly = false, linger = false) {
         const closed = this.state.close(owner, id, hoverOnly);
         if (!closed)
             return;
-        this.window?.hide();
+        clearTimeout(this.revealTimer);
+        this.endClosing();
+        const w = this.window;
+        if (linger && this.sight === "seen" && w && !w.isDestroyed()) {
+            this.sight = "closing";
+            w.setIgnoreMouseEvents(true, { forward: true });
+            w.setFocusable(false);
+            this.closing = { owner: closed.owner, timer: setTimeout(() => this.hideNow(), CLOSE_LINGER_MS) };
+        }
+        else
+            this.hideNow();
         this.options.closed(closed.owner, closed.request.id);
+    }
+    private hideNow() {
+        this.endClosing();
+        this.sight = "hidden";
+        if (this.window && !this.window.isDestroyed())
+            this.window.hide();
+    }
+    private endClosing() {
+        clearTimeout(this.closing?.timer);
+        this.closing = undefined;
     }
     ensureVisible() { const c = this.state.current; if (c && !this.options.source(c.owner))
         this.close(); }
@@ -145,21 +197,46 @@ export class TooltipWindow {
                 if (typeof args[2] === "number" && Number.isFinite(args[2]))
                     this.size.width = Math.max(120, Math.min(520, Math.ceil(args[2])));
                 this.place();
-                if (this.state.current === c)
-                    w.showInactive();
+                // Its final size (its pictures and letters are in): the page draws it there now (a card in sight stayed
+                // until then), and an unseen one comes into sight once it has.
+                if (args[3] === true) {
+                    w.webContents.send("tooltip:placed", c.serial);
+                    if (this.sight === "unseen") {
+                        clearTimeout(this.revealTimer);
+                        this.revealTimer = setTimeout(() => this.reveal(c), REVEAL_WAIT_MS);
+                    }
+                }
+                return;
             }
+            if (channel === "tooltip:drawn")
+                this.reveal(c);
         });
-        w.webContents.once("render-process-gone", () => { this.close(); this.ready = false; w.destroy(); this.window = undefined; });
+        w.webContents.once("render-process-gone", () => { this.close(); this.hideNow(); this.ready = false; w.destroy(); this.window = undefined; });
         void w.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(TOOLTIP_DOCUMENT)).catch(() => this.close());
         return w;
     }
+    private reveal(open: OpenTooltip) {
+        clearTimeout(this.revealTimer);
+        const w = this.window;
+        if (this.sight !== "unseen" || this.state.current !== open || !w || w.isDestroyed())
+            return;
+        this.sight = "seen";
+        this.takeInput(open);
+        w.setOpacity(this.options.hidden ? 0 : 1);
+    }
+    /** A pinned card takes clicks and keys (its close button, Escape); a hover card lets them through to the panel. */
+    private takeInput(open: OpenTooltip) {
+        const w = this.window!, pinned = !!open.request.pinned && !this.options.hidden;
+        w.setIgnoreMouseEvents(!pinned, { forward: true });
+        w.setFocusable(pinned);
+    }
+    /** Sends the page the card to lay out; the window goes to it once the page has measured it (tooltip:size). */
     private render(open: OpenTooltip) {
         const source = this.options.source(open.owner);
         if (!source) {
             this.close();
             return;
         }
-        this.place();
         // A skin only dresses the card layout; a name the module hasn't defined (yet) shows the plain card. Its data goes
         // over once per page, then the card names it by id.
         const c = open.request.content, skin = c.layout === "card" && c.skin ? this.skins.get(source.module, c.skin) : undefined;
@@ -169,7 +246,7 @@ export class TooltipWindow {
         }
         const theme = this.options.theme();
         void this.fontCss.replace(fontStylesheet(theme.font));
-        this.window!.webContents.send("tooltip:render", { serial: open.serial, content: c, pinned: !!open.request.pinned, pinnable: open.request.pinnable !== false, source: source.name, theme, language: this.options.language(), ...(skin ? { skin: skin.id } : {}) });
+        this.window!.webContents.send("tooltip:render", { serial: open.serial, content: c, pinned: !!open.request.pinned, pinnable: open.request.pinnable !== false, source: source.name, theme, language: this.options.language(), room: this.room(), keep: this.sight === "seen", ...(skin ? { skin: skin.id } : {}) });
     }
     private place() {
         const c = this.state.current, w = this.window;
@@ -180,9 +257,11 @@ export class TooltipWindow {
             this.close();
             return;
         }
-        const area = this.options.parent.getContentBounds();
-        w.setBounds(tooltipBounds({ x: area.x + source.bounds.x + c.request.at.x, y: area.y + source.bounds.y + c.request.at.y }, this.size, area));
+        const area = this.options.parent.getContentBounds(), dx = area.x + source.bounds.x, dy = area.y + source.bounds.y, box = c.request.box;
+        w.setBounds(tooltipBounds({ x: dx + c.request.at.x, y: dy + c.request.at.y }, this.size, area, box && { ...box, x: dx + box.x, y: dy + box.y }));
     }
-    dispose() { this.state.close(); if (this.window && !this.window.isDestroyed())
+    /** The tallest the card can be in the window (tooltipBounds), so the page can tell when to make it compact. */
+    private room() { return Math.max(1, this.options.parent.getContentBounds().height - 16); }
+    dispose() { clearTimeout(this.revealTimer); this.endClosing(); this.sight = "hidden"; this.state.close(); if (this.window && !this.window.isDestroyed())
         this.window.destroy(); this.window = undefined; }
 }
