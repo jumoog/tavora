@@ -1,0 +1,16 @@
+# npm: security fixes only (open-pull-requests-limit 0 turns off version updates; security updates still come), since a
+# bump in a built-in module needs its own version raised. Actions: weekly, grouped into one pull request.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
