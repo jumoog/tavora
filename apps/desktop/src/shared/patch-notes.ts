@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.82",
+    date: "2026-11-17",
+    title: "Tighter safety",
+    notes: [
+      "Tavora checks its app files each time it starts, so a changed copy won't run.",
+      "An OBS overlay stops at once when its module loses access or is removed.",
+    ],
+    prs: [
+      { number: 817, title: "Security: close the gaps before 1.0" },
+    ],
+    tags: ["accounts", "catalog", "cloud-copy", "modules", "overlays", "privacy", "security", "service", "website", "whiteboard"],
+  },
+  {
     version: "0.24.81",
     date: "2026-11-17",
     title: "Even icons",
