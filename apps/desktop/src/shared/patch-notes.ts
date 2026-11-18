@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.89",
+    date: "2026-11-18",
+    title: "Easier to see what you picked",
+    notes: [
+      "In lists and menus where you pick one thing, your choice now has a soft highlight and an edge instead of a small tick.",
+      "It no longer looks like the row under your mouse.",
+    ],
+    prs: [
+      { number: 825, title: "Kit: one chosen-row look for pick-one lists" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.24.88",
     date: "2026-11-17",
     title: "Licences and legal pages",
