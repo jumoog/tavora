@@ -4595,6 +4595,7 @@ export class Host {
       closeRequested: request.closeRequested,
       layoutRequested: request.layoutRequested,
       ended: request.ended,
+      activated: request.activated,
       frameText: request.frameText,
       ...(panel ? { panel } : {}),
     });
@@ -5446,6 +5447,7 @@ export class Host {
           },
         },
         language: () => this.language,
+        theme: () => this.currentTheme,
         changed: () => this.pushStateSoon(),
         overlaysChanged: () => {
           this.syncGameWatcher();
