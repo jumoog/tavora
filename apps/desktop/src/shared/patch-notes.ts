@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.94",
+    date: "2026-11-18",
+    title: "Simpler list over the game",
+    notes: [
+      "Over the game you tick, rename and add to-dos. Everything else stays in the To-Dos panel in Tavora, so no menu gets cut off.",
+    ],
+    prs: [
+      { number: 831, title: "To-Dos: no row menu over the game" },
+    ],
+    tags: ["todos"],
+  },
+  {
     version: "0.24.93",
     date: "2026-11-18",
     title: "Arrange stays open",
