@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.96",
+    date: "2026-11-18",
+    title: "Steadier overlay layer",
+    notes: [
+      "The overlay card no longer jumps around while you drag something in Arrange.",
+      "A panel that is just opening over the game no longer catches a click.",
+    ],
+    prs: [
+      { number: 833, title: "Overlay: batch-review fixes for the quick layer PRs (#829-#832)" },
+    ],
+    tags: ["overlays", "todos"],
+  },
+  {
     version: "0.24.95",
     date: "2026-11-18",
     title: "No flicker when the layer closes",
