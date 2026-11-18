@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.92",
+    date: "2026-11-18",
+    title: "Smoother over the game",
+    notes: [
+      "Opening the layer no longer flashes the full panel first.",
+      "In To-Dos, ⋯ no longer covers a to-do's count.",
+      "No Undo pops up in the middle of your game.",
+    ],
+    prs: [
+      { number: 829, title: "Overlay: no flash of the full panel, ⋯ off the count, no Undo over the game" },
+    ],
+    tags: ["modules", "overlays", "todos"],
+  },
+  {
     version: "0.24.91",
     date: "2026-11-18",
     title: "Overlays ready to use",
