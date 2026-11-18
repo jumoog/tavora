@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.90",
+    date: "2026-11-18",
+    title: "To-dos right over your game",
+    notes: [
+      "Your To-Dos list over the game stays just as it is when you open the layer.",
+      "Tick, rename and add to-dos right there, and find more under ⋯ on a row.",
+      "Panels over the game no longer move or shrink when you open the layer.",
+      "A panel no longer stays zoomed in after it was over the game.",
+    ],
+    prs: [
+      { number: 827, title: "To-Dos: edit the live view in place over the game" },
+    ],
+    tags: ["modules", "overlays", "publishing", "sdk", "todos", "website"],
+  },
+  {
     version: "0.24.89",
     date: "2026-11-18",
     title: "Easier to see what you picked",
