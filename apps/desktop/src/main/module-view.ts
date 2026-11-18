@@ -538,7 +538,7 @@ export class ModuleView {
     contents.on("dom-ready", () => {
       if (this.disposed) return;
       // A new document starts without the style of Tavora's own that fades it over the game.
-      if (this.overGame) this.overGame.css = undefined;
+      this.gameCss = undefined;
       if (this.overGame) void this.applyGameOpacity();
       this.themeCss.forget();
       this.fontCss.forget();
@@ -795,6 +795,7 @@ export class ModuleView {
           if (this.bridge === bridge) this.navigated(requestId, handled, ok);
         },
         isMaximized: () => this.maximized,
+        isOverGame: () => this.overGame !== null,
         setMaximized: async (maximized) => {
           // Covering the other panels takes a click, so a page cannot take over the workspace on its own.
           if (maximized) {
@@ -1310,33 +1311,37 @@ export class ModuleView {
    * with the same bridge; only the look changes (see through, as the user set it) and clicks and keys count as the
    * user's while `arranging()` is true.
    */
-  private overGame: { arranging(): boolean; opacity: Opacity; zoom: number; css: string | undefined } | null = null;
+  private overGame: { arranging(): boolean; opacity: Opacity; zoom: number } | null = null;
+  /**
+   * The style of Tavora's own on the page while over the game (opacity, zoom). Kept here, not with one stay over the game,
+   * so it is always taken off again: a style left behind kept the panel zoomed in its workspace.
+   */
+  private gameCss: string | undefined;
 
   get isOverGame(): boolean {
     return this.overGame !== null;
   }
 
   enterGame(arranging: () => boolean): void {
-    this.overGame = { arranging, opacity: 100, zoom: 1, css: undefined };
+    const was = this.overGame !== null;
+    this.overGame = { arranging, opacity: 100, zoom: 1 };
+    // A stay that never ended (the panel lent again) leaves no style of its own behind.
+    if (was) void this.applyGameOpacity();
     // Without a colour of its own, so the opacity the user chose lets the game show through.
     this.view.setBackgroundColor("#00000000");
     this.refreshBehind();
+    // The page may draw a lighter look of itself there (panel.isOverGame asks the same).
+    if (!was) this.bridge?.emit("panel.overGame", { over: true });
   }
 
   leaveGame(): void {
-    const away = this.overGame;
-    if (!away) return;
+    if (!this.overGame) return;
     this.overGame = null;
     this.refreshBehind();
+    this.bridge?.emit("panel.overGame", { over: false });
     this.view.setBackgroundColor(this.options.getTheme().tokens.background);
     // After any style being set or removed, so the style it inserts last isn't left behind.
-    this.gameOpacityQueue = this.gameOpacityQueue.then(async () => {
-      const contents = this.contents();
-      if (!away.css || !contents) return;
-      const css = away.css;
-      away.css = undefined;
-      await contents.removeInsertedCSS(css).catch(() => undefined);
-    });
+    void this.applyGameOpacity();
   }
 
   /** How much of the panel shows through over the game: a style of Tavora's own on the page, as for overlay pages. */
@@ -1361,11 +1366,15 @@ export class ModuleView {
     this.gameOpacityQueue = this.gameOpacityQueue.then(async () => {
       const away = this.overGame;
       const contents = this.contents();
-      if (!contents || !away) return;
+      if (!contents) return;
       try {
-        if (away.css) await contents.removeInsertedCSS(away.css);
+        const old = this.gameCss;
+        this.gameCss = undefined;
+        if (old) await contents.removeInsertedCSS(old);
+        // Back in its workspace: no style of Tavora's own at all.
+        if (!away) return;
         const rules = [away.opacity === 100 ? "" : `opacity:${away.opacity / 100} !important;`, away.zoom === 1 ? "" : `zoom:${away.zoom} !important;`].join("");
-        away.css = rules ? await contents.insertCSS(`html{${rules}}`, { cssOrigin: "user" }) : undefined;
+        if (rules) this.gameCss = await contents.insertCSS(`html{${rules}}`, { cssOrigin: "user" });
       } catch {
         // The page went away; the next load sets it again.
       }
