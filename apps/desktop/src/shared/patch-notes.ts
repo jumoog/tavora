@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.93",
+    date: "2026-11-18",
+    title: "Arrange stays open",
+    notes: [
+      "Arrange no longer closes the overlay right after you click it.",
+      "The overlay card moves aside so it never covers your panels.",
+    ],
+    prs: [
+      { number: 830, title: "Overlay: Arrange no longer ends the layer; the card keeps off the items" },
+    ],
+    tags: ["overlays"],
+  },
+  {
     version: "0.24.92",
     date: "2026-11-18",
     title: "Smoother over the game",
