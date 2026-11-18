@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.91",
+    date: "2026-11-18",
+    title: "Overlays ready to use",
+    notes: [
+      "Your overlay key now opens everything ready to use: click and type in your panels, with no frames in the way.",
+      "Want to move or resize something? Pick Arrange in the small card at the top. Use takes you back.",
+      "In To-Dos, Keep finished to-dos now also decides what the overlay shows, so ticked to-dos stay there while it's on.",
+    ],
+    prs: [
+      { number: 828, title: "Overlay: layer opens ready to use, Arrange from a Tavora card" },
+    ],
+    tags: ["modules", "overlays", "privacy", "todos", "website"],
+  },
+  {
     version: "0.24.90",
     date: "2026-11-18",
     title: "To-dos right over your game",
