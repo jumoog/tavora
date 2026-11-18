@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.95",
+    date: "2026-11-18",
+    title: "No flicker when the layer closes",
+    notes: [
+      "Closing the overlay layer no longer flashes your list as it was before your changes.",
+    ],
+    prs: [
+      { number: 832, title: "Overlay: live views stay current while the layer is open" },
+    ],
+    tags: ["overlays"],
+  },
+  {
     version: "0.24.94",
     date: "2026-11-18",
     title: "Simpler list over the game",
