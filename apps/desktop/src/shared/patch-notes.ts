@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.98",
+    date: "2026-11-19",
+    title: "Whole board as an image",
+    notes: [
+      "Copy as image and Save as image on a whiteboard always take the whole board, pictures included.",
+    ],
+    prs: [
+      { number: 835, title: "Whiteboard: Copy and Save as image take the whole board" },
+    ],
+    tags: ["whiteboard"],
+  },
+  {
     version: "0.24.97",
     date: "2026-11-19",
     title: "Your layout stays put",
