@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.97",
+    date: "2026-11-19",
+    title: "Your layout stays put",
+    notes: [
+      "A tab you pick or a panel you move just before closing Tavora is now kept.",
+      "Panels of a module Tavora can't find right now (a folder not connected yet) now wait for it instead of disappearing.",
+    ],
+    prs: [
+      { number: 826, title: "Keep the layout on quit and panels whose module Tavora can't see" },
+    ],
+    tags: ["workspace"],
+  },
+  {
     version: "0.24.96",
     date: "2026-11-18",
     title: "Steadier overlay layer",
