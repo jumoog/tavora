@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.99",
+    date: "2026-11-19",
+    title: "Boards open where you left them",
+    notes: [
+      "After a restart, a whiteboard opens just as you left it instead of pushed to the top-left.",
+      "Where you moved the style palette is kept after a restart too.",
+    ],
+    prs: [
+      { number: 836, title: "Whiteboard: a board opens after a restart just as it was left" },
+    ],
+    tags: ["whiteboard"],
+  },
+  {
     version: "0.24.98",
     date: "2026-11-19",
     title: "Whole board as an image",
