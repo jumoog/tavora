@@ -28,6 +28,17 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.100",
+    date: "2026-11-19",
+    title: "The tab you picked stays picked",
+    notes: [
+      "Coming back to a workspace shows the tab you picked last, even when another panel's page grabs the keyboard as it loads.",
+    ],
+    prs: [
+      { number: 837, title: "Keep a picked tab when a back tab's page takes the focus" },
+    ],
+  },
+  {
     version: "0.24.99",
     date: "2026-11-19",
     title: "Boards open where you left them",
