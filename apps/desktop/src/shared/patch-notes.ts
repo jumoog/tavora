@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.105",
+    date: "2026-11-20",
+    title: "Overlays stay in OBS",
+    notes: [
+      "Your OBS overlay links keep working. An overlay can't leave its page in OBS any more, so it can't take anything off your PC that way.",
+      "An overlay starts with fresh saved data once. If one looks stuck after the update, press Refresh on its Browser Source in OBS.",
+      "When a Browser page wants to take you to a site you sign in to for all workspaces, or away from one, without a click, it asks first. Press Open to go there, or stay on the page.",
+    ],
+    prs: [
+      { number: 845, title: "Security: OBS overlays in a sandboxed frame, Browser session switch only after a click" },
+    ],
+    tags: ["browser", "overlays", "privacy", "publishing", "sdk", "security", "website", "workspace"],
+  },
+  {
     version: "0.24.104",
     date: "2026-11-20",
     title: "Your keys and saves stay yours",
