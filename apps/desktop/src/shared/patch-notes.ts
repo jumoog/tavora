@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.101",
+    date: "2026-11-20",
+    title: "A fresh start for empty workspaces",
+    notes: [
+      "An empty workspace shows modules to add with one click: the game's own first, then Browser, Notes and To-Dos.",
+      "A game with more modules than fit shows how many more there are. One click opens them in the library.",
+      "A game's modules you already have show up there too, and open with one click.",
+      "Layouts get their own spot below, so starting with a layout is just as easy.",
+    ],
+    prs: [
+      { number: 838, title: "Empty workspace: one-click module tiles, layouts below" },
+    ],
+    tags: ["privacy", "ui-kit", "website", "workspace"],
+  },
+  {
     version: "0.24.100",
     date: "2026-11-19",
     title: "The tab you picked stays picked",
