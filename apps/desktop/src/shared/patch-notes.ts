@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.102",
+    date: "2026-11-20",
+    title: "Steadier saving",
+    notes: [
+      "A module that keeps changing its tab text can't slow Tavora down or hold up your saves any more.",
+    ],
+    prs: [
+      { number: 840, title: "Security: coalesce panel saves, keep leaked keys leaked, show the signer's diff" },
+    ],
+    tags: ["accounts", "catalog", "privacy", "publishing", "security", "service", "website", "workspace"],
+  },
+  {
     version: "0.24.101",
     date: "2026-11-20",
     title: "A fresh start for empty workspaces",
