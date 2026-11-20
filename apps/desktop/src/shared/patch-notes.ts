@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.108",
+    date: "2026-11-21",
+    title: "Your keys stay with your account",
+    notes: [
+      "Signed out from another device? Your recovery key and publisher keys wait on this PC for you. Someone else who signs in here gets their own and never sees yours.",
+      "Sign out removes only your own keys. With your cloud copy in a folder, your key stays for it: only the saved publisher keys go.",
+      "Your cloud copy pauses while someone else is signed in. If they turn on a cloud copy of their own here, yours stays off until you turn it on again.",
+      "When a development folder takes over a module, its tabs in other workspaces start fresh too, and the module's own saves wait for it.",
+    ],
+    prs: [
+      { number: 851, title: "Security: account keys stay with their account, panel owner handover for closed panels" },
+    ],
+    tags: ["accounts", "cloud-copy", "modules", "privacy", "publishing", "website", "workspace"],
+  },
+  {
     version: "0.24.107",
     date: "2026-11-20",
     title: "Browser asks, overlays stay framed",
