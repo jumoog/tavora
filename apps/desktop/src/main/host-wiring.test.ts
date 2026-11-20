@@ -30,6 +30,34 @@ describe("host.ts", () => {
     expect(body(/async flush\(\): Promise<void> \{/)).toContain("this.workspaces.flush();");
   });
 
+  it("gives a panel only the grants of the owner its page runs as, and restarts panels whose module changed owner", () => {
+    const view = body(/private createView\(/);
+    expect(view).toContain("networkHosts: () => this.networkHostsOf(module),");
+    expect(view).toContain("connectors: () => this.connectorsOf(module),");
+    expect(body(/private networkHostsOf\(/)).toContain("sameOwner(module, this.modules)");
+    expect(body(/private connectorsOf\(/)).toContain("sameOwner(module, this.modules)");
+    expect(body(/private folderHostOf\(/)).toContain("sameOwner(module, this.modules)");
+    const reload = body(/private async reloadModules\(\)/);
+    expect(reload).toContain("viewsOfAnotherOwner(this.moduleViews(), modules)");
+    // In place: closing for good would forget the panel's bounds, and the host UI sends none while they don't change.
+    expect(reload).toContain("this.panels.restart(view.instanceId);");
+    expect(reload).not.toContain("this.panels.close(view.instanceId);");
+    expect(reload).toContain("if (restarted.size > 0) this.panels.applyBounds();");
+    // What the old owner's page left is set aside before its page closes.
+    expect(reload.indexOf("this.data.panelState.handOver(view.instanceId, view.owner,")).toBeLessThan(reload.indexOf("this.panels.restart(view.instanceId);"));
+    expect(reload).toContain("delete record.content;");
+    // Panels that waited for the old copy's question still start when the new copy asks nothing.
+    expect(reload).toContain("for (const id of restarted) this.startWaitingPanels(id);");
+    expect(body(/private reloadModuleViews\(/)).toContain("this.startWaitingPanels(moduleId);");
+  });
+
+  it("starts panels again after clearing their storage only when it wasn't cleared just before", () => {
+    const purge = body(/private async purgeModuleStorage\(/);
+    expect(purge).toContain("const restart = this.purges.note(key);");
+    expect(purge).toContain("if (restart) for (const view of views) view.reload();");
+    expect(purge).not.toMatch(/^\s*for \(const view of views\) view\.reload\(\);/m);
+  });
+
   it("deletes a refused update's installer", () => {
     expect(host).toMatch(/onRefused: \(info\) => removeRefusedInstaller\(info, app\.isPackaged\)/);
   });

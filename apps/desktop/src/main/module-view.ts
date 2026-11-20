@@ -501,14 +501,21 @@ export class ModuleView {
     contents.on("focus", () => !this.disposed && this.options.onFocus?.());
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
     contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
+    // A blocked main-frame navigation starts no page: Electron asks these after did-start-navigation counted it.
+    const block = (event: { preventDefault(): void }, mainFrame: boolean) => {
+      event.preventDefault();
+      if (!mainFrame || !this.pendingDocument) return;
+      this.pendingDocument = false;
+      this.documents--;
+    };
     contents.on("will-navigate", (event) => {
-      if (!sameModule(event.url)) event.preventDefault();
+      if (!sameModule(event.url)) block(event, true);
     });
     contents.on("will-frame-navigate", (event) => {
-      if (!sameModule(event.url)) event.preventDefault();
+      if (!sameModule(event.url)) block(event, event.isMainFrame);
     });
     contents.on("will-redirect", (event) => {
-      if (!sameModule(event.url)) event.preventDefault();
+      if (!sameModule(event.url)) block(event, event.isMainFrame);
     });
     contents.on("will-attach-webview", (event) => event.preventDefault());
 
@@ -518,6 +525,8 @@ export class ModuleView {
       if (event.isMainFrame && !event.isSameDocument) {
         // A closed panel's page that goes elsewhere has nothing more to save here.
         if (this.disposed) return this.closeNow();
+        this.documents++;
+        this.pendingDocument = true;
         this.lastConnect = 0;
         this.disconnect();
         this.setStatus("loading");
@@ -527,6 +536,8 @@ export class ModuleView {
     // The module's own files are served by the protocol handler, so an
     // error status means the entry page is missing or unreadable.
     contents.on("did-navigate", (_event, url, httpResponseCode) => {
+      // The page counted at its start is there now: nothing can take it back.
+      this.pendingDocument = false;
       if (httpResponseCode < 400) return;
       if (this.disposed) return this.closeNow();
       console.warn(`[tavora] module ${module.manifest.id} failed to load ${url}: HTTP ${httpResponseCode}`);
@@ -667,17 +678,26 @@ export class ModuleView {
     this.options.onOpenLink(url);
   }
 
-  /** When the page shown now started loading. */
-  private pageStartedAt = Date.now();
+  /** When this view's first page started loading: the pass of a panel just added counts from here. */
+  private readonly firstPageAt = Date.now();
+  /**
+   * Main-frame pages this view has started (did-start-navigation, the first load too), less those blocked before they
+   * came (will-navigate and the others, which Electron asks after did-start-navigation).
+   */
+  private documents = 0;
+  /** The page counted last has not come yet (did-navigate), so a block can still take it back. */
+  private pendingDocument = false;
   /** Until when this page may open its dialog once without a click (a panel just added), or null. */
   private addPass: { until: number } | null = null;
 
   /**
    * The page asked for its bridge: only a panel the user just added, in the workspace, gets the one dialog without a
-   * click, and only within ADD_DIALOG_MS of its page starting. A reload or any later page gets none.
+   * click, and only its view's first page, within ADD_DIALOG_MS of that page starting. A page that holds back its
+   * hello and loads again later gets none, nor does any later page.
    */
   private startPage(launch: PanelLaunch): void {
-    this.addPass = launch.reason === "add" && !this.overGame && (this.options.mayWelcome?.() ?? true) ? { until: this.pageStartedAt + ADD_DIALOG_MS } : null;
+    const firstPage = this.documents <= 1;
+    this.addPass = launch.reason === "add" && firstPage && !this.overGame && (this.options.mayWelcome?.() ?? true) ? { until: this.firstPageAt + ADD_DIALOG_MS } : null;
   }
 
   /** panel.setDialog: opening takes a click or key press, or the pass of a panel just added (used up either way). */
@@ -694,7 +714,6 @@ export class ModuleView {
   /** Starts counting for a new page: it is hidden until it settles or the cap runs out. */
   private hideUntilSettled(): void {
     if (this.disposed) return;
-    this.pageStartedAt = Date.now();
     this.revealed = false;
     this.firstDrawn = false;
     // Over the game nothing else shows the view again (the host leaves such a panel alone), so it hides and shows itself.
@@ -745,6 +764,15 @@ export class ModuleView {
 
   get moduleId(): string {
     return this.options.module.manifest.id;
+  }
+
+  /** The owner the page runs as (its grants and data are this owner's); a copy of another owner never takes over the view (reload). */
+  get owner(): string {
+    return this.options.module.owner;
+  }
+
+  get workspaceId(): string {
+    return this.options.workspace.id;
   }
 
   /**
@@ -809,7 +837,8 @@ export class ModuleView {
         setLive: (state) => this.options.setLive(state),
         workspace,
         data,
-        panelState,
+        // Its state is kept as the owner it runs as: another owner's copy of the module under its id never reads it.
+        panelState: { get: (id) => panelState.get(id, module.owner), set: (id, value) => panelState.set(id, value, module.owner) },
         appSettings: this.options.appSettings,
         appBlobs: this.options.appBlobs,
         aiUsage: this.options.aiUsage,
