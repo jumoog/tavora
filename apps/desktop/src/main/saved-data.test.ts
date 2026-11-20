@@ -4,9 +4,28 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyLibrary } from "./library";
 import { DATA_FILES, keepNewerFile, readGrayscaleText, SavedData, WINDOW_FILE } from "./saved-data";
+import { emptyWorkspaces } from "./workspace";
+
+// Counts the writes per file and keeps their order, so a test can tell what a burst of saves cost.
+const writes = vi.hoisted(() => new Map<string, number>());
+const order = vi.hoisted(() => [] as string[]);
+vi.mock("./fsutil", async (original) => {
+  const actual = await original<typeof import("./fsutil")>();
+  return {
+    ...actual,
+    writeFileAtomic: (file: string, ...rest: unknown[]) => {
+      const name = path.basename(file);
+      writes.set(name, (writes.get(name) ?? 0) + 1);
+      order.push(name);
+      return (actual.writeFileAtomic as (...args: unknown[]) => Promise<void>)(file, ...rest);
+    },
+  };
+});
 
 let dir: string;
 beforeEach(async () => {
+  writes.clear();
+  order.length = 0;
   dir = await mkdtemp(path.join(tmpdir(), "tavora-saved-"));
 });
 afterEach(async () => {
@@ -52,6 +71,70 @@ describe("SavedData", () => {
     await rm(path.join(dir, "profile.json"), { recursive: true });
     await saved.saveProfile(first.profile);
     expect((await saved.loadProfile()).saved).toBe(true);
+  });
+
+  it("keeps one waiting write per file however fast saves come, and the newest one lands", async () => {
+    const saved = new SavedData(dir);
+    const workspace = emptyWorkspaces(["w"]);
+    const library = emptyLibrary();
+    for (let call = 0; call < 1000; call++) {
+      // Two titles in turn, as a page calling panel.setContent in a loop would.
+      workspace.workspaces.w!.instances = [{ instanceId: "p", moduleId: "m", content: { id: "a", title: call % 2 ? "two" : "one" } }];
+      saved.saveWorkspace(structuredClone(workspace));
+      library.onlineSearch = call % 2 === 1;
+      saved.saveLibrary(library);
+      saved.saveWindow({ bounds: { x: call, y: 0, width: 800, height: 600 }, maximized: false });
+      // Let the writes run now and then, so new saves arrive while one is on its way.
+      if (call % 50 === 0) await new Promise((resolve) => setImmediate(resolve));
+    }
+    await saved.flush();
+    for (const name of ["workspace.json", "library.json", WINDOW_FILE]) expect(writes.get(name)).toBeLessThanOrEqual(21);
+    expect(JSON.parse(await read("workspace.json")).workspaces.w.instances[0].content.title).toBe("two");
+    expect(JSON.parse(await read("library.json")).onlineSearch).toBe(true);
+    expect(JSON.parse(await read(WINDOW_FILE)).bounds.x).toBe(999);
+  });
+
+  it("writes a save that comes in while the same file is being written", async () => {
+    const saved = new SavedData(dir);
+    const library = emptyLibrary();
+    saved.saveLibrary(library);
+    await Promise.resolve();
+    library.onlineSearch = true;
+    saved.saveLibrary(library);
+    await saved.flush();
+    expect(JSON.parse(await read("library.json")).onlineSearch).toBe(true);
+  });
+
+  it("writes in the order of the newest saves: a replaced write moves to the end", async () => {
+    const saved = new SavedData(dir);
+    const library = emptyLibrary();
+    const window = { bounds: { x: 1, y: 2, width: 800, height: 600 }, maximized: false };
+    saved.saveLibrary(library);
+    saved.saveWindow(window);
+    library.onlineSearch = true;
+    saved.saveLibrary(library);
+    await saved.flush();
+    expect(order).toEqual(["window.json", "library.json"]);
+    expect(JSON.parse(await read("library.json")).onlineSearch).toBe(true);
+  });
+
+  it("writes a new save after a failed one", async () => {
+    // The failed write is reported to the log on purpose; keep it out of the test output.
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const saved = new SavedData(dir);
+    const library = emptyLibrary();
+    await mkdir(path.join(dir, "library.json"));
+    saved.saveLibrary(library);
+    saved.saveWindow({ bounds: { x: 1, y: 2, width: 800, height: 600 }, maximized: false });
+    await saved.flush();
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("could not save library"), expect.any(Error));
+    expect(JSON.parse(await read(WINDOW_FILE)).bounds.width).toBe(800);
+    logged.mockRestore();
+    await rm(path.join(dir, "library.json"), { recursive: true });
+    library.onlineSearch = true;
+    saved.saveLibrary(library);
+    await saved.flush();
+    expect(JSON.parse(await read("library.json")).onlineSearch).toBe(true);
   });
 
   it("copies aside every data file a newer Tavora wrote", async () => {
