@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.106",
+    date: "2026-11-20",
+    title: "Tab names say what's wrong",
+    notes: [
+      "Renaming a tab with an empty name keeps telling you why, even when the tabs move or scroll.",
+    ],
+    prs: [
+      { number: 848, title: "Kit TabStrip: a scroll hides the rename message's card, not the error" },
+    ],
+    tags: ["pdf-viewer", "ui-kit"],
+  },
+  {
     version: "0.24.105",
     date: "2026-11-20",
     title: "Your overlay, your way",
