@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.103",
+    date: "2026-11-20",
+    title: "Safer panels",
+    notes: [
+      "A panel that keeps overfilling its storage now stays stopped until you reload it, open its workspace again or restart Tavora.",
+      "A panel's welcome opens by itself only right after you add it, never on a later load.",
+      "When a project folder takes over an installed module, its open panels start again from the project.",
+      "Files and pictures a module saves can't get a name Windows keeps for itself, like NUL.txt.",
+    ],
+    prs: [
+      { number: 842, title: "Security: owner-bound grants, first-page welcome pass, purge loop stop, device names" },
+    ],
+    tags: ["modules", "privacy", "publishing", "security", "website", "workspace"],
+  },
+  {
     version: "0.24.102",
     date: "2026-11-20",
     title: "Steadier saving",
