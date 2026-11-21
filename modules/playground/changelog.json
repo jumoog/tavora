@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.1.57",
+    "date": "2026-11-20",
+    "notes": [
+      "Style and Theme pickers show every control in Hardware and Liquid Glass."
+    ]
+  },
+  {
     "version": "0.1.56",
     "date": "2026-11-20",
     "notes": [

@@ -7,7 +7,7 @@
 import { readdir, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { isModuleId, isReleaseVersion, needsNewerTavora } from "@tavora/module-schema";
-import { DEFAULT_THEME_FONT, OPTIONAL_THEME_TOKENS, THEME_TOKENS, type TavoraTheme, type ThemeFont, type ThemeToken, type ToastPosition } from "@tavora/sdk/protocol";
+import { DEFAULT_THEME_FONT, OPTIONAL_THEME_TOKENS, THEME_TOKENS, type TavoraStyle, type TavoraTheme, type ThemeFont, type ThemeToken, type ToastPosition } from "@tavora/sdk/protocol";
 import { THEME } from "./games";
 import { compareModuleVersions } from "../shared/module-version";
 import { OFFICIAL_PREFIX, type Provenance } from "./registry";
@@ -202,6 +202,60 @@ export function contrastProblems(variation: Pick<ThemeVariation, "colors" | "con
     if (ratio < needed) problems.push(`${fore} on ${back} has a contrast of ${ratio.toFixed(2)}:1 and needs ${needed}:1`);
   }
   return problems;
+}
+
+// ── Glass ────────────────────────────────────────────────────────────────
+
+/** `a` over `b` at `amount` (0 to 1), as CSS color-mix(in srgb, a amount, b) draws it: both #rrggbb. */
+export function mixed(a: string, b: string, amount: number): string {
+  const channel = (offset: number) => Math.round(parseInt(a.slice(offset, offset + 2), 16) * amount + parseInt(b.slice(offset, offset + 2), 16) * (1 - amount));
+  return `#${[1, 3, 5].map((offset) => channel(offset).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
+ * What can show through a glass surface: the window's background and the brightest spots of the soft colour field the
+ * glass look paints behind everything (dock.css --style-field: primary and info at 30 %, success and warning at 26 %).
+ */
+function glassBackdrops(colors: Record<ThemeToken, string>): string[] {
+  const field: [ThemeToken, number][] = [["primary", 0.3], ["info", 0.3], ["success", 0.26], ["warning", 0.26]];
+  return [colors.background, ...field.map(([token, amount]) => mixed(colors[token], colors.background, amount))];
+}
+
+/** The pairs drawn on glass: text and lines on the rail, the panel frames and cards, and menus and dialogs. */
+const GLASS_PAIRS: Pair[] = [
+  ["foreground", "rail", "text"],
+  ["card-foreground", "card", "text"],
+  ["muted-foreground", "card", "text"],
+  ["primary", "card", "text"],
+  ["destructive", "card", "text"],
+  ["ring", "card", "non-text"],
+  ["popover-foreground", "popover", "text"],
+];
+
+/**
+ * The pairs below the ratio they need when the surfaces are glass at `opacity`, each measured on the mixed colour over
+ * every backdrop (`glassBackdrops`). The blur and its saturation are left out: they move colours a little, never much.
+ */
+export function glassProblems(variation: Pick<ThemeVariation, "colors" | "contrast">, opacity: number): string[] {
+  const problems: string[] = [];
+  const backdrops = glassBackdrops(variation.colors);
+  for (const [fore, back, kind] of GLASS_PAIRS) {
+    const needed = kind === "non-text" ? NON_TEXT : variation.contrast === "high" ? TEXT_AAA : TEXT_AA;
+    const worst = Math.min(...backdrops.map((backdrop) => contrast(variation.colors[fore], mixed(variation.colors[back], backdrop, opacity))));
+    if (worst < needed) problems.push(`${fore} on glass ${back} has a contrast of ${worst.toFixed(2)}:1 and needs ${needed}:1`);
+  }
+  return problems;
+}
+
+/**
+ * The glass opacity a theme variation gets with a style: the style's own, raised in steps of 0.01 until every glass pair
+ * passes. At 1 the glass is the solid colour, which the theme's own check passed, so every pairing works.
+ */
+export function glassOpacity(variation: Pick<ThemeVariation, "colors" | "contrast">, opacity: number): number {
+  for (let step = Math.round(Math.max(0, Math.min(1, opacity)) * 100); step < 100; step++) {
+    if (glassProblems(variation, step / 100).length === 0) return step / 100;
+  }
+  return 1;
 }
 
 // ── Validation ───────────────────────────────────────────────────────────
@@ -402,7 +456,11 @@ export async function discoverThemes({ official = [], local = [] }: ThemeSources
   return { themes, problems, hints };
 }
 
-async function candidates(dir: string): Promise<string[]> {
+/**
+ * The package folders in a directory: the directory itself when it has the manifest, else its direct children that have
+ * one, by name. Styles (styles.ts) are found the same way with their own manifest.
+ */
+export async function candidates(dir: string, manifest: string = THEME_MANIFEST): Promise<string[]> {
   let root: string;
   try {
     root = await realpath(dir);
@@ -411,7 +469,7 @@ async function candidates(dir: string): Promise<string[]> {
   }
   const hasManifest = async (folder: string) => {
     try {
-      return (await stat(path.join(folder, THEME_MANIFEST))).isFile();
+      return (await stat(path.join(folder, manifest))).isFile();
     } catch {
       return false;
     }
@@ -460,17 +518,43 @@ export function resolveTheme(
   return { theme: fallback, variation: systemMode ? variationForMode(fallback, saved.id, systemMode) : saved };
 }
 
-/** What modules get through ui.getTheme and the ui.theme event, with where the user wants toasts and the font they picked. */
-export function moduleTheme(variation: ThemeVariation, toasts: ToastPosition = "bottom-center", font: ThemeFont = DEFAULT_THEME_FONT): TavoraTheme {
+/**
+ * What modules get through ui.getTheme and the ui.theme event, with where the user wants toasts, the font in use and the
+ * design style (styles.ts; left out, the theme has none, as from a Tavora before styles).
+ */
+export function moduleTheme(variation: ThemeVariation, toasts: ToastPosition = "bottom-center", font: ThemeFont = DEFAULT_THEME_FONT, style?: TavoraStyle): TavoraTheme {
   const { colors } = variation;
   return {
     mode: variation.mode,
-    colors: { background: colors.background, surface: colors.card, text: colors.foreground, textMuted: colors["muted-foreground"], accent: colors.primary },
+    colors: themeSummary(colors),
     tokens: { ...colors },
     radius: variation.radius,
     toasts,
     font: { ...font },
+    ...(style ? { style: { ...style, looks: { ...style.looks }, values: { ...style.values } } } : {}),
   };
+}
+
+const themeSummary = (colors: Record<ThemeToken, string>): TavoraTheme["colors"] => ({
+  background: colors.background,
+  surface: colors.card,
+  text: colors.foreground,
+  textMuted: colors["muted-foreground"],
+  accent: colors.primary,
+});
+
+/**
+ * The theme module panels get, from the one the host page shows. A style whose content is set in (`looks.content`
+ * "inset") shows a light variation's panels as screens in the theme's dark colours: the dark variation of the same
+ * contrast, else the first dark one. A theme without a dark variation, or a dark variation in use, changes nothing.
+ * Browser pages keep the host's theme (docs/features/style-system.md, "Inset content").
+ */
+export function insetPanelTheme(theme: ThemePackage, variation: ThemeVariation, host: TavoraTheme): TavoraTheme {
+  if (host.style?.looks.content !== "inset" || variation.mode !== "light") return host;
+  const darks = theme.variations.filter((item) => item.mode === "dark");
+  const dark = darks.find((item) => item.contrast === variation.contrast) ?? darks[0];
+  if (!dark) return host;
+  return { ...host, mode: "dark", colors: themeSummary(dark.colors), tokens: { ...dark.colors } };
 }
 
 // ── A starter for the user's own theme ─────────────────────────────────

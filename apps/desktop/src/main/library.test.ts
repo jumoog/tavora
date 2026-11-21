@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { addOrRestoreWorkspace, gameCopyFinder } from "./game-copy";
 import {
   addWorkspace,
+  switchStyle,
+  MAX_STYLE_THEMES,
   iconFileShared,
   createFolder,
   deleteFolder,
@@ -208,14 +210,92 @@ describe("adding games", () => {
     expect(sanitizeLibrary({ autoUpdate: "no" }).autoUpdate).toBe(true);
   });
 
-  it("keeps the interface font's id, also one this Tavora doesn't know, and leaves it out for Inter", () => {
+  it("keeps the interface font's id, also one this Tavora doesn't know, and Inter as the user's own pick", () => {
     expect(sanitizeLibrary({ font: "saira" }).font).toBe("saira");
     // A font a newer Tavora has: kept, so it comes back there; this one shows Inter meanwhile.
     expect(sanitizeLibrary({ font: "future-font" }).font).toBe("future-font");
+    // No font is "Style default".
     expect(sanitizeLibrary({}).font).toBeUndefined();
-    // Inter is what no font means, so it is left out like the default it is.
-    expect(sanitizeLibrary({ font: "inter" }).font).toBeUndefined();
+    // Inter is an override too: in a style with another font it is the user's own pick.
+    expect(sanitizeLibrary({ font: "inter" }).font).toBe("inter");
     for (const bad of ["Saira", "../x", "", 3, null]) expect(sanitizeLibrary({ font: bad }).font, String(bad)).toBeUndefined();
+  });
+
+  it("keeps the design style, left out for Classic, and one this Tavora doesn't have", () => {
+    expect(sanitizeLibrary({}).styleId).toBeUndefined();
+    expect("styleId" in sanitizeLibrary({})).toBe(false);
+    expect(sanitizeLibrary({ styleId: "tavora.hardware" }).styleId).toBe("tavora.hardware");
+    // A style a newer Tavora has: kept, so it comes back there; this one shows Classic meanwhile.
+    expect(sanitizeLibrary({ styleId: "community.future" }).styleId).toBe("community.future");
+    expect(sanitizeLibrary({ styleId: "tavora.classic" }).styleId).toBeUndefined();
+    for (const bad of ["Hardware", "../x", "", 3, null]) expect(sanitizeLibrary({ styleId: bad }).styleId, String(bad)).toBeUndefined();
+  });
+
+  it("gives each style its own theme: a style never used starts with its first, and going back brings the last one", () => {
+    const installed = new Set(["tavora.default", "tavora.nightfall", "tavora.hardware", "tavora.glass", "tavora.nothing"]);
+    const go = (from: string, to: string, first: string) => switchStyle(library, { from, to, first: { id: first, variation: "dark" }, hasTheme: (id) => installed.has(id) });
+    const library = emptyLibrary();
+    library.theme = { id: "tavora.nightfall", variation: "light" };
+    go("tavora.classic", "tavora.hardware", "tavora.hardware");
+    expect([library.styleId, library.theme]).toEqual(["tavora.hardware", { id: "tavora.hardware", variation: "dark" }]);
+    library.theme = { id: "tavora.nothing", variation: "dark" };
+    go("tavora.hardware", "tavora.glass", "tavora.glass");
+    expect(library.theme).toEqual({ id: "tavora.glass", variation: "dark" });
+    // Back to Classic: the theme it had before styles; back to Hardware: the one picked there, not its first.
+    go("tavora.glass", "tavora.classic", "tavora.default");
+    expect([library.styleId, library.theme]).toEqual([undefined, { id: "tavora.nightfall", variation: "light" }]);
+    go("tavora.classic", "tavora.hardware", "tavora.hardware");
+    expect(library.theme).toEqual({ id: "tavora.nothing", variation: "dark" });
+    // Picking the style in use changes nothing.
+    go("tavora.hardware", "tavora.hardware", "tavora.hardware");
+    expect(library.theme).toEqual({ id: "tavora.nothing", variation: "dark" });
+    // A remembered theme that is gone: the style's own first theme instead.
+    installed.delete("tavora.glass");
+    library.styleThemes = { ...library.styleThemes, "tavora.glass": { id: "tavora.gone", variation: "dark" } };
+    go("tavora.hardware", "tavora.glass", "tavora.glass");
+    expect(library.theme).toEqual({ id: "tavora.glass", variation: "dark" });
+  });
+
+  it("remembers the theme under the style shown, and keeps the newest when the list is full", () => {
+    // A saved style that isn't installed shows Classic: picking Classic clears it and keeps the theme.
+    const library = emptyLibrary();
+    library.styleId = "tavora.rabbit";
+    library.theme = { id: "tavora.nightfall", variation: "dark" };
+    switchStyle(library, { from: "tavora.classic", to: "tavora.classic", first: { id: "tavora.default", variation: "dark" }, hasTheme: () => true });
+    expect([library.styleId, library.theme.id]).toEqual([undefined, "tavora.nightfall"]);
+    // The style just left is never the one dropped.
+    library.styleThemes = Object.fromEntries(Array.from({ length: MAX_STYLE_THEMES }, (_, i) => [`local.s${i}`, { id: "tavora.default", variation: "dark" }]));
+    library.styleId = "local.s0";
+    switchStyle(library, { from: "local.s0", to: "tavora.hardware", first: { id: "tavora.hardware", variation: "dark" }, hasTheme: () => true });
+    expect(Object.keys(library.styleThemes ?? {})).toHaveLength(MAX_STYLE_THEMES);
+    expect(library.styleThemes?.["local.s0"]?.id).toBe("tavora.nightfall");
+  });
+
+  it("keeps each style's theme across a save, left out while no style was switched, and drops broken entries", () => {
+    expect("styleThemes" in sanitizeLibrary({})).toBe(false);
+    const saved = sanitizeLibrary({ styleThemes: { "tavora.hardware": { id: "tavora.hardware", variation: "dark" }, "../x": { id: "a.b", variation: "dark" }, "tavora.glass": { id: 3 } } });
+    expect(saved.styleThemes).toEqual({ "tavora.hardware": { id: "tavora.hardware", variation: "dark" } });
+    expect(sanitizeLibrary(JSON.parse(JSON.stringify(saved))).styleThemes).toEqual(saved.styleThemes);
+  });
+
+  it("takes a corner radius from 0 to 16 over the style's, and null for the style's", () => {
+    for (const radius of [0, 3, 6, 12, 16]) expect(sanitizeLibrary({ radius }).radius, String(radius)).toBe(radius);
+    for (const bad of [-1, 17, 6.5, "8", undefined]) expect(sanitizeLibrary({ radius: bad }).radius, String(bad)).toBeNull();
+  });
+
+  it("reads a library from before styles as it looked: Classic, the theme's radius or the user's, the font as saved", () => {
+    const old = sanitizeLibrary({ theme: { id: "tavora.nightfall", variation: "light" }, followSystem: false, radius: 6, font: "allo", panelStyle: "folders" });
+    expect([old.styleId, old.radius, old.font, old.panelStyle, old.theme.id]).toEqual([undefined, 6, "allo", "folders", "tavora.nightfall"]);
+    const plain = sanitizeLibrary({ radius: null });
+    expect([plain.styleId, plain.radius, plain.font]).toEqual([undefined, null, undefined]);
+  });
+
+  it("writes what a Tavora from before styles reads back: the style is an extra field it keeps", () => {
+    const now = sanitizeLibrary({ styleId: "tavora.hardware", radius: 4, font: "saira" });
+    const json = JSON.parse(JSON.stringify(now)) as Record<string, unknown>;
+    expect([json.styleId, json.radius, json.font]).toEqual(["tavora.hardware", 4, "saira"]);
+    // The previous version's reader keeps fields it doesn't know (unknownFields) and reads radius and font as before.
+    expect(sanitizeLibrary(json).styleId).toBe("tavora.hardware");
   });
 
   it("marks running games by default and keeps only a real choice", () => {

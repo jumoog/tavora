@@ -356,3 +356,173 @@
     box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--foreground) 30%, transparent);
   }
 }
+
+/* ---------- Styles other than Classic (docs/features/style-system.md) ----------
+   theme.ts sets data-style and data-look-* on <html>; host.ts puts every style but Classic on the Framed layout, so
+   these only restyle Framed. The module body's corner is the style's radius; main/ rounds the native view to match. */
+:root[data-style]:not([data-style="tavora.classic"]) {
+  --panel-body-radius: var(--radius);
+}
+:root[data-style]:not([data-style="tavora.classic"]) .dockview-theme-tavora {
+  --dv-tabs-and-actions-container-font-size: var(--text-sm);
+}
+
+/* Surfaces. Raised: each panel is a casing with a top light and a cast shadow, on a plain canvas. */
+:root[data-look-surface="raised"] {
+  --panel-canvas: var(--background);
+}
+:root[data-look-surface="raised"] .dockview-theme-tavora .dv-groupview,
+:root[data-look-surface="raised"] .dockview-theme-tavora .dv-groupview.dv-active-group {
+  background: linear-gradient(color-mix(in srgb, white 4%, var(--card)), var(--card));
+  border: var(--style-border-width, 1px) solid color-mix(in srgb, var(--foreground) 10%, var(--border));
+  box-shadow: var(--style-bevel), var(--style-cast), 0 10px 22px -12px color-mix(in srgb, black 30%, transparent);
+}
+:root[data-look-surface="raised"] .dockview-theme-tavora .dv-groupview.dv-active-group {
+  border-color: color-mix(in srgb, var(--foreground) 24%, var(--border));
+}
+:root[data-look-surface="raised"] [data-testid="rail"] {
+  box-shadow: inset -1px 0 0 color-mix(in srgb, white 40%, transparent);
+}
+
+/* Glass: a soft colour field from the theme's own colours behind everything (kept out of the top right, where Windows
+   draws its title buttons on one solid colour); the rail and the panel frames are glass
+   over it. Panel content stays solid (a module cannot see behind its own view). */
+:root[data-look-surface="glass"] {
+  --style-field:
+    radial-gradient(45% 55% at 8% 18%, color-mix(in srgb, var(--primary) 50%, transparent), transparent 72%),
+    radial-gradient(45% 55% at 94% 72%, color-mix(in srgb, var(--info) 48%, transparent), transparent 72%),
+    radial-gradient(50% 50% at 62% 104%, color-mix(in srgb, var(--success) 42%, transparent), transparent 72%),
+    radial-gradient(40% 45% at 22% 94%, color-mix(in srgb, var(--warning) 40%, transparent), transparent 72%),
+    var(--background);
+  --glass-edge: color-mix(in srgb, white 55%, transparent);
+  --glass-light: color-mix(in srgb, white 70%, transparent);
+}
+:root.dark[data-look-surface="glass"] {
+  --glass-edge: color-mix(in srgb, white 12%, transparent);
+  --glass-light: color-mix(in srgb, white 14%, transparent);
+}
+:root[data-look-surface="glass"] body {
+  background: var(--style-field);
+}
+:root[data-look-surface="glass"] .workspace-canvas {
+  background: transparent;
+}
+:root[data-look-surface="glass"] [data-testid="rail"] {
+  background: color-mix(in srgb, var(--rail) calc(var(--style-glass-opacity, 0.72) * 100%), transparent);
+  backdrop-filter: blur(30px) saturate(1.5);
+  border-color: var(--glass-edge);
+}
+:root[data-look-surface="glass"] .dockview-theme-tavora .dv-groupview,
+:root[data-look-surface="glass"] .dockview-theme-tavora .dv-groupview.dv-active-group {
+  background: color-mix(in srgb, var(--card) calc(var(--style-glass-opacity, 0.72) * 100%), transparent);
+  backdrop-filter: blur(28px) saturate(1.6);
+  border: var(--style-border-width, 1px) solid var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-light), 0 14px 32px -16px color-mix(in srgb, black 35%, transparent);
+}
+:root[data-look-surface="glass"] .dockview-theme-tavora .dv-groupview.dv-active-group {
+  background: color-mix(in srgb, var(--card) calc(min(1, var(--style-glass-opacity, 0.72) + 0.12) * 100%), transparent);
+}
+
+/* Tabs. Keycap: small keys in the row; the open tab of the panel you work in is pressed in (inverted). */
+:root[data-look-tabs="keycap"] .dockview-theme-tavora .dv-tabs-container {
+  align-items: center;
+  gap: 4px;
+}
+:root[data-look-tabs="keycap"] .dockview-theme-tavora .dv-tab {
+  height: calc(var(--dv-tabs-and-actions-container-height) - 12px);
+  border-radius: var(--radius-sm);
+  --tab-divider: 0 0 transparent;
+  --tab-line: 0 0 transparent;
+}
+:root[data-look-tabs="keycap"] .dockview-theme-tavora .dv-tab:hover {
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+:root[data-look-tabs="keycap"] .dockview-theme-tavora .dv-tab.dv-active-tab {
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+:root[data-look-tabs="keycap"] .dockview-theme-tavora .dv-groupview.dv-active-group .dv-tab.dv-active-tab {
+  background: var(--foreground);
+  color: var(--background);
+  box-shadow: 0 1px 0 color-mix(in srgb, black 30%, transparent);
+}
+
+/* Pill (outside Classic, whose tabs stay as they are): rounded tabs straight on the frame, no box around the row. The
+   open tab of the panel you work in is a raised light tile; in other panels the open tab is only a soft fill. */
+:root[data-look-tabs="pill"][data-style]:not([data-style="tavora.classic"]) .dockview-theme-tavora .dv-tabs-container {
+  align-items: center;
+  gap: 2px;
+}
+:root[data-look-tabs="pill"][data-style]:not([data-style="tavora.classic"]) .dockview-theme-tavora .dv-tab {
+  height: calc(var(--dv-tabs-and-actions-container-height) - 10px);
+  border-radius: var(--radius-md);
+  color: var(--muted-foreground);
+  --tab-divider: 0 0 transparent;
+  --tab-line: 0 0 transparent;
+}
+:root[data-look-tabs="pill"][data-style]:not([data-style="tavora.classic"]) .dockview-theme-tavora .dv-tab:hover {
+  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  color: var(--foreground);
+}
+:root[data-look-tabs="pill"][data-style]:not([data-style="tavora.classic"]) .dockview-theme-tavora .dv-tab.dv-active-tab {
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  color: var(--foreground);
+}
+:root[data-look-tabs="pill"][data-style]:not([data-style="tavora.classic"]) .dockview-theme-tavora .dv-groupview.dv-active-group .dv-tab.dv-active-tab {
+  background: var(--card);
+  box-shadow: 0 0 0 0.5px color-mix(in srgb, black 10%, transparent), 0 1px 3px color-mix(in srgb, black 14%, transparent);
+}
+:root.dark[data-look-tabs="pill"][data-style]:not([data-style="tavora.classic"]) .dockview-theme-tavora .dv-groupview.dv-active-group .dv-tab.dv-active-tab {
+  background: color-mix(in srgb, var(--foreground) 14%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 8%, transparent), 0 1px 3px color-mix(in srgb, black 35%, transparent);
+}
+
+/* Keycap draws no line between tabs, also in the Framed layout (whose own divider rule is more
+   specific than a look's; [data-style] keeps these one step above it). */
+:root[data-look-tabs="keycap"][data-style] .dockview-theme-tavora .dv-tab + .dv-tab {
+  --tab-divider: 0 0 transparent;
+}
+/* Keycap marks the open tab with its fill, never the Framed layout's underline. */
+:root[data-look-tabs="keycap"][data-style] .dockview-theme-tavora .dv-groupview .dv-tab.dv-active-tab {
+  --tab-line: 0 0 transparent;
+}
+
+/* Labels: tab names in small caps, mono. */
+:root[data-look-labels="caps-mono"] .dockview-theme-tavora .dv-tab {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--text-xs);
+}
+:root[data-look-labels="caps-mono"] .dockview-theme-tavora .dv-tab {
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+}
+
+/* Status light: the open tab of the panel you work in has a glowing dot. The tab is a block, not a flex row, so the dot
+   sits on top of it (absolute) in room the tab makes on its left; in the flow it pushed the label below the tab. */
+/* Every tab keeps the light's room, lit or not, so opening a tab never changes its width. */
+:root[data-look-status="led"] .dockview-theme-tavora .dv-tab {
+  position: relative;
+  padding-left: 8px;
+}
+:root[data-look-status="led"] .dockview-theme-tavora .dv-groupview.dv-active-group .dv-tab.dv-active-tab::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 6px var(--primary);
+  pointer-events: none;
+}
+
+/* Content. Inset: the module is a screen set into the panel, with a dark bezel around it (its colours come in dark).
+   Only the bezel: the panel body keeps the theme's background, because Tavora's own parts in it (the Browser's
+   toolbar, update and permission bars) stay in the theme's colours. */
+:root[data-look-content="inset"] .panel-body {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, black 45%, var(--border)),
+    0 0 0 3px color-mix(in srgb, var(--foreground) 5%, transparent);
+}

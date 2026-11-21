@@ -30,7 +30,7 @@ import {
   type WebContents,
   type WebContentsView,
 } from "electron";
-import type { TavoraTheme, TavoraWorkspace } from "@tavora/sdk/protocol";
+import { styleMarks, type TavoraTheme, type TavoraWorkspace } from "@tavora/sdk/protocol";
 import type { IconTone } from "../shared/icon-tone";
 import type { PanelDialogSize } from "./bridge";
 import type { AccountView, ActionResult, AiUsageView, AppearanceView, BrowserCommand, CatalogListResult, CatalogPageResult, CatalogReviews, CatalogReviewsResult, DeveloperLink, InstalledGameView, LegalPage, LicenceList, ModulePageResult, OfficialPublishRun, OfficialPublishView, WorkspaceView, HostViewState, ModuleMenu, OnlineSearchResult, PanelDialog, PanelPlacement, ProfileRanksView, ReleaseStatus, Screen, SteamImportGame, SteamLibraryResult, SteamShareResult, SteamShareView, UnlistedGame } from "../shared/host-api";
@@ -107,6 +107,7 @@ import {
   markIconShared,
   setWorkspaceLabel,
   setRail,
+  switchStyle,
   sortedRoot,
   trashedWorkspaces,
   trashWorkspace,
@@ -118,7 +119,7 @@ import {
 } from "./library";
 import { fontStylesheet } from "./module-fonts";
 import { setOverlayFont } from "./overlay-font";
-import { DEFAULT_FONT_ID, themeFont } from "../shared/ui-fonts";
+import { themeFont } from "../shared/ui-fonts";
 import { moduleBaseCss } from "./module-style";
 import { backupData, backupsDir } from "./backup";
 import { hasLibrary, loadLibrary, SavedData, WORKSPACE_FILE } from "./saved-data";
@@ -215,7 +216,6 @@ import { PurgeCount, viewsInSession } from "./storage-purge";
 import {
   DEFAULT_THEME,
   discoverThemes,
-  moduleTheme,
   resolveTheme,
   variationForMode,
   STARTER_README,
@@ -223,11 +223,13 @@ import {
   THEME_MANIFEST,
   themeManifest,
   veiled,
-  withRadius,
   type InstalledTheme,
   type ThemeHint,
   type ThemeProblem,
 } from "./themes";
+import { appearanceThemes, discoverStyles, resolveStyle, starterStyle, STYLE_MANIFEST, STYLE_README, styleManifest, tavoraStyle, type InstalledStyle, type StyleHint, type StyleProblem } from "./styles";
+import { panelCorners, type PanelCorners } from "./panel-corners";
+import { CLASSIC_STYLE_ID, resolveFontId, resolveRadius } from "../shared/styles";
 import { copyExample, slugOf } from "./example-copy";
 import { writeFileAtomic } from "./fsutil";
 import {
@@ -308,6 +310,8 @@ export interface HostOptions {
   officialThemeDirs: string[];
   /** Development only: more folders of local themes besides the user's own themes folder. */
   themeDirs?: string[];
+  /** Styles that ship with Tavora (styles/ in the repo). Left out, only Classic, as written in code. */
+  officialStyleDirs?: string[];
   rendererDir: string;
   modulePreload: string;
   hostPreload: string;
@@ -416,6 +420,8 @@ interface Prepared {
   openTimes: OpenTimes;
   /** Tavora's emblem for the cover's fire, read once. */
   emblem: string | null;
+  /** The design styles found at start (styles.ts). */
+  styles: Awaited<ReturnType<typeof discoverStyles>>;
 }
 
 export class Host {
@@ -628,8 +634,14 @@ export class Host {
   private catalogTimer: ReturnType<typeof setInterval> | undefined;
   /** Looks for new versions; only in an installed (packaged) app. */
   private updates: UpdateManager | null = null;
-  /** The active theme as modules get it; rebuilt when the theme changes. */
+  /** The active theme as the host page, its windows and Browser pages show it; rebuilt when the theme or style changes. */
   private currentTheme: TavoraTheme;
+  /** The theme module panels get: the host's, except for an inset style in a light variation (styles.ts appearanceThemes). */
+  private panelTheme: TavoraTheme;
+  /** The design styles Tavora has (styles.ts), and the style folders that could not be used. */
+  private styles: Map<string, InstalledStyle>;
+  private styleProblems: StyleProblem[];
+  private styleHints: StyleHint[];
   private windowSaveTimer: ReturnType<typeof setTimeout> | undefined;
   readonly window: BrowserWindow;
   private tooltips:TooltipWindow;
@@ -663,7 +675,12 @@ export class Host {
     this.systemInfo = prepared.systemInfo;
     this.openTimes = prepared.openTimes;
     this.emblem = prepared.emblem;
-    this.currentTheme = moduleTheme(withRadius(resolveTheme(themes, library.theme, library.followSystem ? Host.systemMode(options) : undefined).variation, library.radius), library.toasts, themeFont(library.font));
+    this.styles = prepared.styles.styles;
+    this.styleProblems = prepared.styles.problems;
+    this.styleHints = prepared.styles.hints;
+    const appearance = appearanceThemes(resolveTheme(themes, library.theme, library.followSystem ? Host.systemMode(options) : undefined), resolveStyle(this.styles, library.styleId), library);
+    this.currentTheme = appearance.host;
+    this.panelTheme = appearance.panel;
     setOverlayFont(this.currentTheme.font);
     this.files = new ModuleFilesFolder({
       userData: options.userData,
@@ -816,7 +833,7 @@ export class Host {
         return{root:module.root,module:view.moduleId,name:this.shown(module.manifest).name,bounds};
       }});
     this.watchShortcuts(this.window.webContents);
-    this.cover = new PanelCover({ parent: this.window.contentView, emblem: () => this.emblem, fontCss: (theme) => fontStylesheet(theme.font) });
+    this.cover = new PanelCover({ parent: this.window.contentView, emblem: () => this.emblem, fontCss: (theme) => fontStylesheet(theme.font), radius: () => this.corners().cover });
     // Whatever is added to the window later (panels, the opening cover, the Overlay page) goes below the toasts.
     this.toastView = new ToastView({
       window: this.window,
@@ -902,6 +919,7 @@ export class Host {
     const installed = new Installed(await Host.loadModules(options, library.developmentFolders, safetyLists, official), (manifest) => translateManifest(manifest, Host.languageOf(library, options)));
     const { modules, problems: moduleProblems } = installed;
     const { themes, problems: themeProblems, hints: themeHints } = await discoverThemes(Host.themeSources(options), app.getVersion());
+    const styles = await discoverStyles(Host.styleSources(options));
     // Before any module session or store is opened (S5: data is keyed by owner and id).
     await migrateModuleData(userData, (line) => console.warn(`[tavora] ${line}`), library.moduleFilesFolder ?? defaultFilesRoot(userData)).catch((error: unknown) =>
       console.error("[tavora] moving module data under its owner failed", error),
@@ -964,7 +982,7 @@ export class Host {
     await openTimes.load();
     const emblem = await Host.readEmblem(options);
 
-    const host = new Host(options, { encryptor, signIn, copySync, installed, safetyLists, official, grants, connection, systemInfo, openTimes, emblem }, library, workspaces, profile, windowState, themes, themeProblems, themeHints, savedData);
+    const host = new Host(options, { encryptor, signIn, copySync, installed, safetyLists, official, grants, connection, systemInfo, openTimes, emblem, styles }, library, workspaces, profile, windowState, themes, themeProblems, themeHints, savedData);
     if (ownersNoted) host.workspaces.saveSoon();
     host.openedAtStart = openedTimes(library);
     // Before any module opens, so none sees the pictures half moved.
@@ -1847,6 +1865,11 @@ export class Host {
     return { official: options.officialThemeDirs, local: [path.join(options.userData, "themes"), ...(options.themeDirs ?? [])] };
   }
 
+  /** Tavora's own styles, then the user's own from the styles folder of their data folder, like themes. */
+  private static styleSources(options: HostOptions) {
+    return { official: options.officialStyleDirs ?? [], local: [path.join(options.userData, "styles")] };
+  }
+
   /** The window buttons, in the theme's colours; under a dialog backdrop dimmed like the page around them. */
   private titleBarOverlay() {
     const { background: themeBackground, text } = this.currentTheme.colors;
@@ -1884,17 +1907,19 @@ export class Host {
 
   /** Shows the theme the library names, in the host window, native controls and every open module. */
   private applyTheme(): void {
-    const next = moduleTheme(withRadius(this.currentChoice().variation, this.library.radius), this.library.toasts, themeFont(this.library.font));
-    if (JSON.stringify(next) === JSON.stringify(this.currentTheme)) {
+    const { host: next, panel } = appearanceThemes(this.currentChoice(), this.currentStyle(), this.library);
+    if (JSON.stringify(next) === JSON.stringify(this.currentTheme) && JSON.stringify(panel) === JSON.stringify(this.panelTheme)) {
       this.syncNativeTheme();
       return;
     }
     this.currentTheme = next;
+    this.panelTheme = panel;
     this.syncNativeTheme();
     this.window.setBackgroundColor(next.colors.background);
     this.applyTitleBarOverlay();
     this.toastView.refresh();
-    for (const view of this.nativePanels()) view.applyTheme(next);
+    for (const view of this.nativePanels()) view.applyTheme(view instanceof ModuleView ? panel : next);
+    this.applyCorners();
     this.panels.forgetStandIns();
     // Each keeps its font when it is the same (InsertedCss), so only a new font costs a swap; overlay pages hear a new one.
     setOverlayFont(next.font);
@@ -1907,7 +1932,27 @@ export class Host {
     this.themes = themes;
     this.themeProblems = problems;
     this.themeHints = hints;
+    const styles = await discoverStyles(Host.styleSources(this.options));
+    this.styles = styles.styles;
+    this.styleProblems = styles.problems;
+    this.styleHints = styles.hints;
     this.applyTheme();
+  }
+
+  /** The style the library names; Classic while it is not installed. */
+  private currentStyle() {
+    return resolveStyle(this.styles, this.library.styleId);
+  }
+
+  /** The corners of the native views now (panel-corners.ts): style, panel style and the radius in use. */
+  private corners(): PanelCorners {
+    return panelCorners(this.currentStyle(), this.library.panelStyle, this.currentTheme.radius);
+  }
+
+  /** Rounds every open panel's view, and the cover, to the corners of the style now. */
+  private applyCorners(): void {
+    const corners = this.corners();
+    for (const view of this.nativePanels()) view.setCorners(corners);
   }
 
   /** Writes a copy of the Tavora theme into the themes folder, loads it and shows the folder. */
@@ -1926,6 +1971,32 @@ export class Host {
     // Test runs keep the window hidden and open no file manager.
     if (!this.options.hidden) void shell.openPath(folder(suffix));
     return theme.id;
+  }
+
+  /** Writes a copy of the style in use into the styles folder, loads it and shows the folder. Answers with its id. */
+  private async createStarterStyle(): Promise<string> {
+    const root = path.join(this.options.userData, "styles");
+    await mkdir(root, { recursive: true });
+    const base = this.currentStyle();
+    let suffix = 1;
+    const folder = (n: number) => path.join(root, starterStyle(base, n).id.replace(/^local\./, ""));
+    const taken = (n: number) => this.styles.has(starterStyle(base, n).id) || existsSync(folder(n));
+    while (taken(suffix)) suffix++;
+    const style = starterStyle(base, suffix);
+    await mkdir(folder(suffix));
+    await writeFileAtomic(path.join(folder(suffix), STYLE_MANIFEST), styleManifest(style));
+    await writeFileAtomic(path.join(folder(suffix), "README.txt"), STYLE_README);
+    await this.reloadThemes();
+    // Test runs keep the window hidden and open no file manager.
+    if (!this.options.hidden) void shell.openPath(folder(suffix));
+    return style.id;
+  }
+
+  private async openStylesFolder(): Promise<void> {
+    const dir = path.join(this.options.userData, "styles");
+    await mkdir(dir, { recursive: true });
+    const error = await shell.openPath(dir);
+    if (error) throw new LibraryError("error.openStylesFolder", { problem: error });
   }
 
   private async openThemesFolder(): Promise<void> {
@@ -2684,6 +2755,7 @@ export class Host {
       }),
       "set-panel-style": saved((action) => {
         this.library.panelStyle = action.style;
+        this.applyCorners();
       }),
       // Every open panel moves its toasts at once: the position goes out with the theme.
       "set-toasts": saved((action) => {
@@ -2795,9 +2867,26 @@ export class Host {
         this.library.radius = action.radius;
         this.applyTheme();
       }),
+      // null is "Style default"; any font, Inter too, is the user's own over the style's.
       "set-font": saved((action) => {
-        if (action.font === DEFAULT_FONT_ID) delete this.library.font;
+        if (action.font === null) delete this.library.font;
         else this.library.font = action.font;
+        this.applyTheme();
+      }),
+      // A style that is not installed is kept, like a theme, and shows Classic until it is back.
+      // Each style keeps its own theme: one never used starts with its own first theme (Classic: Tavora's), in the mode
+      // shown now.
+      "set-style": saved((action) => {
+        const picked = this.styles.get(action.styleId)?.style;
+        const firstId = picked?.themes.find((id) => this.themes.has(id)) ?? DEFAULT_THEME.id;
+        const first = this.themes.get(firstId)?.theme;
+        const variation = first ? variationForMode(first, "", this.currentChoice().variation.mode).id : DEFAULT_THEME.variation;
+        switchStyle(this.library, {
+          from: resolveStyle(this.styles, this.library.styleId).id,
+          to: action.styleId,
+          first: { id: firstId, variation },
+          hasTheme: (id) => this.themes.has(id),
+        });
         this.applyTheme();
       }),
       "reset-theme": saved(() => {
@@ -2805,11 +2894,17 @@ export class Host {
         this.library.followSystem = true;
         this.library.radius = null;
         delete this.library.font;
+        delete this.library.styleId;
+        delete this.library.styleThemes;
         this.applyTheme();
       }),
       "reload-themes": () => this.reloadThemes(),
       "open-themes-folder": () => this.openThemesFolder(),
       "create-starter-theme": () => this.createStarterTheme(),
+      // Themes and styles load together, so one Reload finds both.
+      "reload-styles": () => this.reloadThemes(),
+      "open-styles-folder": () => this.openStylesFolder(),
+      "create-starter-style": () => this.createStarterStyle(),
 
       // Profile
       "save-profile": async (action) => {
@@ -4095,7 +4190,8 @@ export class Host {
       hostVersion: app.getVersion(),
       preload: this.options.modulePreload,
       devTools: this.options.devTools,
-      getTheme: () => this.currentTheme,
+      getTheme: () => this.panelTheme,
+      cornerRadius: () => this.corners().module,
       getLanguage: () => this.language,
       baseCss: MODULE_CSS,
       fontCss: (theme) => fontStylesheet(theme.font),
@@ -4454,6 +4550,7 @@ export class Host {
       instanceId,
       devTools: this.options.devTools,
       background: () => this.currentTheme.tokens.background,
+      cornerRadius: () => this.corners().page,
       sessionFor: (kind) => this.browserSessionFor(kind, workspace.id),
       isSharedSite: (url) => this.isSiteListed("sharedSites", url),
       adblockOn: (url) => !this.isSiteListed("adblockOff", url),
@@ -5152,17 +5249,41 @@ export class Host {
 
   private appearanceView(): AppearanceView {
     const { theme, variation } = this.currentChoice();
+    const style = this.currentStyle();
+    const fontId = resolveFontId(this.library.font, style);
+    // Classic first, then Tavora's other styles by name, then the user's own by name.
+    const styleOrder = (entry: InstalledStyle) => (entry.style.id === CLASSIC_STYLE_ID ? 0 : entry.provenance === "official" ? 1 : 2);
+    const styles = [...this.styles.values()].sort((a, b) => styleOrder(a) - styleOrder(b) || a.style.name.localeCompare(b.style.name));
     // Official themes first, the default leading, then the user's own by name.
     const order = (entry: InstalledTheme) => (entry.theme.id === DEFAULT_THEME.id ? 0 : entry.provenance === "official" ? 1 : 2);
     const themes = [...this.themes.values()].sort((a, b) => order(a) - order(b) || a.theme.name.localeCompare(b.theme.name));
     return {
       themeId: theme.id,
       variationId: variation.id,
-      isDefault: theme.id === DEFAULT_THEME.id && this.library.followSystem && this.library.radius === null && this.library.font === undefined,
+      isDefault: theme.id === DEFAULT_THEME.id && this.library.followSystem && this.library.radius === null && this.library.font === undefined && style.id === CLASSIC_STYLE_ID,
       followSystem: this.library.followSystem,
       radius: this.library.radius,
-      // The saved id as it is: one this Tavora doesn't know shows Inter, and picking Inter still changes it.
-      font: { id: this.library.font ?? DEFAULT_FONT_ID, family: themeFont(this.library.font).family },
+      resolvedRadius: resolveRadius(this.library.radius, style, variation.radius),
+      // The id as it is: a saved one this Tavora doesn't know shows Inter, and picking Inter still changes it.
+      font: { id: fontId, family: themeFont(fontId).family },
+      fontOverride: this.library.font ?? null,
+      styleId: style.id,
+      styles: styles.map(({ style: item, provenance }) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        author: item.author,
+        provenance,
+        radius: item.radius,
+        font: item.font,
+        themes: [...item.themes],
+        looks: { ...item.looks },
+        values: { ...item.values },
+      })),
+      // The style as the theme sends it: with glass opacity raised where a theme needs it for contrast.
+      styleMarks: styleMarks(this.currentTheme.style ?? tavoraStyle(style)),
+      styleProblems: this.styleProblems.map((problem) => ({ ...problem })),
+      styleHints: this.styleHints.map((hint) => ({ ...hint })),
       themes: themes.map(({ theme: item, provenance }) => ({
         id: item.id,
         name: item.name,

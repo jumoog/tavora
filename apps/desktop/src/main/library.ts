@@ -16,8 +16,9 @@ import { UserError } from "./messages";
 import { CATALOG, catalogGame } from "./catalog";
 import { DEFAULT_OVERLAY_PORT, MAX_OVERLAY_PORT, MIN_OVERLAY_PORT } from "./overlays";
 import { iconFileAllowed, isSteamAppId, needsIcon } from "./steam-icons";
-import { DEFAULT_THEME, isThemeRadius, isVariationId } from "./themes";
-import { DEFAULT_FONT_ID, isFontId } from "../shared/ui-fonts";
+import { DEFAULT_THEME, isVariationId, type ThemeChoice } from "./themes";
+import { CLASSIC_STYLE_ID, isStyleRadius } from "../shared/styles";
+import { isFontId } from "../shared/ui-fonts";
 import { isLearnableGameId, learnsGameId } from "./workspace-game";
 import { unknownFields } from "./json";
 
@@ -155,13 +156,28 @@ export interface Library {
   theme: { id: string; variation: string };
   /** Show the variation that matches the system's light or dark setting, and change with it. */
   followSystem: boolean;
-  /** The user's own corner radius in px, over the theme's (THEME_LIMITS.radius); null uses the theme's. */
+  /**
+   * The user's own corner radius in px (STYLE_RADIUS, 0 to 16); null uses the style's ("Style default"), which in Classic
+   * is the theme's. A Tavora from before styles reads only 4 to 12 and uses the theme's for any other.
+   */
   radius: number | null;
   /**
-   * The interface font's id (shared/ui-fonts.ts); left out for Inter, so a library that never picked one is written as
-   * before. Kept even while this Tavora doesn't know it, which shows Inter.
+   * The interface font's id (shared/ui-fonts.ts) the user picked over the style's; left out for "Style default", so a
+   * library that never picked one is written as before (Classic's font is Inter). Kept even while this Tavora doesn't
+   * know it, which shows Inter.
    */
   font?: string;
+  /**
+   * The design style's id (styles.ts); left out for Classic, so a library that never picked one is written as before. Kept
+   * even while that style is not installed, which shows Classic.
+   */
+  styleId?: string;
+  /**
+   * The theme each style was last used with (style id, Classic's too), so going back to a style brings its theme back. A
+   * style missing here starts with its own first theme (switchStyle). Left out while empty, so a library that never
+   * switched styles is written as before.
+   */
+  styleThemes?: Record<string, ThemeChoice>;
   /** False until the first-run welcome was finished or skipped. */
   onboarded: boolean;
   /** True once the user said they want to make modules (Settings > Development, Let's go): its tools show. */
@@ -794,7 +810,7 @@ const WORKSPACE_ENTRY_FIELDS = Object.keys({
 const FOLDER_FIELDS = Object.keys({ id: true, name: true, label: true, workspaces: true } satisfies Record<keyof Folder, true>);
 
 /** Library fields that are left out when they hold their default, so a library that never set them is written as before. */
-const OPTIONAL_FIELDS = ["font"] as const satisfies readonly (keyof Library)[];
+const OPTIONAL_FIELDS = ["font", "styleId", "styleThemes"] as const satisfies readonly (keyof Library)[];
 
 /**
  * Turns whatever was saved into a consistent library: broken entries are
@@ -949,8 +965,16 @@ export function sanitizeLibrary(raw: unknown): Library {
   const theme = asRecord(saved.theme);
   if (isModuleId(theme.id) && isVariationId(theme.variation)) library.theme = { id: theme.id, variation: theme.variation };
   if (typeof saved.followSystem === "boolean") library.followSystem = saved.followSystem;
-  if (isThemeRadius(saved.radius)) library.radius = saved.radius;
-  if (isFontId(saved.font) && saved.font !== DEFAULT_FONT_ID) library.font = saved.font;
+  if (isStyleRadius(saved.radius)) library.radius = saved.radius;
+  // Inter too: in a style with another font, Inter is the user's own pick. A library from before styles never saved it.
+  if (isFontId(saved.font)) library.font = saved.font;
+  if (isModuleId(saved.styleId) && saved.styleId !== CLASSIC_STYLE_ID) library.styleId = saved.styleId;
+  const styleThemes: Record<string, ThemeChoice> = {};
+  for (const [styleId, value] of Object.entries(asRecord(saved.styleThemes)).slice(0, MAX_STYLE_THEMES)) {
+    const choice = asRecord(value);
+    if (isModuleId(styleId) && isModuleId(choice.id) && isVariationId(choice.variation)) styleThemes[styleId] = { id: choice.id, variation: choice.variation };
+  }
+  if (Object.keys(styleThemes).length) library.styleThemes = styleThemes;
   // A library saved before the welcome existed belongs to someone who is past it.
   library.onboarded = typeof saved.onboarded === "boolean" ? saved.onboarded : true;
   if (typeof saved.makesModules === "boolean") library.makesModules = saved.makesModules;
@@ -962,6 +986,35 @@ export function sanitizeLibrary(raw: unknown): Library {
   library.pc = { ...asRecord(saved.pc) };
   // Fields a library may leave out (font) are known too: a bad saved value is dropped, not passed through.
   return { ...unknownFields(saved, [...Object.keys(library), ...OPTIONAL_FIELDS]), ...library };
+}
+
+/** Most styles whose theme a library remembers. */
+export const MAX_STYLE_THEMES = 50;
+
+/** A style switch: the style shown now (Classic for a saved one that isn't installed), the one picked, its own first theme, and which themes are installed. */
+export interface StyleSwitch {
+  from: string;
+  to: string;
+  first: ThemeChoice;
+  hasTheme(id: string): boolean;
+}
+
+/**
+ * Switches the library to another style: the theme in use is remembered for the style left, and the new style gets the
+ * theme it was last used with, or its own first theme when it was never used or that theme is gone.
+ */
+export function switchStyle(library: Library, change: StyleSwitch): void {
+  if (change.from !== change.to) {
+    // Remembered last, so the newest entries are the ones a full list keeps.
+    const remembered = { ...library.styleThemes };
+    delete remembered[change.from];
+    remembered[change.from] = { ...library.theme };
+    const last = remembered[change.to];
+    library.theme = { ...(last && change.hasTheme(last.id) ? last : change.first) };
+    library.styleThemes = Object.fromEntries(Object.entries(remembered).slice(-MAX_STYLE_THEMES));
+  }
+  if (change.to === CLASSIC_STYLE_ID) delete library.styleId;
+  else library.styleId = change.to;
 }
 
 /** Most sites a Browser list keeps. */

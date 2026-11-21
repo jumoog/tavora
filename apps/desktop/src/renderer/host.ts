@@ -11,6 +11,7 @@ import { SETTING_SECTIONS, type SettingsPlace, type SettingsSection } from "./co
 import { MAC, numberedWorkspaces } from "./shortcuts";
 import { isLanguageReady, loadLanguage, setLanguage, t } from "./i18n";
 import { applyTheme } from "./theme";
+import { CLASSIC_STYLE_ID as CLASSIC_STYLE } from "../shared/styles";
 import { developerSetup } from "./developer-setup";
 import { createDialogQueue } from "./dialog-queue";
 import { answerStep, askAllStep, dialogsHolding, measureStep, NO_WATCH, openWatch, POPUPS, type PopupRequest, type PopupWatch } from "./overlay-area";
@@ -226,6 +227,8 @@ export const hiddenSettingIds = computed<ReadonlySet<string>>(
       ...(asksFor("ai-usage") ? [] : ["ai-usage-accounts"]),
       ...(asksFor("leaderboards") ? [] : ["leaderboards"]),
       ...(state.value?.gameOverlays.supported ? [] : GAME_OVERLAY_SETTINGS),
+      // Panel styles belong to Classic; in another style the row is hidden, so search doesn't lead there.
+      ...(state.value && state.value.appearance.styleId !== CLASSIC_STYLE ? ["panel-style"] : []),
     ]),
 );
 
@@ -1095,9 +1098,12 @@ document.addEventListener("keydown", (event) => (event.key === "ContextMenu" || 
 // Windows tell the page the pointer left and came back, so a hint on the header would close and open again.
 const clickAwayOpen = computed(() => openMenus.value > (hintOpen.value ? 1 : 0) || overlayWhole.value);
 watch(clickAwayOpen, (open) => document.documentElement.classList.toggle("floating-open", open), { immediate: true });
-// How panels are drawn (dock.css reads it).
+// How panels are drawn (dock.css reads it). The panel style is a choice inside Classic only: every other style
+// (data-style, set by theme.ts) builds on the Framed layout and draws it its own way.
+const styleId = ref(document.documentElement.dataset.style ?? "");
+new MutationObserver(() => (styleId.value = document.documentElement.dataset.style ?? "")).observe(document.documentElement, { attributes: true, attributeFilter: ["data-style"] });
 watch(
-  () => state.value?.library.panelStyle ?? "framed",
+  () => (styleId.value && styleId.value !== CLASSIC_STYLE ? "framed" : (state.value?.library.panelStyle ?? "framed")),
   (style) => (document.documentElement.dataset.panelStyle = style),
   { immediate: true },
 );
