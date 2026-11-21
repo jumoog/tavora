@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.109",
+    date: "2026-11-21",
+    title: "Browser asks, also when you change a site",
+    notes: [
+      "While the Browser asks to open another site, changing a site's sign-in or ad blocking leaves the question there. Only Open opens it.",
+      "The sign-in and ad-block buttons are off while it asks.",
+      "When a site starts or stops signing in for all workspaces, a page you typed opens again as it was. Any other page opens at the site's home.",
+    ],
+    prs: [
+      { number: 853, title: "Browser: a site-list change never opens the asked address; pages move to their site's home" },
+    ],
+    tags: ["browser", "modules", "privacy", "security", "website", "workspace"],
+  },
+  {
     version: "0.24.108",
     date: "2026-11-21",
     title: "Your keys stay yours",
