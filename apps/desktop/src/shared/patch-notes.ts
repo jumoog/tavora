@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.113",
+    date: "2026-11-21",
+    title: "Media connector",
+    notes: [
+      "Media keeps following the right player when one closes and another one of the same app opens.",
+    ],
+    prs: [
+      { number: 857, title: "SDK, packing and media helper fixes from the bug hunt" },
+    ],
+    tags: ["media", "publishing", "sdk"],
+  },
+  {
     version: "0.24.112",
     date: "2026-11-21",
     title: "Style pictures show what changes",
