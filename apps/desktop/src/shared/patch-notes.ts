@@ -28,6 +28,23 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.120",
+    date: "2026-11-22",
+    title: "Better game detection",
+    notes: [
+      "Game names and folders with umlauts now work on German Windows.",
+      "A closed game no longer counts as running when Windows reuses its process.",
+      "Tavora now asks about each running program only once, so protected games are left alone.",
+      "Skyrim Special Edition now counts as Skyrim.",
+      "Games with an .ico icon now get their icon, and Steam shortcuts on a OneDrive Desktop are found.",
+      "System Monitor shows CPU for apps that just started.",
+    ],
+    prs: [
+      { number: 870, title: "Game detection: fewer process opens, reused ids, umlauts, more games found" },
+    ],
+    tags: ["catalog", "games", "icons", "system-monitor"],
+  },
+  {
     version: "0.24.119",
     date: "2026-11-21",
     title: "Small fixes",
