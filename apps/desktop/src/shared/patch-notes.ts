@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.111",
+    date: "2026-11-21",
+    title: "Styles look cleaner",
+    notes: [
+      "Liquid Glass: fields are easier to see in dark, with softer edges on toggles and pickers.",
+      "Hardware: status badges and disabled buttons fit the style.",
+    ],
+    prs: [
+      { number: 855, title: "Styles: polish pass for Hardware and Liquid Glass" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.24.110",
     date: "2026-11-21",
     title: "Styles",
