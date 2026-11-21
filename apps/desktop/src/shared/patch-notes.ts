@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.117",
+    date: "2026-11-21",
+    title: "Styles read better",
+    notes: [
+      "Hardware keeps calculator keys at their size and names as you wrote them.",
+      "You can see the keyboard focus on switches, checkboxes and number fields in Hardware and Liquid Glass.",
+      "The selected row in Hardware lists is easier to read, and tab names are the right size.",
+    ],
+    prs: [
+      { number: 862, title: "Styles and kit: readable Hardware, visible focus, IME-safe Enter" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard", "workspace"],
+  },
+  {
     version: "0.24.116",
     date: "2026-11-21",
     title: "Your work stays put",
