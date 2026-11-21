@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.114",
+    date: "2026-11-21",
+    title: "Calculator gets its numbers right",
+    notes: [
+      "Pasting 1,234.56 or 1.234,56 gives the right number.",
+      "Results round the way you'd expect: 1.005 shows as 1.01, and just under a billion as 1B.",
+      "Typing after a very big result works now.",
+    ],
+    prs: [
+      { number: 863, title: "Calculator: read pasted numbers, round as written, type after big results" },
+    ],
+    tags: ["calculator"],
+  },
+  {
     version: "0.24.113",
     date: "2026-11-21",
     title: "Media connector",
