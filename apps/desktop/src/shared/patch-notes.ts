@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.123",
+    date: "2026-11-22",
+    title: "Overlays when you alt-tab",
+    notes: [
+      "The Overlay page's toolbar has Alt-tab: Overlays stay or Overlays hide, the same choice as \"Keep when you switch windows\" in Settings › Overlays.",
+      "Take picture keeps only the game: a windowed game's title bar is cut off, so the picture fits the canvas.",
+    ],
+    prs: [
+      { number: 875, title: "Overlay page: Alt-tab choice in the toolbar; Take picture cuts the title bar" },
+    ],
+    tags: ["overlays", "workspace"],
+  },
+  {
     version: "0.24.122",
     date: "2026-11-22",
     title: "AI Usage asks you to sign in",
