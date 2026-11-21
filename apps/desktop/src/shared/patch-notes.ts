@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.121",
+    date: "2026-11-22",
+    title: "Menus and tooltips in panel dialogs",
+    notes: [
+      "Menus and tooltips now work inside a panel's own dialog, right next to what you clicked.",
+      "Closing a panel while a menu is open no longer leaves an old picture behind.",
+    ],
+    prs: [
+      { number: 872, title: "Panel dialogs: menus and tooltips work, no stale state after a closed panel" },
+    ],
+    tags: ["workspace"],
+  },
+  {
     version: "0.24.120",
     date: "2026-11-22",
     title: "Better game detection",
