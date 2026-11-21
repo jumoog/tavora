@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.116",
+    date: "2026-11-21",
+    title: "Your work stays put",
+    notes: [
+      "Whiteboard: a board too big to save stays open when you switch, so your drawing isn't lost.",
+      "Notes: pasting from Excel or Word keeps the text.",
+      "PDF Viewer: reloading a changed file can't break its entry any more.",
+    ],
+    prs: [
+      { number: 864, title: "Whiteboard, Notes, PDF Viewer: keep what you made" },
+    ],
+    tags: ["notes", "pdf-viewer", "whiteboard"],
+  },
+  {
     version: "0.24.115",
     date: "2026-11-21",
     title: "Small fixes in your modules",
