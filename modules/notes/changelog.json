@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.6.28",
+    "date": "2026-11-21",
+    "notes": [
+      "In Hardware, names keep their case and you can see keyboard focus on switches and number fields."
+    ]
+  },
+  {
     "version": "0.6.27",
     "date": "2026-11-21",
     "notes": [

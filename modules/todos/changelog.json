@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.2.37",
+    "date": "2026-11-21",
+    "notes": [
+      "In Hardware, names keep their case and you can see keyboard focus on switches and number fields.",
+      "Enter in a slider box waits until you've finished composing a word (Japanese, Chinese, Korean)."
+    ]
+  },
+  {
     "version": "0.2.36",
     "date": "2026-11-21",
     "notes": [
