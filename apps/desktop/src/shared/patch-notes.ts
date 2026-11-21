@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.115",
+    date: "2026-11-21",
+    title: "Small fixes in your modules",
+    notes: [
+      "To-Dos: the list over the game gets your last change when you close the panel.",
+      "Clock & Counter: laps past 99 keep their time and number, and number fields understand 2.5 and +5.",
+      "System Monitor: sizes no longer read 10.0 GB or 1024 GB.",
+    ],
+    prs: [
+      { number: 865, title: "To-Dos, Clock & Counter, System Monitor: small fixes" },
+    ],
+    tags: ["clock-counter", "system-monitor", "todos", "ui-kit"],
+  },
+  {
     version: "0.24.114",
     date: "2026-11-21",
     title: "Calculator gets its numbers right",
