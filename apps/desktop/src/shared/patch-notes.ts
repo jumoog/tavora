@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.112",
+    date: "2026-11-21",
+    title: "Style pictures show what changes",
+    notes: [
+      "Each style in Settings > Appearance shows its tabs, buttons, a field and a switch, in its own colours.",
+    ],
+    prs: [
+      { number: 856, title: "Settings: style pictures show the tabs, buttons, field and switch each style draws" },
+    ],
+    tags: ["settings"],
+  },
+  {
     version: "0.24.111",
     date: "2026-11-21",
     title: "Styles look cleaner",
