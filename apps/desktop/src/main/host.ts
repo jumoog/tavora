@@ -8,7 +8,7 @@ import os from "node:os";
 import { appendFile, mkdir, readdir, readFile, realpath, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
-import { allowsPersonalWorkspaces, continuingPanelType, folderKey, isModuleId, isOwnerId, LOCAL_OWNER, OFFICIAL_OWNER, OFFICIAL_PINS, officialOn, panelTypes, translateManifest, withGamePanelType, type ModuleManifest } from "@tavora/module-schema";
+import { allowsPersonalWorkspaces, continuingPanelType, folderKey, isModuleId, OFFICIAL_PINS, officialOn, panelTypes, translateManifest, withGamePanelType, type ModuleManifest } from "@tavora/module-schema";
 import {
   app,
   BrowserWindow,
@@ -35,7 +35,6 @@ import { MAX_PICKER_COVERS } from "../shared/host-api";
 import { isForWorkspaceGame } from "./workspace-game";
 import { resolveLanguage, translate, type Language } from "../shared/i18n";
 import { ownKeys } from "./own-keys";
-import { suggestPrefix } from "../shared/id-prefix";
 import { isVoicePaused } from "../shared/discord-voice";
 import { UserError } from "./messages";
 import { UndoGoneError, UndoShelf } from "./undo-shelf";
@@ -51,17 +50,20 @@ import { legalPageUrl } from "../shared/legal-links";
 import { gridTemplate, layoutTemplate } from "../shared/layout-templates";
 import { parseAction, runAction, type ActionHandlers } from "./actions";
 import { contentTypeFor, HOST_CSP, HOST_SCHEME, resolveAsset } from "./assets";
-import { deleteModuleDataOf, listModuleData, migrateModuleData, holdLeftovers, orphanedPartitions, partitionWorkspace, queueLocalDataMove } from "./module-data";
+import { migrateModuleData, holdLeftovers, orphanedPartitions, partitionWorkspace } from "./module-data";
 import { AI_USAGE_MODULE_ID, DISCORD_MODULE_ID, movedModule, MOVED_MODULES_OWNER, moveOfficialModules } from "./moved-modules";
 import { checkZipData, recoverInstalls } from "./installer";
 import { Installed, loadInstalledModules, type InstalledModules } from "./installed-modules";
 import { sameOwner, settlePanelOwner } from "./module-owner";
 import { PendingQuestions } from "./pending-questions";
 import { createOverlayServices } from "./overlay-wiring";
-import { hasUnseenNotes, installedNotes } from "./module-notes";
+import { installedNotes } from "./module-notes";
+import { ModuleNotesSeen } from "./module-notes-seen";
 import { GrantStore } from "./grants";
+import { ModuleLeftovers } from "./module-leftovers";
 import { ModuleLifecycle } from "./module-lifecycle";
 import { ModulePanels, panelTypesOf } from "./module-panels";
+import { ModulesFolder } from "./modules-folder";
 import { DevelopmentFolders } from "./development-folders";
 import { ModuleCatalog } from "./module-catalog";
 import type { TestHosts } from "./network";
@@ -108,7 +110,7 @@ import { CatalogClient } from "./catalog-client";
 import { OnlineSearch } from "./online";
 import { countAppUpdate } from "./usage-counts";
 import { askedName, sendModuleRequest } from "./module-request";
-import { PublisherNames } from "./publisher-names";
+import { PublisherNames, publisherOf } from "./publisher-names";
 import { PreviewUpdater, previewCheck, UpdateManager, type UpdaterLike } from "./updates";
 import { PINNED_UPDATE_KEYS } from "./update-keys";
 import { checkDownloadedUpdate } from "./update-signature";
@@ -174,6 +176,7 @@ import { LibraryWorkspaces } from "./workspace-lookup";
 
 import { CopySync, type CopySyncOptions } from "./cloud-copy-sync";
 import { Inbox } from "./inbox";
+import { AccountFlows } from "./account-flows";
 import { thisDeviceName } from "./device-name";
 import { AccountClient, deviceOs, linkCommand, loadAccount, saveAccount, type AccountClientOptions } from "./account";
 import { discordLogin } from "./discord-login";
@@ -458,7 +461,8 @@ export class Host {
   private readonly account: AccountClient;
   /** The user's messages with developers and Tavora (inbox.ts). */
   private readonly inbox: Inbox;
-  private inboxSignedIn = false;
+  /** What follows the account: the messages, publisher keys and cloud copy, sign-out, the first developer steps (account-flows.ts). */
+  private readonly accountFlows: AccountFlows;
   /** The cloud copy: made before the data is read, since a newer copy is taken before anything reads it. */
   private readonly copySync: CopySync;
   /** The publisher keys the account's vault keeps (developer-keys.ts). */
@@ -470,8 +474,12 @@ export class Host {
   private readonly publisherNames: PublisherNames;
   private screen: Screen = "welcome";
   private notice: string | null = null;
-  /** Every (owner, module) with saved settings or documents, for Settings > Modules. */
-  private moduleData: { owner: string; moduleId: string }[] = [];
+  /** The data modules keep, by owner: what uninstalled ones left, an unsigned copy's for its signed version (module-leftovers.ts). */
+  private readonly moduleLeftovers: ModuleLeftovers;
+  /** Which installed modules' patch notes the user has read (module-notes-seen.ts). */
+  private readonly notesSeen: ModuleNotesSeen;
+  /** Settings > Modules' folder: installing a zip, opening the folder or one that doesn't load (modules-folder.ts). */
+  private readonly modulesFolder: ModulesFolder;
   /** What the user granted each module (grants.ts); loaded before any module panel opens. */
   private readonly grants: GrantStore;
   /** The catalog's signed safety lists (revoked keys, blocked zips, successions). */
@@ -708,7 +716,7 @@ export class Host {
       load: async () => {
         const found = await Host.loadModules(this.options, this.library.developmentFolders, this.safetyLists, this.official);
         if (this.copySync.dataHeld) found.problems.push(Host.heldProblem(this.options));
-        this.moduleData = await listModuleData(this.options.userData, this.files.root());
+        await this.moduleLeftovers.refresh();
         return found;
       },
       grants: this.grants,
@@ -723,7 +731,7 @@ export class Host {
       modulesChanged: async (restarted) => {
         // A module removed, blocked, replaced by another publisher's or updated without the connector ends its open OBS pages now.
         this.streaming?.recheckStreams();
-        this.noteModuleVersions();
+        this.notesSeen.noteNew();
         // Panels restarted as another owner's that run behind an overlay start again now.
         if (restarted) this.syncOverlayPanels();
         // A module that came, went or changed may run with its game (or no longer): the watcher and those panels follow. A
@@ -751,6 +759,27 @@ export class Host {
       gone: (module) => this.gameOverlays.forgetModule(module.manifest.id, module.owner),
       // Test runs keep the window hidden and open no file manager.
       openPath: options.hidden ? null : (folder) => shell.openPath(folder),
+    });
+    this.moduleLeftovers = new ModuleLeftovers({
+      userData: options.userData,
+      filesRoot: () => this.files.root(),
+      installed: this.installed,
+      forget: (owner, moduleId) => {
+        this.data.forgetModule(owner, moduleId);
+        this.streaming.forgetModule(owner, moduleId);
+        this.gameOverlays.forgetModule(moduleId, owner);
+      },
+      clearSession: (partition) => clearSession(session.fromPartition(partition)),
+      restart: () => this.options.restart(),
+    });
+    this.notesSeen = new ModuleNotesSeen({ library, saveLibrary: () => this.saveLibrary(), installed: this.installed });
+    this.modulesFolder = new ModulesFolder({
+      dir: userModulesDir(options),
+      dialogs: this.fileDialogs,
+      language: () => this.language,
+      installFile: (file) => this.lifecycle.installFile(file),
+      openPath: (dir) => shell.openPath(dir),
+      problems: () => this.moduleProblems,
     });
     this.lifecycle = new ModuleLifecycle({
       userData: options.userData,
@@ -870,14 +899,8 @@ export class Host {
     });
     this.account = Host.accountClient(options, prepared.signIn, prepared.encryptor, () => this.language, { get: () => this.userProfile.data(), apply: (remote) => this.userProfile.apply(remote) }, (view) => {
       if (!this.window.isDestroyed()) this.window.webContents.send("host:account", view);
-      if (this.inbox && this.inboxSignedIn !== (view.account !== null)) {
-        this.inboxSignedIn = view.account !== null;
-        this.inbox.accountChanged(view.account !== null);
-      }
-      // Which account, not only whether one: what was read for one is never shown to another.
-      const accountId = view.account !== null ? prepared.signIn.id() : null;
-      this.developerKeys?.accountChanged(accountId);
-      this.copySync.accountChanged(accountId);
+      // Made once the messages and publisher keys are: the account says nothing before init().
+      this.accountFlows?.changed(view);
     });
     this.moduleBoards = new ModuleBoards({ installed: this.installed, account: this.account, language: () => this.language });
     this.gameIcons = new GameIcons({
@@ -1046,6 +1069,15 @@ export class Host {
         if (!this.window.isDestroyed()) this.window.webContents.send("host:developer-keys", view);
       },
     });
+    this.accountFlows = new AccountFlows({
+      account: this.account,
+      signInId: () => prepared.signIn.id(),
+      inbox: this.inbox,
+      developerKeys: this.developerKeys,
+      copy: this.copySync,
+      dialogs: this.fileDialogs,
+      online: () => this.library.onlineSearch,
+    });
     this.publisher = this.modulePublisher();
     this.pairing = new Pairing({
       copySync: this.copySync,
@@ -1189,7 +1221,7 @@ export class Host {
     host.openedAtStart = openedTimes(library);
     // Before any module opens, so none sees the pictures half moved.
     await host.files.moveFromOldDefault((line) => console.warn(`[tavora] ${line}`));
-    host.moduleData = await listModuleData(userData, host.files.root());
+    await host.moduleLeftovers.refresh();
     host.syncConnection();
     await host.startOverlays();
     await host.moveAiUsagePanelData();
@@ -1201,7 +1233,7 @@ export class Host {
     void host.refreshPublisherNames();
     void host.refreshSafetyLists();
     setInterval(() => void host.refreshSafetyLists(), SAFETY_REFRESH_MS).unref();
-    host.noteModuleVersions();
+    host.notesSeen.noteNew();
     // The system's light or dark setting changed (or Tavora's own native theme did, which applyTheme ignores).
     nativeTheme.on("updated", () => {
       if (host.library.followSystem) host.applyTheme();
@@ -1386,40 +1418,6 @@ export class Host {
   }
 
   /**
-   * Deletes what a module that is not installed left behind: its settings and
-   * documents in every workspace now, its browser storage cleared now and its
-   * folders removed at the next start. An installed module's data is not deleted here.
-   */
-  private async deleteLeftoverData(owner: string, moduleId: string): Promise<void> {
-    if (this.modules.get(moduleId)?.owner === owner) throw new LibraryError("error.dataInUse");
-    this.data.forgetModule(owner, moduleId);
-    this.streaming.forgetModule(owner, moduleId);
-    this.gameOverlays.forgetModule(moduleId, owner);
-    for (const partition of await deleteModuleDataOf(this.options.userData, owner, moduleId, this.files.root())) {
-      const ses = session.fromPartition(partition);
-      await ses.clearStorageData();
-      await ses.clearCache();
-    }
-    this.moduleData = await listModuleData(this.options.userData, this.files.root());
-  }
-
-  /**
-   * Hands a module's local data (from an unsigned copy used before) to its
-   * signed version: Tavora restarts and moves it before any module opens.
-   */
-  private async moveLocalData(moduleId: string): Promise<void> {
-    const module = this.modules.get(moduleId);
-    if (!module || !this.localDataWaiting(module)) throw new LibraryError("error.noLocalData");
-    await queueLocalDataMove(this.options.userData, moduleId, module.owner);
-    this.options.restart();
-  }
-
-  /** A signed module whose id has data from an unsigned local copy. */
-  private localDataWaiting(module: InstalledModule): boolean {
-    return this.publisherOf(module) !== null && this.moduleData.some((entry) => entry.owner === LOCAL_OWNER && entry.moduleId === module.manifest.id);
-  }
-
-  /**
    * Asks the service for the newest signed safety lists (only while online features are on). A list
    * that blocks an installed module's zip stops it at once.
    */
@@ -1433,55 +1431,8 @@ export class Host {
 
   /** Asks for the developer names of the installed modules' keys (each at most once a day). Quietly: offline is fine. */
   private refreshPublisherNames(): Promise<void> {
-    const keys = [...this.modules.values()].map((module) => this.publisherOf(module)).filter((key): key is string => key !== null);
+    const keys = [...this.modules.values()].map((module) => publisherOf(module)).filter((key): key is string => key !== null);
     return this.publisherNames.refresh(keys).catch((error: unknown) => console.warn("[tavora] publisher names", error));
-  }
-
-  /** The key fingerprint of a module from a signed zip, or null. */
-  private publisherOf(module: InstalledModule): string | null {
-    return isOwnerId(module.owner) && module.owner !== OFFICIAL_OWNER && module.owner !== LOCAL_OWNER ? module.owner : null;
-  }
-
-  /** The key a module's seen patch notes are kept under: who publishes it and its id. */
-  private static notesKey(module: InstalledModule): string {
-    return `${module.owner}:${module.manifest.id}`;
-  }
-
-  /**
-   * A module seen for the first time counts as read up to its version, so only the notes of later updates are new.
-   * Kept under owner and id, so another publisher's module with the same id starts fresh.
-   */
-  private noteModuleVersions(): void {
-    let changed = false;
-    for (const module of this.modules.values()) {
-      const key = Host.notesKey(module);
-      if (module.builtIn || this.library.moduleNotesSeen[key] !== undefined) continue;
-      this.library.moduleNotesSeen[key] = module.manifest.version;
-      changed = true;
-    }
-    if (changed) this.saveLibrary();
-  }
-
-  /** What Settings shows of a module's patch notes: the newest version they cover, and whether any are new to the user. */
-  private notesView(module: InstalledModule): { latest: string | null; unseen: boolean } {
-    const notes = installedNotes(this.moduleInfo.get(module.manifest.id)?.changelog ?? [], module.manifest.version);
-    return { latest: notes[0]?.version ?? null, unseen: hasUnseenNotes(notes, module.manifest.version, this.library.moduleNotesSeen[Host.notesKey(module)]) };
-  }
-
-  // ── Pictures of modules ──────────────────────────────────────────────
-
-  private async openModulesFolder(): Promise<void> {
-    const dir = userModulesDir(this.options);
-    await mkdir(dir, { recursive: true });
-    const error = await shell.openPath(dir);
-    if (error) throw new LibraryError("error.openModulesFolder", { problem: error });
-  }
-
-  /** Opens a folder Settings lists as not loading; only those, so the host UI cannot open any path. */
-  private async openModuleProblemFolder(dir: string): Promise<void> {
-    if (!this.moduleProblems.some((problem) => !problem.developmentFolder && problem.path === dir)) return;
-    const error = await shell.openPath(dir);
-    if (error) throw new LibraryError("error.openFolder", { problem: error });
   }
 
   /** The workspaces, by id in the library, with a panel of this module. */
@@ -1500,26 +1451,6 @@ export class Host {
     const workspace = this.workspace;
     if (!workspace) return;
     for (const instanceId of this.workspaces.vacate(moduleId, workspace.id)) this.closeView(instanceId);
-  }
-
-  /** Installs a module from a zip the user picks. Answers with the module's id, or nothing when the user cancelled. */
-  private async installModule(): Promise<string | void> {
-    const file = await this.fileDialogs.pick("install-module", {
-      title: translate(this.language, "dialog.installModule"),
-      properties: ["openFile"],
-      filters: [{ name: translate(this.language, "dialog.moduleZip"), extensions: ["zip"] }],
-    });
-    if (!file) return;
-    const id = await this.lifecycle.installFile(file);
-    this.fileDialogs.remember("install-module", file);
-    return id;
-  }
-
-  /** A messages action: online features must be on, and the user needs a sign-in. */
-  private async inboxAction<T>(run: () => Promise<T>): Promise<T> {
-    if (!this.library.onlineSearch) throw new UserError("error.catalogOff");
-    if (!this.account.token()) throw new UserError("account.error.signedOut");
-    return run();
   }
 
   private static themeSources(options: HostOptions) {
@@ -2222,8 +2153,8 @@ export class Host {
       "remove-profile-picture": () => this.userProfile.setPicture(null),
 
       // Modules
-      "open-modules-folder": () => this.openModulesFolder(),
-      "open-module-problem-folder": (action) => this.openModuleProblemFolder(action.path),
+      "open-modules-folder": () => this.modulesFolder.open(),
+      "open-module-problem-folder": (action) => this.modulesFolder.openProblem(action.path),
       "add-development-folder": () => this.developmentFolders.add(),
       "remove-development-folder": (action) => this.developmentFolders.remove(action.folder),
       "move-development-folder": (action) => this.developmentFolders.move(action.folder, action.index),
@@ -2250,21 +2181,21 @@ export class Host {
       },
       "revoke-module": (action) => this.lifecycle.revoke(action.moduleId),
       "leaderboards-hide": (action) => this.moduleBoards.leave(action.moduleId),
-      "install-module": () => this.installModule(),
+      "install-module": () => this.modulesFolder.installZip(),
       "install-catalog-module": (action) => this.lifecycle.installFromCatalog(action.moduleId),
       "check-module-updates": () => this.moduleCatalog.checkUpdatesNow(),
       "ask-module": (action) => this.moduleCatalog.ask({ name: askedName(action.name), steamAppId: action.steamAppId, gameId: action.gameId }),
       "report-catalog-module": (action) => this.moduleCatalog.report(action.moduleId, { reason: action.reason, note: action.note }),
-      "inbox-send-request": (action) => this.inboxAction(() => this.inbox.sendRequest(action.moduleId, action.requestType, action.text, action.previousId)),
-      "inbox-reply": (action) => this.inboxAction(() => this.inbox.reply(action.id, action.text)),
-      "inbox-close": (action) => this.inboxAction(() => this.inbox.close(action.id, action.outcome)),
-      "inbox-block": (action) => this.inboxAction(() => this.inbox.block(action.id, action.report)),
-      "inbox-report": (action) => this.inboxAction(() => this.inbox.report(action.id, action.report)),
-      "inbox-delete": (action) => this.inboxAction(() => this.inbox.delete(action.id)),
-      "inbox-email-copies": (action) => this.inboxAction(() => this.inbox.setEmailCopies(action.on)),
-      "inbox-contact": (action) => this.inboxAction(() => this.inbox.setContact(action.moduleId, { kind: action.kind, value: action.value })),
-      "inbox-contact-default": (action) => this.inboxAction(() => this.inbox.setContactDefault({ kind: action.kind, value: action.value })),
-      "open-contact-link": (action) => this.inboxAction(() => this.inbox.openContactLink(action.moduleId)),
+      "inbox-send-request": (action) => this.accountFlows.messages(() => this.inbox.sendRequest(action.moduleId, action.requestType, action.text, action.previousId)),
+      "inbox-reply": (action) => this.accountFlows.messages(() => this.inbox.reply(action.id, action.text)),
+      "inbox-close": (action) => this.accountFlows.messages(() => this.inbox.close(action.id, action.outcome)),
+      "inbox-block": (action) => this.accountFlows.messages(() => this.inbox.block(action.id, action.report)),
+      "inbox-report": (action) => this.accountFlows.messages(() => this.inbox.report(action.id, action.report)),
+      "inbox-delete": (action) => this.accountFlows.messages(() => this.inbox.delete(action.id)),
+      "inbox-email-copies": (action) => this.accountFlows.messages(() => this.inbox.setEmailCopies(action.on)),
+      "inbox-contact": (action) => this.accountFlows.messages(() => this.inbox.setContact(action.moduleId, { kind: action.kind, value: action.value })),
+      "inbox-contact-default": (action) => this.accountFlows.messages(() => this.inbox.setContactDefault({ kind: action.kind, value: action.value })),
+      "open-contact-link": (action) => this.accountFlows.messages(() => this.inbox.openContactLink(action.moduleId)),
       "inbox-note-seen": () => this.inbox.noteSeen(),
       "inbox-developer-note-seen": () => this.inbox.developerNoteSeen(),
       "inbox-refresh": async () => {
@@ -2279,14 +2210,9 @@ export class Host {
       "reply-catalog-review": (action) => this.moduleCatalog.reply(action.reviewId, action.text),
       "report-catalog-review": (action) => this.moduleCatalog.reportReview(action.reviewId),
       "apply-module-update": (action) => this.lifecycle.applyUpdate(action.moduleId, action.version),
-      "delete-module-data": (action) => this.deleteLeftoverData(action.owner, action.moduleId),
-      "move-local-data": (action) => this.moveLocalData(action.moduleId),
-      "seen-module-notes": (action) => {
-        const module = this.modules.get(action.moduleId);
-        if (!module || module.builtIn) return;
-        this.library.moduleNotesSeen[Host.notesKey(module)] = module.manifest.version;
-        this.saveLibrary();
-      },
+      "delete-module-data": (action) => this.moduleLeftovers.delete(action.owner, action.moduleId),
+      "move-local-data": (action) => this.moduleLeftovers.moveLocal(action.moduleId),
+      "seen-module-notes": (action) => this.notesSeen.seen(action.moduleId),
 
       // Panels and workspace
       "open-module": (action) =>
@@ -2339,22 +2265,13 @@ export class Host {
       "account-create": (action) => this.account.create(action.ageConfirmed),
       "account-cancel": () => this.account.cancel(),
       "account-refresh": () => this.account.refresh(),
-      "account-sign-out": async () => {
-        // Which account signed out, read before its sign-in goes: only its key goes with it.
-        const who = this.account.accountId();
-        await this.account.signOut();
-        return this.copySync.signedOut(who);
-      },
+      "account-sign-out": () => this.accountFlows.signOut(),
       "account-sign-out-device": (action) => this.account.signOutDevice(action.deviceId),
       "account-rename-device": (action) => this.account.renameDevice(action.deviceId, action.name),
       "account-email-code": (action) => this.account.sendEmailCode(action.email),
       "account-change-email": (action) => this.account.changeEmail(action.code, action.currentCode),
       "account-delete-code": () => this.account.sendDeleteCode(),
-      "account-delete": async (action) => {
-        const who = this.account.accountId();
-        await this.account.deleteAccount(action.code);
-        return this.copySync.signedOut(who);
-      },
+      "account-delete": (action) => this.accountFlows.delete(action.code),
       "account-discord-sign-in": () => this.account.discordSignIn(),
       "account-discord-connect-code": () => this.account.sendConnectDiscordCode(),
       "account-discord-connect": (action) => this.account.connectDiscord(action.code),
@@ -2362,31 +2279,11 @@ export class Host {
       "account-discord-disconnect": (action) => this.account.disconnectDiscord(action.code),
       "account-email-remove-code": () => this.account.sendRemoveEmailCode(),
       "account-email-remove": (action) => this.account.removeEmail(action.code),
-      "account-delete-discord": async () => {
-        const who = this.account.accountId();
-        await this.account.deleteWithDiscord();
-        if (!this.account.view().account) await this.copySync.signedOut(who);
-      },
+      "account-delete-discord": () => this.accountFlows.deleteWithDiscord(),
       "account-profile-choice": (action) => this.account.chooseProfile(action.keep),
 
       // Developer side of the account
-      "account-developer-name": async (action) => {
-        await this.account.setDeveloperName(action.name);
-        // A first-time developer gets the prefix of the name with it (WellBrained: wellbrained) when it
-        // is free; when it isn't, the check stays on screen to pick another.
-        const prefix = suggestPrefix(action.name);
-        if (prefix && this.account.view().prefixes?.held.length === 0) {
-          if ((await this.account.checkPrefix(prefix).catch(() => null)) === "free") await this.account.claimPrefix(prefix).catch(() => undefined);
-        }
-        // And a publisher key: Tavora makes, keeps and links it, and the recovery key is shown. One with
-        // a key already (kept, or a linked key file) gets none.
-        const keys = this.developerKeys.view();
-        // Paused keys count as keys: they are linked again, never replaced by a new one.
-        if ((keys.status === "ready" || keys.status === "none") && !keys.keys.length && ownKeys(this.account.view()).length === 0) {
-          // Another PC keeps the account's key: its recovery key is asked for on screen, then a key is made there.
-          await this.developerKeys.create().catch(() => undefined);
-        }
-      },
+      "account-developer-name": (action) => this.accountFlows.setDeveloperName(action.name),
       "account-link-code": () => this.account.newLinkCode(),
       "account-copy-link-command": () => {
         const code = this.account.view().linkCode?.code;
@@ -2394,14 +2291,7 @@ export class Host {
         clipboard.writeText(linkCommand(code));
       },
       "account-unlink-key": (action) => this.account.unlinkKey(action.fingerprint),
-      "account-replace-key": async (action) => {
-        // The old key may be a paused one whose file is lost (audit 2026-11-22); the new one is a key linked and working,
-        // or one made for it.
-        if (!ownKeys(this.account.view()).includes(action.fingerprint)) throw new UserError("account.error.keyGone");
-        const linked = (this.account.view().publisherKeys ?? []).map((key) => key.fingerprint);
-        const next = await this.developerKeys.replacementFor(action.fingerprint, linked);
-        return this.account.replaceKey(action.fingerprint, next, action.leaked);
-      },
+      "account-replace-key": (action) => this.accountFlows.replaceKey(action.fingerprint, action.leaked),
       "account-publish-token-create": (action) => this.account.createPublishToken(action.name),
       "account-publish-token-copy": () => {
         const token = this.account.newPublishTokenText();
@@ -2449,19 +2339,8 @@ export class Host {
 
       // Cloud copy
       "cloud-copy-on": () => this.copySync.turnOn(),
-      "cloud-copy-on-folder": async () => {
-        const folder = await this.fileDialogs.pick("cloud-copy", { properties: ["openDirectory", "createDirectory"] });
-        if (!folder) return;
-        await this.copySync.turnOn(folder);
-        this.fileDialogs.remember("cloud-copy", folder);
-      },
-      "cloud-copy-move": async (action) => {
-        if (action.to === "server") return this.copySync.move(null);
-        const folder = await this.fileDialogs.pick("cloud-copy", { properties: ["openDirectory", "createDirectory"] });
-        if (!folder) return;
-        await this.copySync.move(folder);
-        this.fileDialogs.remember("cloud-copy", folder);
-      },
+      "cloud-copy-on-folder": () => this.accountFlows.turnOnInFolder(),
+      "cloud-copy-move": (action) => this.accountFlows.moveCopy(action.to),
       "cloud-copy-key": (action) => this.copySync.enterKey(action.key),
       "cloud-copy-cancel": () => this.copySync.cancelKey(),
       "cloud-copy-new-key": () => this.copySync.startOver(),
@@ -3109,7 +2988,8 @@ export class Host {
         this.pushState();
       },
       showMenu: (menu) => this.panelDialogs.showMenu(record.instanceId, menu),
-      ...this.fileDialogs.forModule(Host.notesKey(module)),
+      // Remembered by who publishes the module and its id, as its patch notes are.
+      ...this.fileDialogs.forModule(`${module.owner}:${module.manifest.id}`),
       pickReadOnlyFile: async (extensions, multiple, near) => {
         const files=new ReadOnlyFiles(app.getPath('userData'),module.owner,module.manifest.id,workspace.id);
         const defaultPath=(near ? await files.directoryNear(near.file,near.up ?? 0) : undefined) ?? await saveDialogDirectory(files,this.library.workspaces[workspace.id]?.catalogId ?? workspace.id);
@@ -3802,9 +3682,9 @@ export class Host {
         fromCatalog: this.catalogModules.has(module.manifest.id),
         ...(this.catalogModules.has(module.manifest.id) || (this.official.on && module.shippedVersion !== undefined) ? { updatable: true as const } : {}),
         support: module.manifest.support ?? null,
-        publisher: this.publisherOf(module),
-        publisherName: ((key) => (key ? this.publisherNames.name(key) : null))(this.publisherOf(module)),
-        localDataWaiting: this.localDataWaiting(module),
+        publisher: publisherOf(module),
+        publisherName: ((key) => (key ? this.publisherNames.name(key) : null))(publisherOf(module)),
+        localDataWaiting: this.moduleLeftovers.localWaiting(module),
         icon: this.moduleInfo.get(module.manifest.id)?.icon ?? null,
         permissions: {
           asks: {
@@ -3818,7 +3698,7 @@ export class Host {
         },
         ...((name) => (name ? { gameName: name } : {}))(this.withGameName(module)),
         usedIn: this.workspacesUsing(module.manifest.id),
-        notes: this.notesView(module),
+        notes: this.notesSeen.view(module),
         update: ((pending) =>
           pending
             ? { version: pending.version, asks: { network: [...pending.asks.network], connectors: [...pending.asks.connectors], folders: [...pending.asks.folders], ...(pending.asks.withGame ? { withGame: true } : {}) }, notes: pending.notes }
@@ -3830,9 +3710,7 @@ export class Host {
       devBuild: !app.isPackaged,
       officialPublish: this.officialPublishing.view(),
       developmentFolders: this.developmentFolders.view(),
-      leftoverModuleData: this.moduleData
-        .filter((entry) => this.modules.get(entry.moduleId)?.owner !== entry.owner)
-        .map((entry) => ({ ...entry, publisher: entry.owner === LOCAL_OWNER || entry.owner === OFFICIAL_OWNER ? null : entry.owner })),
+      leftoverModuleData: this.moduleLeftovers.view(),
       panels: workspace.instances.map((record) => {
         const view = this.nativePanel(record.instanceId);
         const type = this.modulePanels.typeOf(record);
