@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.131",
+    date: "2026-11-22",
+    title: "Modules that run with your game",
+    notes: [
+      "A module can ask to keep working while its game runs, for example to record your runs. It asks first, with its other permissions.",
+      "Turn it off per module in Settings > Connections > Runs while its game runs.",
+      "The rail always says which modules run with your game, also with \"When a game starts\" off.",
+    ],
+    prs: [
+      { number: 882, title: "Modules: a panel can run hidden while its game runs (withGame)" },
+    ],
+    tags: ["catalog", "games", "modules", "permissions", "privacy", "publishing", "settings", "website", "with-game", "workspace"],
+  },
+  {
     version: "0.24.130",
     date: "2026-11-22",
     title: "Cloud copy fixes",
