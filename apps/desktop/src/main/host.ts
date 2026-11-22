@@ -36,6 +36,7 @@ import { MAX_PICKER_COVERS } from "../shared/host-api";
 import { addOrRestoreWorkspace } from "./game-copy";
 import { isForWorkspaceGame, withOnlineId } from "./workspace-game";
 import { resolveLanguage, translate, type Language } from "../shared/i18n";
+import { ownKeys } from "./own-keys";
 import { suggestPrefix } from "../shared/id-prefix";
 import { isVoicePaused } from "../shared/discord-voice";
 import { UserError } from "./messages";
@@ -883,7 +884,8 @@ export class Host {
       installedVersion: (moduleId) => this.modules.get(moduleId)?.manifest.version,
       isDeveloper: () => this.account.view().developer !== null,
       ownModules: async () => {
-        const linked = new Set((this.account.view().publisherKeys ?? []).map((key) => key.fingerprint));
+        // A paused key is still the account's: its modules stay its own.
+        const linked = new Set(ownKeys(this.account.view()));
         return ((await this.catalog.index()) ?? []).filter((entry) => linked.has(entry.owner)).map((entry) => ({ id: entry.id, name: entry.name }));
       },
       onChange: (view) => {
@@ -2404,7 +2406,8 @@ export class Host {
         // And a publisher key: Tavora makes, keeps and links it, and the recovery key is shown. One with
         // a key already (kept, or a linked key file) gets none.
         const keys = this.developerKeys.view();
-        if ((keys.status === "ready" || keys.status === "none") && !keys.keys.length && !this.account.view().publisherKeys?.length) {
+        // Paused keys count as keys: they are linked again, never replaced by a new one.
+        if ((keys.status === "ready" || keys.status === "none") && !keys.keys.length && ownKeys(this.account.view()).length === 0) {
           // Another PC keeps the account's key: its recovery key is asked for on screen, then a key is made there.
           await this.developerKeys.create().catch(() => undefined);
         }
@@ -2417,8 +2420,10 @@ export class Host {
       },
       "account-unlink-key": (action) => this.account.unlinkKey(action.fingerprint),
       "account-replace-key": async (action) => {
+        // The old key may be a paused one whose file is lost (audit 2026-11-22); the new one is a key linked and working,
+        // or one made for it.
+        if (!ownKeys(this.account.view()).includes(action.fingerprint)) throw new UserError("account.error.keyGone");
         const linked = (this.account.view().publisherKeys ?? []).map((key) => key.fingerprint);
-        if (!linked.includes(action.fingerprint)) throw new UserError("account.error.keyGone");
         const next = await this.developerKeys.replacementFor(action.fingerprint, linked);
         return this.account.replaceKey(action.fingerprint, next, action.leaked);
       },
