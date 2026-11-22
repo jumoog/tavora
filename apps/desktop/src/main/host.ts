@@ -8,7 +8,7 @@ import os from "node:os";
 import { appendFile, mkdir, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
-import { allowsPersonalWorkspaces, continuingPanelType, folderKey, isModuleId, isOwnerId, LOCAL_OWNER, OFFICIAL_OWNER, OFFICIAL_PINS, officialOn, panelTypes, translateManifest, type Connector, type ModuleManifest, type ResolvedPanelType } from "@tavora/module-schema";
+import { allowsPersonalWorkspaces, continuingPanelType, folderKey, isModuleId, isOwnerId, LOCAL_OWNER, OFFICIAL_OWNER, OFFICIAL_PINS, officialOn, panelTypes, translateManifest, withGamePanelType, type Connector, type ModuleManifest, type ResolvedPanelType } from "@tavora/module-schema";
 import {
   app,
   BrowserWindow,
@@ -248,6 +248,7 @@ import { initialBounds, MIN_SIZE, type WindowState } from "./window-state";
 import { layoutKey, OpenTimes, PanelCover } from "./panel-cover";
 import { BrowserPanelView, ModulePanelView } from "./panel-view-adapters";
 import { clampRect, PanelViews, type PanelViewAdapter } from "./panel-views";
+import { withGameInstanceId, WithGamePanels, type WithGameModule } from "./with-game";
 
 /**
  * How long a workspace's panels may keep each other waiting when it opens; past it, every panel shows. Each page gives up on
@@ -566,6 +567,29 @@ export class Host {
     return this.installed.catalog;
   }
   private running: string[] = [];
+  /** The panels running with their game (with-game.ts): they follow the games running, whatever "When a game starts" says. */
+  private readonly withGame = new WithGamePanels({
+    ready: () => this.panelPages.step === "running" && !this.windowClosed,
+    isGameWorkspace: (id) => isLive(this.library, id) && this.library.workspaces[id]!.kind === "game",
+    modules: () => this.withGameModules(),
+    fits: (module, workspaceId) => {
+      const installed = this.modules.get(module.moduleId);
+      return installed !== undefined && this.supportsWorkspace(installed, workspaceId);
+    },
+    records: (workspaceId) => this.records(workspaceId),
+    shownWorkspaceId: () => this.workspace?.id ?? null,
+    panels: () => this.panels,
+    createView: (record, workspaceId) => {
+      const entry = this.library.workspaces[workspaceId];
+      if (entry && !entry.trashedAt) this.createView(record, { id: entry.id, displayName: entry.name, kind: entry.kind });
+    },
+    held: (moduleId, workspaceId) => this.purging.has(`${moduleId}@${workspaceId}`),
+    moduleName: (moduleId) => {
+      const module = this.modules.get(moduleId);
+      return module ? this.shown(module.manifest).name : null;
+    },
+    changed: () => this.pushStateSoon(),
+  });
   /** The running games not in the library, the one started last at the end (game-watch.ts). */
   private unlistedRunning: readonly UnlistedGame[] = [];
   /** When each workspace was last opened as of startup: the rail keeps this order until the next start. */
@@ -674,6 +698,8 @@ export class Host {
     this.safetyLists = prepared.safetyLists;
     this.official = prepared.official;
     this.grants = prepared.grants;
+    // A version that dropped running with its game (installed while Tavora was closed, say) forgets the answer.
+    void this.forgetDroppedWithGame();
     this.connection = prepared.connection;
     this.systemInfo = prepared.systemInfo;
     this.openTimes = prepared.openTimes;
@@ -730,6 +756,9 @@ export class Host {
       panels: { reload: (moduleId) => this.reloadModuleViews(moduleId), close: (moduleId) => this.removeModulePanels(moduleId) },
       grantsChanged: () => {
         this.syncConnection();
+        // A panel allowed to run with its game starts (or stops) now, and the game watcher runs while one may.
+        this.syncGameWatcher();
+        this.syncWithGame();
         // An OBS page of a module that just lost the stream-overlay connector stops now, not at its next ping.
         this.streaming?.recheckStreams();
       },
@@ -1028,6 +1057,12 @@ export class Host {
     // that are gone. What a lost library or workspace file may have listed is kept (holdLeftovers).
     const orphaned = await orphanedPartitions(userData, new Set(Object.keys(library.workspaces)));
     const livePanels = new Set(Object.values(workspaces.workspaces).flatMap((workspace) => workspace.instances.map((i) => i.instanceId)));
+    // The hidden panels that run with their game keep what they saved, for every game workspace and module that has one.
+    for (const module of host.modules.values()) {
+      if (!withGamePanelType(module.manifest)) continue;
+      // Trashed game workspaces too: restoring one brings its panels back with what they saved.
+      for (const entry of Object.values(library.workspaces)) if (entry.kind === "game") livePanels.add(withGameInstanceId(entry.id, module.manifest.id, module.owner));
+    }
     const stalePanels = (await readdir(path.join(userData, "panel-state")).catch(() => [] as string[])).filter((name) => name.endsWith(".json") && !livePanels.has(name.slice(0, -".json".length))).map((name) => name.slice(0, -".json".length));
     const leftovers = { workspaces: new Set(orphaned.map((dir) => partitionWorkspace(dir)!)), panels: new Set(stalePanels) };
     const held = await holdLeftovers(userData, libraryRead && workspaceRead && !copySync.dataHeld, leftovers).catch(() => leftovers);
@@ -1221,6 +1256,11 @@ export class Host {
     this.workspaces.settlePanelTypes(panelTypesOf(modules));
     this.syncPanelTypes();
     if (restarted.size > 0) this.syncOverlayPanels();
+    // A module that came, went or changed may run with its game (or no longer): the watcher and those panels follow. A
+    // version that dropped it forgets the answer first, so bringing it back asks again however it was installed.
+    await this.forgetDroppedWithGame();
+    this.syncGameWatcher();
+    this.syncWithGame();
     const moved = new Set([...modules].filter(([id, module]) => roots.has(id) && roots.get(id) !== module.root).map(([id]) => id));
     // Panels started anew just now load the new copy already; panels that waited for the old copy's question start
     // now if the new copy asks nothing.
@@ -1619,7 +1659,7 @@ export class Host {
     const module = this.modules.get(moduleId);
     if (!module || module.builtIn) return false;
     const missing = this.grants.missing(module);
-    return missing.network.length > 0 || missing.connectors.length > 0 || missing.folders.length > 0;
+    return missing.network.length > 0 || missing.connectors.length > 0 || missing.folders.length > 0 || missing.withGame === true;
   }
 
   /**
@@ -2371,6 +2411,8 @@ export class Host {
       this.closeOverlayWindows();
       void this.gameOverlays.shutdown().catch((error: unknown) => console.error("[tavora]", error));
       void this.closePanelPages();
+      // Their pages are closing with the rest (closePanelPages waits for them); nothing runs with a game any more.
+      this.withGame.clear();
       onUnreadableFileKept(null);
       this.cover.dispose();
       this.toastView.dispose();
@@ -2970,7 +3012,8 @@ export class Host {
       "open-legal-page": (action) => this.openLegalPage(action.page),
       "reload-modules": async () => void (await this.reloadModules()),
       "remove-module": (action) => this.lifecycle.remove(action.moduleId),
-      "grant-module": (action) => this.lifecycle.grant(action.moduleId, action.network, action.connectors, action.folders ?? []),
+      "grant-module": (action) => this.lifecycle.grant(action.moduleId, action.network, action.connectors, action.folders ?? [], action.withGame === true),
+      "set-module-with-game": (action) => this.lifecycle.setWithGame(action.moduleId, action.on),
       "choose-module-folder": async (action) => {
         const module = this.modules.get(action.moduleId);
         if (!module) throw new LibraryError("error.moduleMissing");
@@ -3298,7 +3341,8 @@ export class Host {
       if (wanted.has(instanceId)) continue;
       this.panels.stopKeeping(instanceId);
       const shownHere = this.workspace && this.records(this.workspace.id).some((record) => record.instanceId === instanceId);
-      if (!shownHere && !this.panels.isLent(instanceId)) this.panels.release(instanceId);
+      // Still running with its game: it stays.
+      if (!shownHere && !this.panels.isLent(instanceId) && !this.panels.isKept(instanceId)) this.panels.release(instanceId);
     }
   }
 
@@ -3897,6 +3941,8 @@ export class Host {
     if (this.windowClosed) return;
     // Game overlays forget the window of a game that stopped, whatever the switch below says.
     this.gameOverlays?.gamesRunning(running);
+    // Panels that run with their game start and stop with it, whatever the switch below says.
+    this.withGame.gamesRunning(running);
     // With "When a game starts" off the watcher only serves game overlays, which look at the window in front themselves.
     if (this.library.gameStart === "off") {
       this.running = [];
@@ -3926,6 +3972,52 @@ export class Host {
     this.questions.cancel({ workspace: gameId }, "gameSwitch");
     const back = this.library.gameEndWorkspaceId;
     if (back && this.workspaceId === gameId && isLive(this.library, back) && this.library.workspaces[back]!.kind === "personal") this.openWorkspaceQuietly(back);
+  }
+
+  // ── Panels running with their game ───────────────────────────────────
+
+  /** The modules allowed to run their `withGame` panel type while their game runs; none that still misses access it needs. */
+  private withGameModules(): WithGameModule[] {
+    const modules: WithGameModule[] = [];
+    for (const module of this.modules.values()) {
+      const panelType = withGamePanelType(module.manifest);
+      if (!panelType || isVoicePaused(module.manifest.id) || !this.grants.allowed(module).withGame || this.needsAnswer(module.manifest.id)) continue;
+      modules.push({ moduleId: module.manifest.id, owner: module.owner, panelType });
+    }
+    return modules;
+  }
+
+  /** Whether some module may run with its game, so the game watcher has to look even with game start and overlays off. */
+  private withGameWanted(): boolean {
+    return this.withGame.wanted();
+  }
+
+  /**
+   * Starts and stops the panels that run with their game (with-game.ts): in the workspace of each library game running
+   * now, the `withGame` panel of each module allowed to, for that game. Called when the running games, the grants or
+   * the modules change, and with every state push (a layout changed: a panel of that type added or closed there).
+   */
+  private syncWithGame(): void {
+    this.withGame.sync();
+  }
+
+  /**
+   * Installed modules whose version no longer asks to run with their game forget the answer (grants.ts forgetWithGame),
+   * at every start and module reload. Nothing shown changes: a module that doesn't ask has nothing to answer.
+   */
+  private async forgetDroppedWithGame(): Promise<void> {
+    for (const module of this.modules.values()) {
+      if (module.builtIn) continue;
+      await this.grants.forgetWithGame(module).catch((error: unknown) => console.error("[tavora] forgetting a grant failed", error));
+    }
+  }
+
+  /** For a module running with its game, made for one game: that game's name in the library (the one opened last), for the consent dialog. */
+  private withGameName(module: InstalledModule): string | null {
+    const { games } = module.manifest;
+    if (games.length !== 1 || !withGamePanelType(module.manifest)) return null;
+    const entries = liveWorkspaces(this.library).filter((entry) => entry.kind === "game" && isForWorkspaceGame(games, entry));
+    return entries.sort((a, b) => (b.lastOpenedAt ?? "").localeCompare(a.lastOpenedAt ?? ""))[0]?.name ?? null;
   }
 
   /** Opens a workspace without bringing the window to the front, so the game keeps the focus. */
@@ -4283,7 +4375,8 @@ export class Host {
       tooltip:{show:request=>this.tooltips.show(record.instanceId,request),move:anchor=>this.tooltips.move(record.instanceId,anchor.id,anchor.at,anchor.box),close:(id,hoverOnly,linger)=>this.tooltips.close(record.instanceId,id,hoverOnly,linger),defineSkin:(name,skin)=>this.tooltips.defineSkin(record.moduleId,module.root,name,skin)},
       launch: () => this.launchOf(record),
       mayWelcome: () => this.panels.takeWelcome(record.instanceId),
-      setContent: (content) => this.setPanelContent(record, content),
+      // The hidden panel running with its game has no tab to name.
+      setContent: (content) => (this.withGame.isHidden(record.instanceId) ? undefined : this.setPanelContent(record, content)),
       openPanel: (type, content) => this.openRelatedPanel(record, type, content),
       openPanels: async (types) => this.openPanels(record, types),
       setLive: (state) => this.gameOverlays.setLive(record.instanceId, module.owner, state),
@@ -4321,8 +4414,11 @@ export class Host {
           measured = true;
           timings.record("panel-open", performance.now() - openedAt!);
         }
+        // Out of sight with its game, a page that crashed or hangs starts again once (with-game.ts); nobody is told.
+        this.withGame.status(record.instanceId, workspace.id, record.moduleId, view, status);
         this.pushStateSoon();
       },
+      runsOnlyWithGame: () => this.withGame.runsOnlyWithGame(record.instanceId, workspace.id),
     });
     view.setWindowBehind(this.windowBehind);
     const adapter = new ModulePanelView(view);
@@ -5155,13 +5251,22 @@ export class Host {
         localDataWaiting: this.localDataWaiting(module),
         icon: this.moduleInfo.get(module.manifest.id)?.icon ?? null,
         permissions: {
-          asks: { network: [...module.manifest.permissions.network], connectors: [...(module.manifest.permissions.connectors ?? [])], folders: (module.manifest.permissions.folders ?? []).map(folderKey) },
+          asks: {
+            network: [...module.manifest.permissions.network],
+            connectors: [...(module.manifest.permissions.connectors ?? [])],
+            folders: (module.manifest.permissions.folders ?? []).map(folderKey),
+            ...(withGamePanelType(module.manifest) ? { withGame: true } : {}),
+          },
           granted: this.grants.allowed(module),
           missing: this.grants.missing(module),
         },
+        ...((name) => (name ? { gameName: name } : {}))(this.withGameName(module)),
         usedIn: this.workspacesUsing(module.manifest.id),
         notes: this.notesView(module),
-        update: ((pending) => (pending ? { version: pending.version, asks: { network: [...pending.asks.network], connectors: [...pending.asks.connectors], folders: [...pending.asks.folders] }, notes: pending.notes } : null))(
+        update: ((pending) =>
+          pending
+            ? { version: pending.version, asks: { network: [...pending.asks.network], connectors: [...pending.asks.connectors], folders: [...pending.asks.folders], ...(pending.asks.withGame ? { withGame: true } : {}) }, notes: pending.notes }
+            : null)(
           this.lifecycle.updates.pending(module.manifest.id),
         ),
       })),
@@ -5268,6 +5373,7 @@ export class Host {
       opening: this.panels.opening,
       ...pending,
       runningGameId: this.running.filter((id) => id !== this.workspaceId && isLive(this.library, id)).at(-1) ?? null,
+      runningWithGame: this.withGame.lines(),
       workspaceRunning: this.workspaceId !== null && this.running.includes(this.workspaceId),
       unlistedGame: this.unlistedRunning.length ? unlistedToOffer(this.unlistedRunning, liveWorkspaces(this.library), this.running, this.library.gameStart) : null,
       pendingGameSwitch: pending.pendingGameSwitch && isLive(this.library, pending.pendingGameSwitch) ? pending.pendingGameSwitch : null,
@@ -5362,6 +5468,8 @@ export class Host {
     this.statePush = undefined;
     // Hotkeys follow the workspace shown now and its panels, which most changes that push the state can move.
     this.streaming?.sync();
+    // So do the panels running with their game: one of that type added to (or closed in) its workspace takes over.
+    this.syncWithGame();
     this.syncConnection();
     if (!this.window.isDestroyed()) this.window.webContents.send("host:state", this.viewState());
     if (this.canvas) {
@@ -5715,9 +5823,9 @@ export class Host {
     return this.savedData.flush();
   }
 
-  /** Looks at the running programs while "When a game starts" or game overlays need it. */
+  /** Looks at the running programs while "When a game starts", game overlays or a panel running with its game need it. */
   private syncGameWatcher(): void {
-    if (this.library.gameStart !== "off" || this.gameOverlays?.needsWatcher()) this.gameWatcher.start();
+    if (this.library.gameStart !== "off" || this.gameOverlays?.needsWatcher() || this.withGameWanted()) this.gameWatcher.start();
     else this.gameWatcher.stop();
   }
 

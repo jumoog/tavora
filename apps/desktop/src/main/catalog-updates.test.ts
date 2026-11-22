@@ -5,7 +5,7 @@ import path from "node:path";
 import { fingerprint, readZip, signedHash, signFiles, writeZip, type ZipFile } from "@tavora/pack";
 import { describe, expect, it } from "vitest";
 import { CatalogClient, type CatalogEntry, type CatalogVersion } from "./catalog-client";
-import { CatalogUpdater, findUpdates, newAsks, notesSince, type CatalogInstalled } from "./catalog-updates";
+import { asksNothing, CatalogUpdater, findUpdates, newAsks, notesSince, type CatalogInstalled } from "./catalog-updates";
 import { checkZipData, installZipData, readOwnerRecords } from "./installer";
 import type { InstalledModule } from "./registry";
 import type { SafetyCheck } from "./safety-lists";
@@ -128,6 +128,26 @@ describe("newAsks", () => {
     expect(newAsks({ network: ["a.example.com"], connectors: ["discord"], folders: [] }, { network: [] })).toEqual({ network: [], connectors: [], folders: [] });
     // A connector asked for on request waits until the module needs it.
     expect(newAsks({ network: [], connectors: [], folders: [] }, { network: [], connectors: ["stream-overlay"], onRequest: ["stream-overlay"] })).toEqual({ network: [], connectors: [], folders: [] });
+  });
+
+  it("asks to run while the game runs only when the update newly brings it, so it waits for the user", () => {
+    const none = { network: [], connectors: [], folders: [] };
+    const brings = newAsks(none, { network: [] }, true);
+    expect(brings).toEqual({ ...none, withGame: true });
+    expect(asksNothing(brings)).toBe(false);
+    expect(newAsks({ ...none, withGame: true }, { network: [] }, true)).toEqual(none);
+    expect(newAsks({ ...none, withGame: true }, { network: [] }, false)).toEqual(none);
+  });
+
+  it("asks again when the update runs with a game the installed version wasn't made for", () => {
+    const none = { network: [], connectors: [], folders: [] };
+    const asked = { ...none, withGame: true };
+    expect(newAsks(asked, { network: [] }, true, { before: ["9-kings"], after: ["9-kings", "9-kings-2"] })).toEqual(asked);
+    // Fewer games, or the same ones, ask nothing new.
+    expect(newAsks(asked, { network: [] }, true, { before: ["9-kings", "9-kings-2"], after: ["9-kings"] })).toEqual(none);
+    expect(newAsks(asked, { network: [] }, true, { before: ["9-kings"], after: ["9-kings"] })).toEqual(none);
+    // Without withGame a new game asks nothing for it.
+    expect(newAsks(none, { network: [] }, false, { before: ["9-kings"], after: ["other"] })).toEqual(none);
   });
 });
 

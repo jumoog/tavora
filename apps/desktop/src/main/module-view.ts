@@ -165,6 +165,12 @@ export interface ModuleViewOptions {
   hotkeys: { list(): HotkeyBinding[]; set(action: string, target: string, label: string): Promise<HotkeySetResult>; remove(target: string, action: string | null): void };
   /** Test runs only: hosts mapped to a local server (network.ts). */
   testHosts?: TestHosts;
+  /**
+   * The panel runs now only because its game runs, out of sight (with-game.ts): the hidden panel never placed in a
+   * layout, or one of a workspace not shown. What needs the user there (a dialog, a menu, a picker, a link, another
+   * panel, a key) is refused, without a word to the user.
+   */
+  runsOnlyWithGame?(): boolean;
 }
 
 /** How often the host checks that a module's page still runs. */
@@ -236,6 +242,35 @@ async function countWrite(ses: Session, request: Request, serve: () => Promise<R
     uploads.running--;
     tell();
   }
+}
+
+/**
+ * The addresses a session answers that act on a press (the clipboard, the save and open dialogs). The press is the
+ * session's, shared by every page of the module in that workspace, so they are refused for a page that runs only with
+ * its game (outOfSight): it can't use a click made in a panel of the same module the user sees.
+ */
+const PRESS_PATHS: ReadonlySet<string> = new Set([CLIPBOARD_PATH, JSON_EXPORT_PATH, PICTURES_PATH, JSON_SAVE_PATH, JSON_OPEN_PATH, FILE_SAVE_PATH, FILE_OPEN_PATH]);
+
+/** The module pages that are open, by their page's id: their session, and whether they run only with their game now. */
+const outOfSight = new Map<number, { session: Session; now(): boolean }>();
+
+/**
+ * Whether a request to the session's own addresses is refused before it is answered (onBeforeRequest): one that acts on
+ * a press, from a page running only with its game. A request no page can be named for (a worker of no page) is refused
+ * while any page of the session runs that way.
+ */
+export function refusedOutOfSight(url: string, origin: string, webContentsId: number | undefined, ses: Session): boolean {
+  if (!url.startsWith(`${origin}/`)) return false;
+  let pathname: string;
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    return false;
+  }
+  if (!PRESS_PATHS.has(pathname)) return false;
+  const page = webContentsId === undefined ? undefined : outOfSight.get(webContentsId);
+  if (page) return page.now();
+  return [...outOfSight.values()].some((other) => other.session === ses && other.now());
 }
 
 function gestureOf(ses: Session): SessionGesture {
@@ -350,7 +385,7 @@ function moduleSession(module: InstalledModule, workspace: TavoraWorkspace, blob
   // network.fetch, which the main process makes (network.ts).
   ses.webRequest.onBeforeRequest((details, callback) => {
     const allowed = details.url.startsWith(`${origin}/`) || details.url.startsWith("devtools://");
-    callback({ cancel: !allowed });
+    callback({ cancel: !allowed || refusedOutOfSight(details.url, origin, details.webContentsId, ses) });
   });
   // Belt and braces: anything that bypasses webRequest still has to go
   // through a proxy that does not exist, loopback included.
@@ -501,6 +536,10 @@ export class ModuleView {
     const contents = this.view.webContents;
     const origin = moduleOrigin(module.manifest.id);
     const sameModule = (url: string) => url.startsWith(`${origin}/`);
+    // So the session can tell this page's requests from those of the module's other pages (refusedOutOfSight).
+    const pageId = contents.id;
+    outOfSight.set(pageId, { session: contents.session, now: () => this.options.runsOnlyWithGame?.() ?? false });
+    contents.on("destroyed", () => outOfSight.delete(pageId));
 
     // The page is a native view, so a click in it never reaches the dock: the host makes its group active instead.
     contents.on("focus", () => !this.disposed && this.options.onFocus?.());
@@ -585,7 +624,8 @@ export class ModuleView {
     });
     contents.on("render-process-gone", (_event, details) => {
       if (this.disposed) return this.closeNow();
-      recordCrash({ type: "module page", reason: details.reason, exitCode: details.exitCode, moduleId: module.manifest.id });
+      // Tavora's own stop (stop()) is no crash of the module's.
+      if (!this.stoppedByTavora) recordCrash({ type: "module page", reason: details.reason, exitCode: details.exitCode, moduleId: module.manifest.id });
       this.disconnect();
       this.setStatus("crashed");
     });
@@ -650,8 +690,14 @@ export class ModuleView {
     this.options.onNeedsTavora?.();
   }
 
+  /** What needs the user is not for a panel that runs only with its game, out of sight: refused, and nobody is told. */
+  private refuseWithGame(what: string): void {
+    if (this.options.runsOnlyWithGame?.()) throw new HostError("PERMISSION_DENIED", `${what} is not available while the panel runs with its game, out of sight`);
+  }
+
   /** Calls that need Tavora's own window (a dialog, a menu, another panel) are not for a panel over the game. */
   private refuseOverGame(what: string): void {
+    this.refuseWithGame(what);
     if (!this.overGame) return;
     this.needsTavora();
     throw new HostError("PERMISSION_DENIED", `${what} is not available while the panel is shown over the game; bring it back first`);
@@ -659,6 +705,7 @@ export class ModuleView {
 
   /** `what` is the call as METHOD_INFO names it (gesture-table.test.ts holds the two together); `detail` only goes into the error. */
   private async takeGesture(what: CallName, detail?: string): Promise<void> {
+    this.refuseWithGame(detail ?? what);
     if (!unused(this.press)) {
       await new Promise<void>((resolve) => {
         const done = () => {
@@ -710,6 +757,7 @@ export class ModuleView {
   /** panel.setDialog: opening takes a click or key press, or the pass of a panel just added (used up either way). */
   private async requestDialog(open: boolean, size: PanelDialogSize): Promise<void> {
     if (!open) return this.options.setDialog(false, size);
+    this.refuseWithGame("panel.setDialog");
     const pass = this.addPass;
     this.addPass = null;
     if (pass && !unused(this.press) && !this.overGame && Date.now() <= pass.until) return this.options.setDialog(true, size, { byClick: false });
@@ -894,6 +942,7 @@ export class ModuleView {
         openLink: (url) => this.openLink(url),
         tooltip:{
           show:async request=>{
+            this.refuseWithGame("ui.tooltip.show");
             if(!this.tooltipAnchorAllowed(request.at))return false;
             if(request.pinned)await this.takeGesture("ui.tooltip.show", "a pinned ui.tooltip.show");
             else {
@@ -1565,8 +1614,18 @@ export class ModuleView {
     this.heartbeat = undefined;
   }
 
+  /**
+   * The page ended because Tavora stopped it (stop(): its storage was cleared, the user's Stop), not by crashing; true
+   * until it loads again. Panels running with their game don't count that as a crash (host.ts).
+   */
+  get stoppedByTavora(): boolean {
+    return this.stopping;
+  }
+  private stopping = false;
+
   /** Loads the page again; with `next`, from the module as installed now (an update may be in another folder). */
   reload(next?: InstalledModule): void {
+    this.stopping = false;
     if (next && next.manifest.id === this.options.module.manifest.id && next.owner === this.options.module.owner) {
       this.options.module = next;
       const page = this.contents();
@@ -1587,6 +1646,7 @@ export class ModuleView {
   stop(): Promise<void> {
     const contents = this.view.webContents;
     if (contents.isDestroyed()) return Promise.resolve();
+    this.stopping = true;
     const gone = new Promise<void>((resolve) => {
       contents.once("render-process-gone", () => resolve());
       contents.once("destroyed", () => resolve());
