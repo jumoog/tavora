@@ -3,6 +3,7 @@ import { folderKey, validateChangelog } from "@tavora/module-schema";
 import type { ZipFile } from "@tavora/pack";
 import { type CatalogStore, type CheckedZip, copyHashes, type ReviewReason } from "./catalog.ts";
 import { checkModuleText } from "./review-filter.ts";
+import { FREE_AFTER_BYTES, freeMemory } from "./upload-memory.ts";
 import type { Scanner } from "./virus-scan.ts";
 
 /**
@@ -12,7 +13,7 @@ import type { Scanner } from "./virus-scan.ts";
  */
 
 /** Names of the checks; the developer's email has a sentence for each (mail.ts). */
-export const CHECKS = ["words", "permissions", "copy", "code", "virus", "first-module", "pictures"] as const;
+export const CHECKS = ["words", "permissions", "copy", "compare", "code", "virus", "first-module", "pictures"] as const;
 export type CheckName = (typeof CHECKS)[number];
 
 /** Who a version is checked as: its account and that account's keys, which "another publisher" is measured against. */
@@ -25,6 +26,10 @@ export interface ModerationOptions {
   catalog: CatalogStore;
   /** The virus scanner. Without one, or when it fails, every version waits. */
   scanner?: Scanner | undefined;
+  /** The longest a whole virus scan may take (SCAN_LIMIT_MS by default). */
+  scanLimitMs?: number | undefined;
+  /** Told about a scan that ran out of time and was told to stop: `stopped` settles once it has, and until then it still holds its memory. */
+  holdWhileScanning?: ((stopped: Promise<void>) => void) | undefined;
 }
 
 const reason = (check: CheckName, text: string, detail?: string): ReviewReason => ({ check, text, ...(detail ? { detail } : {}) });
@@ -144,11 +149,17 @@ function checkCopies(checked: CheckedZip, catalog: CatalogStore, subject: Subjec
     if (mine.some((a) => theirs.some((b) => a === b || (a.length >= 6 && withinOne(a, b))))) found.push(`name like ${other.id} ("${other.names[0]}")`);
   }
   const hashes = copyHashes(checked.files);
+  let uncompared: { id: string; version: string }[] = [];
   if (hashes.reduce((sum, [, size]) => sum + size, 0) >= COPY_MIN_BYTES) {
     const similar = catalog.mostSimilar(self, hashes);
     if (similar && similar.share >= COPY_SHARE) found.push(`${Math.round(similar.share * 100)}% of its files are the same as ${similar.id} ${similar.version}`);
+    uncompared = catalog.uncomparedVersions(self);
   }
-  return found.length === 0 ? null : reason("copy", "It looks like another developer's module.", found.slice(0, 5).join("; "));
+  if (found.length > 0) return reason("copy", "It looks like another developer's module.", found.slice(0, 5).join("; "));
+  // A check that can't run counts as failed: it could be a copy of a version whose files aren't known.
+  if (uncompared.length === 0) return null;
+  const names = uncompared.slice(0, 5).map(({ id, version }) => `${id} ${version}`).join(", ");
+  return reason("compare", "It couldn't be compared with every module, so a person looks at it.", `No stored file hashes for ${names}${uncompared.length > 5 ? ` (+${uncompared.length - 5} more)` : ""}`);
 }
 
 // ── 4. Code warning signs ─────────────────────────────────────────────────
@@ -224,6 +235,8 @@ function signsIn(name: string, text: string): { sign: Sign; detail: string }[] {
 function checkCode(files: readonly ZipFile[]): ReviewReason | null {
   const signs = new Map<Sign, string[]>();
   const note = (sign: Sign, detail: string) => (signs.get(sign) ?? signs.set(sign, []).get(sign)!).push(detail);
+  // Each file is read as text once; those copies are handed back as it goes, or a big module holds all of them next to its files.
+  let unfreed = 0;
   for (const file of files) {
     if (/\.wasm$/i.test(file.name) || (file.data.length >= 4 && file.data.readUInt32BE(0) === 0x0061736d)) note("wasm", `${file.name}: a WebAssembly file`);
     if (!CODE_FILE.test(file.name)) continue;
@@ -232,6 +245,11 @@ function checkCode(files: readonly ZipFile[]): ReviewReason | null {
       continue;
     }
     for (const { sign, detail } of signsIn(file.name, file.data.toString("utf8"))) note(sign, detail);
+    unfreed += file.data.length;
+    if (unfreed >= FREE_AFTER_BYTES) {
+      freeMemory();
+      unfreed = 0;
+    }
   }
   if (signs.size === 0) return null;
   const detail = [...signs].map(([sign, where]) => `${SIGN_LABEL[sign]}: ${where.slice(0, 3).join(" | ")}${where.length > 3 ? ` (+${where.length - 3} more)` : ""}`).join("; ");
@@ -241,15 +259,25 @@ function checkCode(files: readonly ZipFile[]): ReviewReason | null {
 // ── 5. Virus scan ─────────────────────────────────────────────────────────
 
 /** The longest a whole virus scan may take before the version waits instead. */
-const SCAN_LIMIT_MS = 180_000;
+export const SCAN_LIMIT_MS = 180_000;
 
-async function checkVirus(bytes: Buffer, files: readonly ZipFile[], scanner: Scanner | undefined): Promise<ReviewReason | null> {
+async function checkVirus(bytes: Buffer, files: readonly ZipFile[], { scanner, scanLimitMs = SCAN_LIMIT_MS, holdWhileScanning }: ModerationOptions): Promise<ReviewReason | null> {
   if (!scanner) return reason("virus", "The virus scan couldn't run, so a person looks at it.", "No virus scanner is set up on the server");
   try {
-    // However a scanner behaves, a scan that takes this long did not run in time.
+    // However a scanner behaves, a scan that takes this long did not run in time: it is told to stop, and the version waits
+    // right away. Its memory stays counted until it really has stopped.
+    const stop = new AbortController();
+    const scan = Promise.resolve().then(() => scanner.scan(bytes, files, stop.signal));
     let timer: NodeJS.Timeout | undefined;
-    const late = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error("the scan took too long")), SCAN_LIMIT_MS)));
-    const result = await Promise.race([Promise.resolve().then(() => scanner.scan(bytes, files)), late]).finally(() => clearTimeout(timer));
+    const late = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        const error = new Error("the scan took too long");
+        stop.abort(error);
+        holdWhileScanning?.(scan.then(() => undefined, () => undefined));
+        reject(error);
+      }, scanLimitMs);
+    });
+    const result = await Promise.race([scan, late]).finally(() => clearTimeout(timer));
     if (result.clean) return null;
     return reason("virus", "The virus scan found something.", `Found: ${result.threats.slice(0, 5).join(", ")}`);
   } catch (error) {
@@ -273,13 +301,13 @@ async function guarded(check: CheckName, run: () => ReviewReason | null | Promis
  * already in the catalog (the one-time run over live modules), so it is not compared to itself.
  */
 export async function runChecks(options: ModerationOptions, checked: CheckedZip, bytes: Buffer, subject: Subject, exceptSha?: string): Promise<ReviewReason[]> {
-  const { catalog, scanner } = options;
+  const { catalog } = options;
   const results = await Promise.all([
     guarded("words", () => checkWords(checked)),
     guarded("permissions", () => checkPermissions(checked, catalog, exceptSha)),
     guarded("copy", () => checkCopies(checked, catalog, subject)),
     guarded("code", () => checkCode(checked.files)),
-    guarded("virus", () => checkVirus(bytes, checked.files, scanner)),
+    guarded("virus", () => checkVirus(bytes, checked.files, options)),
   ]);
   return results.filter((result): result is ReviewReason => result !== null);
 }

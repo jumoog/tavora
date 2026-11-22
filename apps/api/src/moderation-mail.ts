@@ -25,19 +25,23 @@ const CHECK_LINES: Record<MailLanguage, Record<string, string>> = {
     words: "Its texts need a closer look.",
     permissions: "It asks for network access, connectors, or more than the last version.",
     copy: "It looks like another developer's module.",
+    compare: "We couldn't compare it with every module, so a person takes a look.",
     code: "Its code has parts that need a closer look.",
     virus: "The virus scan found something, or couldn't run.",
     "first-module": "It's your first module.",
     pictures: "It has a new icon or new screenshots.",
+    "taken-down": "This module was taken down. It stays off the catalog until Tavora puts it back.",
   },
   de: {
     words: "Seine Texte brauchen einen genaueren Blick.",
     permissions: "Es braucht Netzwerkzugriff, Konnektoren oder mehr als die letzte Version.",
     copy: "Es sieht aus wie das Modul von jemand anderem.",
+    compare: "Wir konnten es nicht mit jedem Modul vergleichen, darum schaut es sich jemand an.",
     code: "Sein Code hat Stellen, die einen genaueren Blick brauchen.",
     virus: "Der Virenscan hat etwas gefunden oder ließ sich nicht ausführen.",
     "first-module": "Es ist dein erstes Modul.",
     pictures: "Es hat ein neues Icon oder neue Screenshots.",
+    "taken-down": "Dieses Modul wurde aus dem Katalog genommen. Es bleibt draußen, bis Tavora es zurückholt.",
   },
 };
 
