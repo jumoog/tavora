@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.132",
+    date: "2026-11-22",
+    title: "Panels that fit",
+    notes: [
+      "Double-click the line between two panels: the one that scrolls grows until its scrollbars are gone.",
+    ],
+    prs: [
+      { number: 884, title: "Dock: double-click a split line to fit the panel that scrolls" },
+    ],
+    tags: ["privacy", "website", "workspace"],
+  },
+  {
     version: "0.24.131",
     date: "2026-11-22",
     title: "Modules that run with your game",
