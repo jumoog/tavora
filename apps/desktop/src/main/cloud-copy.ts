@@ -1,12 +1,15 @@
 import { apiReason } from "@tavora/module-schema";
 import { createHash } from "node:crypto";
-import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { cp, mkdir, open as openFile, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isOwnerId } from "@tavora/module-schema";
 import { DATA_DIRS, PICTURE_DIRS } from "./backup";
 import { copyKeys, open, PART_ID_BYTES, partId, seal } from "./copy-crypto";
 import { writeFileAtomic } from "./fsutil";
-import { readSavedFile } from "./json";
+import { DamagedFile, look, lookBytes, lookNames, lookStat, unlessHeld, type Looked } from "./file-look";
+import { renameHeld } from "./rename-held";
+import { checkSavedFile } from "./json";
 import { STORE_VERSIONS } from "./saved-versions";
 import { OWNER_RECORDS_FILE } from "./installer";
 import { FILES_DIR } from "./module-files";
@@ -27,8 +30,8 @@ import { DATA_FILES } from "./saved-data";
 export const COPY_LIMIT = 100 * 1024 * 1024;
 /** Files are cut into parts of at most this much, before compression and sealing. */
 export const PART_BYTES = 4 * 1024 * 1024;
-/** About this much of sealed parts goes in one upload. */
-const BATCH_BYTES = 8 * 1024 * 1024;
+/** The most one upload of sealed parts holds, with each part's id and length. The service takes a little more. */
+export const BATCH_BYTES = 8 * 1024 * 1024;
 /** Part ids asked for in one download. */
 const ASK_IDS = 2048;
 export const COPY_TIMEOUT_MS = 60_000;
@@ -146,28 +149,33 @@ interface Found {
   picture: boolean;
 }
 
+/** Whether a file is there. One that is held stops the work (file-look.ts). */
 async function exists(target: string): Promise<boolean> {
-  return stat(target).then(
-    () => true,
-    () => false,
-  );
+  return unlessHeld(await lookStat(target)) !== null;
+}
+
+/** A folder's names; empty when it isn't there. One that is held stops the work. */
+async function namesIn(dir: string): Promise<string[]> {
+  return unlessHeld(await lookNames(dir)) ?? [];
+}
+
+/** A file's SHA-256, read a piece at a time. */
+export async function fileSha256(file: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(file)) hash.update(chunk as Buffer);
+  return hash.digest("hex");
 }
 
 /** Every file the copy would hold right now, by its path in the copy. Temp files of a write in progress are left out. */
 export async function scanCopy(roots: CopyRoot[]): Promise<Found[]> {
   const found: Found[] = [];
   const walk = async (root: CopyRoot, dir: string, prefix: string, top: boolean) => {
-    let names: string[];
-    try {
-      names = await readdir(dir);
-    } catch {
-      return;
-    }
-    for (const name of names.sort()) {
+    // What can't be read right now stops the scan: left out, it would be gone from the copy on every PC.
+    for (const name of (await namesIn(dir)).sort()) {
       if (name.endsWith(".tmp") || !SAFE_SEGMENT.test(name)) continue;
       if (top && root.keep && !root.keep(name)) continue;
       const file = path.join(dir, name);
-      const info = await stat(file).catch(() => null);
+      const info = unlessHeld(await lookStat(file));
       if (!info) continue;
       if (info.isDirectory()) await walk(root, file, `${prefix}/${name}`, false);
       else if (info.isFile()) found.push({ path: `${prefix}/${name}`, file, size: info.size, mtimeMs: info.mtimeMs, picture: root.picture });
@@ -176,7 +184,7 @@ export async function scanCopy(roots: CopyRoot[]): Promise<Found[]> {
   for (const root of roots) {
     if (root.dir) await walk(root, root.path, root.name, true);
     else {
-      const info = await stat(root.path).catch(() => null);
+      const info = unlessHeld(await lookStat(root.path));
       if (info?.isFile()) found.push({ path: root.name, file: root.path, size: info.size, mtimeMs: info.mtimeMs, picture: false });
     }
   }
@@ -419,12 +427,8 @@ export class CloudCopy {
           files[file.path] = state.files[file.path]!;
           continue;
         }
-        let content: Buffer;
-        try {
-          content = await readFile(file.file);
-        } catch {
-          continue; // gone since the scan; the next sync sees it
-        }
+        const content = unlessHeld(await lookBytes(file.file));
+        if (content === null) continue; // gone since the scan; the next sync sees it
         const parts: string[] = [];
         // An empty file is one empty part.
         for (let index = 0; index < Math.max(1, Math.ceil(content.length / PART_BYTES)); index++) {
@@ -435,9 +439,11 @@ export class CloudCopy {
           if (sent.has(hex)) continue;
           sent.add(hex);
           const data = seal(keys, plain);
+          // Sent before this part would take the upload past what the service accepts.
+          const framed = PART_ID_BYTES + 4 + data.length;
+          if (batch.length > 0 && batchBytes + framed > BATCH_BYTES) await flush();
           batch.push({ id, data });
-          batchBytes += data.length;
-          if (batchBytes >= BATCH_BYTES) await flush();
+          batchBytes += framed;
         }
         files[file.path] = { size: content.length, mtimeMs: file.mtimeMs, sha256: createHash("sha256").update(content).digest("hex"), parts };
         done += file.size;
@@ -471,12 +477,13 @@ export class CloudCopy {
    * manifest, and returns its version and the files as they will be synced once swapped in. Nothing outside
    * `staging` is touched; null when there is no copy. `synced` is the version this PC last synced: a copy the
    * service saved on top of an older one is refused ("older"), and so is one without a sealed version once this PC has
-   * seen a sealed one (`sealedSeen`): a list from before Tavora sealed it can only be an old one served again.
+   * seen a sealed one (`sealedSeen`): a list from before Tavora sealed it can only be an old one served again. Once
+   * `wanted` says no (the copy was turned off meanwhile) it stops writing and answers null.
    */
-  async download(copyKey: Uint8Array, roots: CopyRoot[], staging: string, synced = 0, sealedSeen = false): Promise<DownloadedCopy | null> {
+  async download(copyKey: Uint8Array, roots: CopyRoot[], staging: string, synced = 0, sealedSeen = false, wanted: () => boolean = () => true): Promise<DownloadedCopy | null> {
     const keys = copyKeys(copyKey);
     const current = await this.storage.manifest();
-    if (!current) return null;
+    if (!current || !wanted()) return null;
     const { version } = current;
     let manifest: Manifest;
     try {
@@ -505,43 +512,72 @@ export class CloudCopy {
     );
     if (files.length !== manifest.files.length) throw new CopyError("damaged", "the copy's list is off");
 
-    // The parts, checked against their names, then the files, checked against their hashes.
-    const wanted = [...new Set(files.flatMap((file) => file.parts))];
-    const plain = new Map<string, Buffer>();
-    let missing = wanted;
-    while (missing.length > 0) {
-      const asked = new Set(missing.slice(0, ASK_IDS));
-      let got = 0;
-      for (const { id, data } of await this.storage.getParts([...asked])) {
-        if (!asked.has(id)) continue;
-        let content: Buffer;
-        try {
-          content = open(keys, data);
-        } catch {
-          throw new CopyError("damaged", "a part could not be opened");
+    // The parts, checked against their names, then the files, checked against their hashes. Parts wait on disk, next to
+    // the staging folder: a copy in a folder has no size limit, so it may not fit in memory.
+    const partsDir = `${staging}.parts`;
+    await rm(partsDir, { recursive: true, force: true });
+    await mkdir(partsDir, { recursive: true });
+    try {
+      let missing = [...new Set(files.flatMap((file) => file.parts))];
+      while (missing.length > 0) {
+        const asked = new Set(missing.slice(0, ASK_IDS));
+        const got = new Set<string>();
+        const answer = await this.storage.getParts([...asked]);
+        if (!wanted()) return null;
+        for (const { id, data } of answer) {
+          if (!asked.has(id) || got.has(id)) continue;
+          let content: Buffer;
+          try {
+            content = open(keys, data);
+          } catch {
+            throw new CopyError("damaged", "a part could not be opened");
+          }
+          if (partId(keys, content).toString("hex") !== id) throw new CopyError("damaged", "a part is not what its name says");
+          await writeFile(path.join(partsDir, id), content);
+          got.add(id);
         }
-        if (partId(keys, content).toString("hex") !== id) throw new CopyError("damaged", "a part is not what its name says");
-        plain.set(id, content);
-        got++;
+        // In a synced folder the manifest may arrive before its parts: they come later.
+        if (got.size === 0) throw this.storage.arrivesLate ? new CopyError("not-arrived", "parts of the copy are not here yet") : new CopyError("damaged", "parts of the copy are missing");
+        missing = missing.filter((id) => !got.has(id));
       }
-      // In a synced folder the manifest may arrive before its parts: they come later.
-      if (got === 0) throw this.storage.arrivesLate ? new CopyError("not-arrived", "parts of the copy are not here yet") : new CopyError("damaged", "parts of the copy are missing");
-      missing = missing.filter((id) => !plain.has(id));
-    }
 
-    await rm(staging, { recursive: true, force: true });
-    await mkdir(staging, { recursive: true });
-    const result: Record<string, Omit<SyncedFile, "mtimeMs">> = {};
-    for (const file of files) {
-      const content = Buffer.concat(file.parts.map((id) => plain.get(id)!));
-      if (content.length !== file.size || createHash("sha256").update(content).digest("hex") !== file.sha256) throw new CopyError("damaged", "a file does not match the copy's list");
-      const target = path.join(staging, ...file.path.split("/"));
-      await mkdir(path.dirname(target), { recursive: true });
-      await writeFile(target, content);
-      result[file.path] = { size: file.size, sha256: file.sha256, parts: file.parts };
+      await rm(staging, { recursive: true, force: true });
+      await mkdir(staging, { recursive: true });
+      const result: Record<string, Omit<SyncedFile, "mtimeMs">> = {};
+      for (const file of files) {
+        if (!wanted()) return null;
+        const target = path.join(staging, ...file.path.split("/"));
+        await mkdir(path.dirname(target), { recursive: true });
+        await joinParts(partsDir, file, target);
+        result[file.path] = { size: file.size, sha256: file.sha256, parts: file.parts };
+      }
+      return { version, pictures: manifest.pictures !== false, files: result, ...(sealed ? { sealed: true } : {}) };
+    } finally {
+      await rm(partsDir, { recursive: true, force: true }).catch(() => undefined);
     }
-    return { version, pictures: manifest.pictures !== false, files: result, ...(sealed ? { sealed: true } : {}) };
   }
+}
+
+/** Writes a file from its parts, one part in memory at a time, and checks it against the copy's list. */
+async function joinParts(partsDir: string, file: { size: number; sha256: string; parts: string[] }, target: string): Promise<void> {
+  const hash = createHash("sha256");
+  let size = 0;
+  const out = await openFile(target, "w");
+  try {
+    for (const id of file.parts) {
+      const content = unlessHeld(await lookBytes(path.join(partsDir, id)));
+      if (content === null) throw new CopyError("damaged", "a part of the copy is gone");
+      size += content.length;
+      if (size > file.size) break;
+      hash.update(content);
+      await out.writeFile(content);
+    }
+    // On the disk before its list says it is there: a power cut can't leave a file of the right size full of zeros.
+    await out.sync();
+  } finally {
+    await out.close();
+  }
+  if (size !== file.size || hash.digest("hex") !== file.sha256) throw new CopyError("damaged", "a file does not match the copy's list");
 }
 
 /** A copy downloaded into the staging folder: its version, and its files as they will be synced once swapped in. */
@@ -553,43 +589,193 @@ export interface DownloadedCopy {
   sealed?: boolean;
 }
 
-/** Moves a file or folder, also from one drive to another (the module files folder may be elsewhere). */
+/**
+ * Moves a file or folder, also from one drive to another (the module files folder may be elsewhere). Across drives
+ * `to` appears only once it is whole, and `from` is renamed away before it is deleted, so a move cut off at any point
+ * leaves one whole side to go on from (swapOne).
+ */
 async function move(from: string, to: string): Promise<void> {
   await mkdir(path.dirname(to), { recursive: true });
+  // A rename would silently replace a file that is there, and a backup is never written over.
+  if (await exists(to)) throw new Error(`${to} is already there`);
   try {
-    await rename(from, to);
+    await renameHeld(from, to);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-    await cp(from, to, { recursive: true });
-    await rm(from, { recursive: true, force: true });
+    const part = `${to}.part`;
+    await rm(part, { recursive: true, force: true });
+    await cp(from, part, { recursive: true });
+    await renameHeld(part, to);
+    const done = `${from}.moved`;
+    await renameHeld(from, done);
+    await rm(done, { recursive: true, force: true });
+  }
+}
+
+/** `target`, or with a number after it when that name is taken. */
+async function freePath(target: string): Promise<string> {
+  for (let n = 1; ; n++) {
+    const candidate = n === 1 ? target : `${target}.${n}`;
+    if (!(await exists(candidate))) return candidate;
+  }
+}
+
+/** Where a swap's backup keeps what was written in a place after the swap began (the app ran on a swap that failed). */
+export const WRITTEN_SINCE = "written-since";
+
+/** After a name in `written-since`: what the copy or the app had put in a place when a swap was taken back. */
+const UNDONE = ".undone";
+
+/** A place's name in `written-since` without what freePath or a swap taken back added to it. */
+const plainName = (name: string) => name.replace(/(\.undone)?(\.\d+)?$/, "");
+
+/** The date of a synced file that was changed after it arrived: no real file has it, so it counts as changed. */
+const CHANGED_SINCE = -1;
+
+/** Where one root (or one entry of a root) is during a swap. */
+interface SwapPlace {
+  place: string;
+  staged: string;
+  kept: string;
+  /** Where something written since the swap began goes. */
+  since: string;
+  inCopy: boolean;
+}
+
+/** Every root the copy replaces, or for a folder the user may share each of Tavora's entries in it. */
+async function swapPlaces(staging: string, roots: CopyRoot[], keepIn: string, copy: DownloadedCopy): Promise<SwapPlace[]> {
+  // What the copy holds, by root and by a root's top-level entry.
+  const held = new Set<string>();
+  for (const file of Object.keys(copy.files)) {
+    const [root, entry] = file.split("/");
+    held.add(root!);
+    if (entry !== undefined) held.add(`${root}/${entry}`);
+  }
+  const places: SwapPlace[] = [];
+  for (const root of roots.filter((candidate) => copy.pictures || !candidate.picture)) {
+    const staged = path.join(staging, root.name);
+    const kept = path.join(keepIn, root.name);
+    const since = path.join(keepIn, WRITTEN_SINCE, root.name);
+    if (!root.keep) {
+      places.push({ place: root.path, staged, kept, since, inCopy: held.has(root.name) });
+      continue;
+    }
+    // Only Tavora's own entries of a folder the user may share (the module files folder). One a later start moved into
+    // `written-since` may be nowhere else.
+    const here = (await namesIn(root.path)).filter(root.keep);
+    const movedSince = (await namesIn(since)).map(plainName).filter(root.keep);
+    const names = new Set([...here, ...(await namesIn(staged)), ...(await namesIn(kept)), ...movedSince]);
+    for (const name of names) places.push({ place: path.join(root.path, name), staged: path.join(staged, name), kept: path.join(kept, name), since: path.join(since, name), inCopy: held.has(`${root.name}/${name}`) });
+  }
+  return places;
+}
+
+/**
+ * Puts one root (or one entry of a root) of the copy in place. Safe to run again after being cut off at any point:
+ * something the copy holds whose staged side is gone is in place already and stays. Once what was here is kept, whatever
+ * is here now (a half-finished arrival, or what the app wrote after a swap failed) goes aside, never over the backup.
+ */
+async function swapOne({ place, staged, kept, since, inCopy }: SwapPlace, resumed: boolean): Promise<void> {
+  await rm(`${place}.moved`, { recursive: true, force: true });
+  const waiting = await exists(staged);
+  if (!waiting && inCopy) return;
+  // A swap going on from an earlier start: the app may have run on this place since, so it counts as written since
+  // until sortWrittenSince has told what really changed.
+  if (await exists(place)) await move(place, resumed || (await exists(kept)) ? await freePath(since) : kept);
+  if (waiting) await move(staged, place);
+}
+
+/**
+ * Sorts what a settled swap put in `written-since`, so only real work stays there. A file with the copy's content is no
+ * one's work and goes; one as this PC last synced it (`before`) is an ordinary backup and joins the rest. What can't be
+ * read stays, as it may be work. True when anything is left: the user is told, and pruning keeps it.
+ */
+export async function sortWrittenSince(keepIn: string, copy: DownloadedCopy, before: CopyState): Promise<boolean> {
+  const root = path.join(keepIn, WRITTEN_SINCE);
+  const walk = async (dir: string, name: string): Promise<void> => {
+    const names = await lookNames(dir);
+    if (names.status !== "present") return;
+    for (const entry of names.value) {
+      const file = path.join(dir, entry);
+      // A place's own name may carry what freePath or a swap taken back added to it; below that, names are as they were.
+      const plain = name.split("/").length < 2 ? plainName(entry) : entry;
+      const inCopy = name ? `${name}/${plain}` : plain;
+      const info = await lookStat(file);
+      if (info.status !== "present") continue;
+      if (info.value.isDirectory()) {
+        await walk(file, inCopy);
+        await rmdir(file).catch(() => undefined);
+        continue;
+      }
+      const sha = await look(() => fileSha256(file));
+      if (sha.status !== "present") continue;
+      if (copy.files[inCopy]?.sha256 === sha.value) {
+        await rm(file, { force: true }).catch(() => undefined);
+      } else if (before.files[inCopy]?.sha256 === sha.value) {
+        const kept = path.join(keepIn, ...inCopy.split("/"));
+        const there = await lookStat(kept);
+        if (there.status === "missing") await move(file, kept).catch(() => undefined);
+        else if (there.status === "present") {
+          const same = await look(() => fileSha256(kept));
+          if (same.status === "present" && same.value === sha.value) await rm(file, { force: true }).catch(() => undefined);
+        }
+      }
+    }
+  };
+  await walk(root, "");
+  await rmdir(root).catch(() => undefined);
+  return (await lookStat(root)).status !== "missing";
+}
+
+/** The places a copy will fill that hold nothing now, noted before a swap so taking it back can empty them again. */
+export async function emptyPlaces(staging: string, roots: CopyRoot[], keepIn: string, copy: DownloadedCopy): Promise<string[]> {
+  const empty: string[] = [];
+  for (const { place, inCopy } of await swapPlaces(staging, roots, keepIn, copy)) if (inCopy && !(await exists(place))) empty.push(place);
+  return empty;
+}
+
+/**
+ * Takes back a swap that didn't finish, when the user would rather have this PC's data. What was here goes back in its
+ * place: from the backup, or from `written-since` when a later start moved it there. What the copy or the app put in the
+ * place goes aside as `.undone`, which is never taken for the original, so running this again changes nothing. Going back
+ * to the backup sets what `written-since` holds for the place aside first, so a second run can't take that for the
+ * original either. A place that was `empty` before is emptied again. The caller clears the staging.
+ */
+export async function undoSwap(staging: string, roots: CopyRoot[], keepIn: string, copy: DownloadedCopy, empty: readonly string[]): Promise<void> {
+  for (const { place, kept, since } of await swapPlaces(staging, roots, keepIn, copy)) {
+    await rm(`${place}.moved`, { recursive: true, force: true });
+    const isThere = await exists(place);
+    const wasEmpty = empty.includes(place);
+    const original = (await exists(kept)) ? kept : !wasEmpty && (await exists(since)) ? since : null;
+    if (original) {
+      if (original === kept && (await exists(since))) await move(since, await freePath(`${since}${UNDONE}`));
+      if (isThere) await move(place, await freePath(`${since}${UNDONE}`));
+      await move(original, place);
+    } else if (isThere && wasEmpty) {
+      await move(place, await freePath(`${since}${UNDONE}`));
+    }
   }
 }
 
 /**
  * Puts a downloaded copy (in `staging`) in place of this PC's data, after moving what was there into
  * `keepIn`, so the side not kept stays as a local backup. A copy that left out pictures leaves this PC's
- * pictures where they are. Only runs while nothing reads the data (before the workspaces load).
+ * pictures where they are. Only runs while nothing reads the data (before the workspaces load). Cut off, it
+ * is run again with the same `keepIn` and `resumed`, and goes on where it stopped (swapOne); a file the app changed
+ * in place meanwhile then counts as changed, so it goes up instead of passing for what the copy holds.
  * Returns the state to keep: the copy's files with their dates on this PC.
  */
-export async function swapInCopy(staging: string, roots: CopyRoot[], keepIn: string, copy: DownloadedCopy): Promise<CopyState> {
+export async function swapInCopy(staging: string, roots: CopyRoot[], keepIn: string, copy: DownloadedCopy, resumed = false): Promise<CopyState> {
   const taking = roots.filter((root) => copy.pictures || !root.picture);
   await mkdir(keepIn, { recursive: true });
-  for (const root of taking) {
-    const staged = path.join(staging, root.name);
-    if (root.keep) {
-      // Only Tavora's own entries of a folder the user may share (the module files folder).
-      for (const name of (await readdir(root.path).catch(() => [] as string[])).filter(root.keep)) await move(path.join(root.path, name), path.join(keepIn, root.name, name));
-      for (const name of await readdir(staged).catch(() => [] as string[])) await move(path.join(staged, name), path.join(root.path, name));
-      continue;
-    }
-    if (await exists(root.path)) await move(root.path, path.join(keepIn, root.name));
-    if (await exists(staged)) await move(staged, root.path);
-  }
+  for (const place of await swapPlaces(staging, roots, keepIn, copy)) await swapOne(place, resumed);
   await rm(staging, { recursive: true, force: true });
   const files: Record<string, SyncedFile> = {};
   for (const found of await scanCopy(taking)) {
     const synced = copy.files[found.path];
-    if (synced) files[found.path] = { ...synced, mtimeMs: found.mtimeMs };
+    if (!synced) continue;
+    const same = !resumed || (found.size === synced.size && (await fileSha256(found.file)) === synced.sha256);
+    files[found.path] = { ...synced, mtimeMs: same ? found.mtimeMs : CHANGED_SINCE };
   }
   return { version: copy.version, pictures: copy.pictures, files, ...(copy.sealed ? { sealed: true } : {}) };
 }
@@ -598,20 +784,31 @@ export async function swapInCopy(staging: string, roots: CopyRoot[], keepIn: str
 // nothing of the content). The key is the account's (account-key.ts).
 
 /**
- * The state as saved. One a newer Tavora wrote is copied aside, and one that is damaged copied aside and left where it
- * is, as its being there says the copy is on (readSavedFile; the user isn't told, as nothing of theirs is in it). Both
- * start from the empty state, as a missing one does.
+ * The state as saved, or held when it is busy or damaged (a damaged one is also copied aside and left where it is, as
+ * its being there says the copy is on; the user isn't told, as nothing of theirs is in it). One a newer Tavora wrote is
+ * copied aside and counts as empty.
  */
-export async function loadCopyState(file: string): Promise<CopyState> {
-  try {
-    const saved = await readSavedFile(file, { version: STORE_VERSIONS.cloudCopy, versionKey: "v", notice: false, leaveInPlace: true });
-    if (saved?.v !== STORE_VERSIONS.cloudCopy || typeof saved.version !== "number" || typeof saved.files !== "object" || saved.files === null) return EMPTY_STATE;
-    return { version: saved.version, pictures: saved.pictures !== false, files: saved.files as Record<string, SyncedFile>, ...(saved.kept === true ? { kept: true } : {}), ...(saved.sealed === true ? { sealed: true } : {}) };
-  } catch {
-    return EMPTY_STATE;
-  }
+export async function lookCopyState(file: string): Promise<Looked<CopyState>> {
+  const bytes = await lookBytes(file);
+  if (bytes.status !== "present") return bytes;
+  const read = await look(() => checkSavedFile(file, bytes.value, { version: STORE_VERSIONS.cloudCopy, versionKey: "v", notice: false, leaveInPlace: true }));
+  if (read.status === "held") return read;
+  const saved = read.status === "present" ? read.value : null;
+  const damaged: Looked<CopyState> = { status: "held", error: new DamagedFile(`${file} is damaged`) };
+  if (saved === null) return damaged;
+  if (typeof saved.v === "number" && saved.v > STORE_VERSIONS.cloudCopy) return { status: "present", value: EMPTY_STATE };
+  if (saved.v !== STORE_VERSIONS.cloudCopy) return damaged;
+  if (typeof saved.version !== "number" || typeof saved.files !== "object" || saved.files === null) return damaged;
+  return { status: "present", value: { version: saved.version, pictures: saved.pictures !== false, files: saved.files as Record<string, SyncedFile>, ...(saved.kept === true ? { kept: true } : {}), ...(saved.sealed === true ? { sealed: true } : {}) } };
 }
 
+/** The state as saved, or the empty one when it can't be used. */
+export async function loadCopyState(file: string): Promise<CopyState> {
+  const looked = await lookCopyState(file);
+  return looked.status === "present" ? looked.value : EMPTY_STATE;
+}
+
+/** Writes the state. During a swap it goes to another file than cloud-copy.json (CopySync.parkState). */
 export async function saveCopyState(file: string, state: CopyState): Promise<void> {
   await writeFileAtomic(file, JSON.stringify({ v: STORE_VERSIONS.cloudCopy, version: state.version, pictures: state.pictures, files: state.files, ...(state.kept ? { kept: true } : {}), ...(state.sealed ? { sealed: true } : {}) }));
 }

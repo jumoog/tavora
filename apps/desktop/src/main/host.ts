@@ -928,6 +928,7 @@ export class Host {
     );
     const installed = new Installed(await Host.loadModules(options, library.developmentFolders, safetyLists, official), (manifest) => translateManifest(manifest, Host.languageOf(library, options)));
     const { modules, problems: moduleProblems } = installed;
+    if (copySync.dataHeld) moduleProblems.push(Host.heldProblem(options));
     const { themes, problems: themeProblems, hints: themeHints } = await discoverThemes(Host.themeSources(options), app.getVersion());
     const styles = await discoverStyles(Host.styleSources(options));
     // Before any module session or store is opened (S5: data is keyed by owner and id).
@@ -938,7 +939,8 @@ export class Host {
     await moveOfficialModules(userData, (line) => console.warn(`[tavora] ${line}`), library.moduleFilesFolder ?? defaultFilesRoot(userData)).catch((error: unknown) =>
       console.error("[tavora] moving the data of Discord and AI Usage failed", error),
     );
-    const expired = purgeExpired(library, new Date());
+    // Half of a cloud copy may be in place: the Trash is emptied once the data can be trusted again.
+    const expired = copySync.dataHeld ? [] : purgeExpired(library, new Date());
     const waits = panelsWait(moduleProblems);
     // A module that left Tavora for the catalog keeps its panels while it is not installed: they offer to install it.
     const workspaces = await savedData.loadWorkspace(Object.keys(library.workspaces), (id) => modules.has(id) || waits(id) || movedModule(id) !== undefined);
@@ -957,6 +959,8 @@ export class Host {
     }
     const ownersNoted = noteOwners(workspaces, (moduleId) => modules.get(moduleId)?.owner, (instanceId) => stamps.get(instanceId));
     const { profile, saved: profileSaved } = await savedData.loadProfile();
+    // Every data file is read, nothing has written one yet: one that was lost must not go up as empty.
+    await copySync.checkDataFiles();
     const windowState = initialBounds(
       await savedData.loadWindow(),
       screen.getAllDisplays().map((display) => display.workArea),
@@ -994,6 +998,8 @@ export class Host {
 
     const host = new Host(options, { encryptor, signIn, copySync, installed, safetyLists, official, grants, connection, systemInfo, openTimes, emblem, styles }, library, workspaces, profile, windowState, themes, themeProblems, themeHints, savedData);
     if (ownersNoted) host.workspaces.saveSoon();
+    // What the user did while a cloud copy waited is safe in a backup: they hear where.
+    if (copySync.changesKeptIn) host.notice = translate(host.language, "cloudCopy.notice.keptAside", { folder: copySync.changesKeptIn });
     host.openedAtStart = openedTimes(library);
     // Before any module opens, so none sees the pictures half moved.
     await host.files.moveFromOldDefault((line) => console.warn(`[tavora] ${line}`));
@@ -1022,7 +1028,7 @@ export class Host {
     const livePanels = new Set(Object.values(workspaces.workspaces).flatMap((workspace) => workspace.instances.map((i) => i.instanceId)));
     const stalePanels = (await readdir(path.join(userData, "panel-state")).catch(() => [] as string[])).filter((name) => name.endsWith(".json") && !livePanels.has(name.slice(0, -".json".length))).map((name) => name.slice(0, -".json".length));
     const leftovers = { workspaces: new Set(orphaned.map((dir) => partitionWorkspace(dir)!)), panels: new Set(stalePanels) };
-    const held = await holdLeftovers(userData, libraryRead && workspaceRead, leftovers).catch(() => leftovers);
+    const held = await holdLeftovers(userData, libraryRead && workspaceRead && !copySync.dataHeld, leftovers).catch(() => leftovers);
     for (const dir of orphaned) if (!held.workspaces.has(partitionWorkspace(dir)!)) await rm(dir, { recursive: true, force: true });
     await host.data.panelState.prune(new Set([...livePanels, ...held.panels]));
     for (const workspace of expired) await host.deleteWorkspaceData(workspace);
@@ -1104,6 +1110,8 @@ export class Host {
   /** The daily copy of the user's data, made a little after start so it never slows it. */
   private backupSoon(): void {
     setTimeout(() => {
+      // A daily copy of data that can't be trusted yet would push a good one out.
+      if (this.copySync.dataHeld) return;
       backupData({ userData: this.options.userData, moduleFiles: this.files.root(), log: (line) => console.log(`[tavora] ${line}`) }).catch((error: unknown) => console.error("[tavora] backup failed", error));
     }, 30_000).unref();
   }
@@ -1156,6 +1164,11 @@ export class Host {
     return loadInstalledModules({ userData: options.userData, userModules: userModulesDir(options), sources: Host.moduleSources(options, developmentFolders), tavoraVersion: app.getVersion(), safety, official });
   }
 
+  /** While the data can't be trusted (cloud-copy-sync.ts dataHeld), a module may only look gone: every panel waits. */
+  private static heldProblem(options: HostOptions): ModuleProblem {
+    return { folder: path.basename(userModulesDir(options)), path: userModulesDir(options), message: "a cloud copy is still being put in place", kind: "missing", official: true };
+  }
+
   /**
    * Looks for modules again; panels of modules that are gone are closed, and panels of a module now loaded
    * from another folder start again from it (a blocked built-in update falls back to the shipped copy at once).
@@ -1172,6 +1185,7 @@ export class Host {
     const roots = new Map([...this.modules].map(([id, module]) => [id, module.root]));
     this.installed.replace(await Host.loadModules(this.options, this.library.developmentFolders, this.safetyLists, this.official));
     const { modules } = this.installed;
+    if (this.copySync.dataHeld) this.installed.problems.push(Host.heldProblem(this.options));
     this.moduleData = await listModuleData(this.options.userData, this.files.root());
     this.dropPanelsOfMissingModules();
     // A module id now loaded for another owner (a development folder over an installed copy, or back): its open panels
