@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.129",
+    date: "2026-11-22",
+    title: "Bigger unit icons",
+    notes: [
+      "The icons on unit cards are bigger, and their counts are easier to read.",
+    ],
+    prs: [
+      { number: 881, title: "Tooltip: bigger unit icons and readable counts" },
+    ],
+    tags: ["sdk", "ui-kit", "website"],
+  },
+  {
     version: "0.24.128",
     date: "2026-11-22",
     title: "Safer cloud copy",
