@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.141",
+    date: "2026-11-22",
+    title: "Trash, tidied up",
+    notes: [
+      "When you move the open workspace to Trash, its panels close and you're taken Home.",
+      "Undo opens it again right where you left it.",
+    ],
+    prs: [
+      { number: 906, title: "Give the Host's concepts their own modules, part 3d: Trash leaves the open workspace, module leftovers, account wiring" },
+    ],
+    tags: ["accounts", "modules", "workspace"],
+  },
+  {
     version: "0.24.140",
     date: "2026-11-22",
     title: "Development folders kept",
