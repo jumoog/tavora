@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.144",
+    date: "2026-11-23",
+    title: "Safer connector questions",
+    notes: [
+      "A connector you allow goes only to the module copy that asked. If a development folder takes its place meanwhile, the question closes.",
+    ],
+    prs: [
+      { number: 910, title: "Connector questions grant only the owner whose page asked" },
+    ],
+    tags: ["modules", "overlays", "privacy", "website", "workspace"],
+  },
+  {
     version: "0.24.143",
     date: "2026-11-22",
     title: "Trash stops overlays",
