@@ -26,6 +26,10 @@ import type { PanelViews } from "./panel-views";
 import type { Shell } from "./shell";
 import { Streaming } from "./streaming";
 import type { WorkspaceNames } from "./workspace-lookup";
+import { stackAbove, windowsOrder } from "./window-order";
+
+/** Stacking the overlays above the game failed (Windows' calls couldn't be loaded): said once only. */
+let stackFailed = false;
 
 /** What the overlay services ask of the host around them; the host answers (host.ts). */
 export interface OverlayHostPorts {
@@ -132,6 +136,27 @@ export async function createOverlayServices(wiring: OverlayWiring): Promise<Over
       tavoraInFront: () => BrowserWindow.getFocusedWindow() !== null,
       openWindow: (request, panel) => overlayWindow(options, ports.fontCss, request, panel),
       openVeil: () => new GameVeilWindow({ hidden: options.hidden }),
+      // Overlays that stay while the user is elsewhere sit right above the game's window, not above every window.
+      stackAboveGame: (game, windows) => {
+        if (process.platform !== "win32") return false;
+        try {
+          stackAbove(windowsOrder(), game, windows);
+          return true;
+        } catch (error) {
+          // Said once: the service then keeps them above every window, as before, and tries again on each look.
+          if (!stackFailed) console.warn("[tavora] cannot stack the overlays above the game", error);
+          stackFailed = true;
+          return false;
+        }
+      },
+      gameOnTop: (game) => {
+        if (process.platform !== "win32") return false;
+        try {
+          return windowsOrder().topmost(game);
+        } catch {
+          return false;
+        }
+      },
       // The card is a page of the host UI (layer-card.html), with a preload of its own.
       openCard: (request) =>
         new GameLayerCard({
