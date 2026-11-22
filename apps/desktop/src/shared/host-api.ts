@@ -645,6 +645,12 @@ export interface PanelPicture {
   gen: number;
 }
 
+/** How much a panel's page scrolls, in px: what its panel would need on top of its size for the scrollbars to go. */
+export interface PanelOverflow {
+  x: number;
+  y: number;
+}
+
 export interface PanelBounds {
   instanceId: string;
   x: number;
@@ -1330,6 +1336,12 @@ export interface TavoraHostApi {
   setPanelBounds(bounds: PanelBounds[]): void;
   /** Where the workspace is (the card that covers it while a workspace opens), or null when it is not on screen. */
   setWorkspaceBounds(bounds: { x: number; y: number; width: number; height: number } | null): void;
+  /**
+   * How much each of these panels' pages scrolls across (x) and down (y), in px; 0 for a panel that is not on screen,
+   * left out for a page that did not answer. `since`: once each page has a new size, how much the parts that did not
+   * scroll at the last call without it scroll now.
+   */
+  panelOverflow(instanceIds: string[], since?: boolean): Promise<Record<string, PanelOverflow>>;
   /**
    * Hides module panels while a menu, dialog or drag would be drawn under
    * them: `only` these (the ones a menu or hint lies over, added to those
