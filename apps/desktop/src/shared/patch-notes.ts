@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.126",
+    date: "2026-11-22",
+    title: "Clearer publishing",
+    notes: [
+      "A slow upload no longer says it failed when your version went live.",
+      "Too many versions waiting for review? Tavora now tells you that.",
+    ],
+    prs: [
+      { number: 866, title: "Catalog publishing: safe memory, honest answers, real daily limit" },
+    ],
+    tags: ["accounts", "catalog", "publishing", "service", "website"],
+  },
+  {
     version: "0.24.125",
     date: "2026-11-22",
     title: "Your saves are safer",
