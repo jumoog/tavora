@@ -28,6 +28,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.142",
+    date: "2026-11-22",
+    title: "Safer cloud copy restores",
+    notes: [
+      "After you pick Use the cloud copy, an older Tavora can't upload over it before the restart.",
+      "Use the cloud copy works again on a restore that stopped and lost its file list.",
+      "A copy waiting for another account says so, and lets you keep this PC's data.",
+      "A full disk now says your disk is full.",
+      "When a restore keeps two backups, you hear about both.",
+    ],
+    prs: [
+      { number: 894, title: "Cloud copy: leftovers from the #860/#880 reviews" },
+    ],
+    tags: ["cloud-copy", "settings"],
+  },
+  {
     version: "0.24.141",
     date: "2026-11-22",
     title: "Trash, tidied up",
