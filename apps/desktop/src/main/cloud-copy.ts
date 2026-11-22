@@ -685,12 +685,21 @@ async function swapOne({ place, staged, kept, since, inCopy }: SwapPlace, resume
   if (waiting) await move(staged, place);
 }
 
+/** Copies a swap put in before its list was lost (`lists`), and the places they are known to have put in (`places`, by name in the copy). */
+export interface EarlierCopies {
+  lists: readonly DownloadedCopy[];
+  places: readonly string[];
+}
+
 /**
  * Sorts what a settled swap put in `written-since`, so only real work stays there. A file with the copy's content is no
- * one's work and goes; one as this PC last synced it (`before`) is an ordinary backup and joins the rest. What can't be
- * read stays, as it may be work. True when anything is left: the user is told, and pruning keeps it.
+ * one's work and goes; one as this PC last synced it (`before`) is an ordinary backup and joins the rest. One with the
+ * content of an `earlier` copy goes too, but only in a place that copy is known to have put in: elsewhere it may be this
+ * PC's own file from before the swap, which only looks the same. What can't be read stays, as it may be work. True when
+ * anything is left: the user is told, and pruning keeps it.
  */
-export async function sortWrittenSince(keepIn: string, copy: DownloadedCopy, before: CopyState): Promise<boolean> {
+export async function sortWrittenSince(keepIn: string, copy: DownloadedCopy, before: CopyState, earlier: EarlierCopies = { lists: [], places: [] }): Promise<boolean> {
+  const putInEarlier = (name: string) => earlier.places.some((place) => name === place || name.startsWith(`${place}/`));
   const root = path.join(keepIn, WRITTEN_SINCE);
   const walk = async (dir: string, name: string): Promise<void> => {
     const names = await lookNames(dir);
@@ -719,6 +728,8 @@ export async function sortWrittenSince(keepIn: string, copy: DownloadedCopy, bef
           const same = await look(() => fileSha256(kept));
           if (same.status === "present" && same.value === sha.value) await rm(file, { force: true }).catch(() => undefined);
         }
+      } else if (putInEarlier(inCopy) && earlier.lists.some((other) => other.files[inCopy]?.sha256 === sha.value)) {
+        await rm(file, { force: true }).catch(() => undefined);
       }
     }
   };
@@ -732,6 +743,35 @@ export async function emptyPlaces(staging: string, roots: CopyRoot[], keepIn: st
   const empty: string[] = [];
   for (const { place, inCopy } of await swapPlaces(staging, roots, keepIn, copy)) if (inCopy && !(await exists(place))) empty.push(place);
   return empty;
+}
+
+/**
+ * The places of `copy` its swap has surely put in, by name in the copy: its staged side is gone, and what was here before
+ * is in the backup or there was nothing (`empty`). A place moved again by a later start, or one whose staged side was lost
+ * some other way, isn't sure, and isn't named.
+ */
+export async function placesPutIn(staging: string, roots: CopyRoot[], keepIn: string, copy: DownloadedCopy, empty: readonly string[]): Promise<string[]> {
+  const names: string[] = [];
+  for (const { place, staged, kept, inCopy } of await swapPlaces(staging, roots, keepIn, copy)) {
+    if (!inCopy || (await exists(staged))) continue;
+    if (!(await exists(kept)) && !empty.includes(place)) continue;
+    names.push(path.relative(keepIn, kept).split(path.sep).join("/"));
+  }
+  return names;
+}
+
+/**
+ * The same for another copy once a swap has begun (its list was lost, and a newer copy takes its place): what was empty
+ * before (`before`), and a place the new copy holds with nothing in it, in the backup or in `written-since`.
+ */
+export async function emptyPlacesSince(staging: string, roots: CopyRoot[], keepIn: string, copy: DownloadedCopy, before: readonly string[]): Promise<string[]> {
+  const empty = new Set(before);
+  for (const { place, kept, since, inCopy } of await swapPlaces(staging, roots, keepIn, copy)) {
+    if (!inCopy || (await exists(place)) || (await exists(kept))) continue;
+    if ((await namesIn(path.dirname(since))).some((name) => plainName(name) === path.basename(since))) continue;
+    empty.add(place);
+  }
+  return [...empty];
 }
 
 /**

@@ -17,7 +17,8 @@ function body(start: RegExp): string {
 
 describe("host.ts", () => {
   it("tells the user where work done while a cloud copy waited is kept", () => {
-    expect(body(/static async create\(/)).toMatch(/copySync\.changesKeptIn\) host\.notice = translate\(host\.language, "cloudCopy\.notice\.keptAside"/);
+    // Both backups of one start in one message: startNotice (cloud-copy-sync.ts) picks the text.
+    expect(body(/static async create\(/)).toMatch(/const copyNotice = copySync\.notice;\s+if \(copyNotice\) host\.notice = translate\(host\.language, copyNotice\.key, copyNotice\.params\)/);
   });
 
   // That every look at the modules tells what follows them is ModulePanels' (module-panels.test.ts); this holds host.ts to ending OBS pages there.

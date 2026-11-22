@@ -1,6 +1,6 @@
 // The cloud copy when something goes wrong: data lost on this PC, a swap cut off, a folder that can't be read.
 import { randomBytes } from "node:crypto";
-import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BATCH_BYTES, CloudCopy, EMPTY_STATE, swapInCopy, type CopyStorage, type RemoteCopy, type SwapAnswer } from "./cloud-copy";
@@ -68,7 +68,7 @@ describe("data lost on this PC", () => {
     await readSavedFile(path.join(a.userData, "library.json"), { version: 2 });
     await damaged.sync.beforeLoad();
     await damaged.sync.checkDataFiles();
-    expect(damaged.sync.view()).toMatchObject({ conflict: true, lostData: true });
+    expect(damaged.sync.view()).toMatchObject({ conflict: true, conflictKind: "lost" });
     expect(damaged.sync.dataHeld).toBe(true);
 
     // Tavora goes on and saves an empty library; the timer's upload waits.
@@ -81,7 +81,7 @@ describe("data lost on this PC", () => {
     const next = tavora(cloud, a);
     await next.sync.beforeLoad();
     await next.sync.checkDataFiles();
-    expect(next.sync.view()).toMatchObject({ conflict: true, lostData: true });
+    expect(next.sync.view()).toMatchObject({ conflict: true, conflictKind: "lost" });
     await next.sync.sync();
     expect(await remoteVersion(cloud)).toBe(version);
 
@@ -92,7 +92,7 @@ describe("data lost on this PC", () => {
     await restored.sync.beforeLoad();
     await restored.sync.checkDataFiles();
     expect(JSON.parse(await read(a.userData, "library.json")).workspaces).toEqual({ "elden-ring": {} });
-    expect(restored.sync.view()).toMatchObject({ conflict: false, lostData: false });
+    expect(restored.sync.view()).toMatchObject({ conflict: false, conflictKind: null });
   });
 
   it("uploads this PC's side once the user chooses it", async () => {
@@ -108,7 +108,7 @@ describe("data lost on this PC", () => {
     await writeFile(path.join(a.userData, "library.json"), library("hades"));
 
     await damaged.sync.keep("pc");
-    expect(damaged.sync.view()).toMatchObject({ conflict: false, lostData: false });
+    expect(damaged.sync.view()).toMatchObject({ conflict: false, conflictKind: null });
     expect(await remoteVersion(cloud)).toBeGreaterThan(version!);
   });
 
@@ -120,13 +120,13 @@ describe("data lost on this PC", () => {
     const fine = tavora(cloud, a);
     await fine.sync.beforeLoad();
     await fine.sync.checkDataFiles(); // no profile.json, and it was never synced
-    expect(fine.sync.view()).toMatchObject({ conflict: false, lostData: false });
+    expect(fine.sync.view()).toMatchObject({ conflict: false, conflictKind: null });
 
     await rename(path.join(a.userData, "workspace.json"), path.join(a.root, "elsewhere.json"));
     const gone = tavora(cloud, a);
     await gone.sync.beforeLoad();
     await gone.sync.checkDataFiles();
-    expect(gone.sync.view()).toMatchObject({ conflict: true, lostData: true });
+    expect(gone.sync.view()).toMatchObject({ conflict: true, conflictKind: "lost" });
   });
 
   it("asks before taking a copy that has none of this PC's workspaces", async () => {
@@ -184,7 +184,8 @@ describe("a swap that was cut off", () => {
     const stagingDir = path.join(b.userData, "cloud-copy-staging");
     const keepIn = path.join(b.userData, "backups", "cloud-copy-2026-11-21T00-00-00-000Z-this-pc");
     await mkdir(keepIn, { recursive: true });
-    await rename(path.join(b.userData, "cloud-copy.json"), path.join(b.userData, "cloud-copy-swapping.json"));
+    // Choosing the copy parked the state already, as during a swap.
+    expect(await stat(path.join(b.userData, "cloud-copy-swapping.json")).then(() => true, () => false)).toBe(true);
     await writeFile(path.join(b.userData, "cloud-copy-status.json"), JSON.stringify({ v: 1, phase: "swapping", plan: { keepIn, moduleFiles: b.moduleFiles, own: { developmentFolders: ["D:\\mine"] }, empty: [] } }));
     await rename(path.join(b.userData, "library.json"), path.join(keepIn, "library.json"));
     await rename(path.join(stagingDir, "data", "library.json"), path.join(b.userData, "library.json"));

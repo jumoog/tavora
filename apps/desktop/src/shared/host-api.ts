@@ -534,7 +534,7 @@ export interface PairingView {
 }
 
 /** Why the cloud copy could not sync last time, worded by the host UI. */
-export type CloudCopyProblem = "offline" | "signed-out" | "too-big" | "failed" | "deleted" | "new-key" | "no-folder" | "folder-locked" | "not-arrived";
+export type CloudCopyProblem = "offline" | "signed-out" | "too-big" | "failed" | "deleted" | "new-key" | "no-folder" | "folder-locked" | "not-arrived" | "disk-full";
 
 /** What the cloud copy is doing right now: one thing at a time, with how far an upload got (bytes read and sent of what changed). */
 export type CloudCopyActivity =
@@ -571,10 +571,13 @@ export interface CloudCopyView {
   askKey: boolean;
   /** This PC and the copy both changed since they last matched: the user keeps one side. */
   conflict: boolean;
-  /** Part of this PC's data couldn't be opened: nothing goes up until the user chooses, and `conflict` asks them. */
-  lostData: boolean;
-  /** A copy stopped halfway going in: nothing goes up, and `conflict` asks to try again or go back to this PC's data. */
-  swapUnfinished: boolean;
+  /**
+   * Why `conflict` asks, when it isn't that both changed; nothing goes up until the user chooses. `unfinished`: a copy
+   * stopped halfway going in (try again, or go back to this PC's data). `lost`: part of this PC's data couldn't be opened.
+   * `waiting`: a copy the user chose belongs to another account than the one signed in (sign in with it, or keep this
+   * PC's data). Null otherwise.
+   */
+  conflictKind: "unfinished" | "lost" | "waiting" | null;
   /** A newer copy from another PC is downloaded; a restart takes it. */
   restartToTake: boolean;
   /** Closing waits for the last upload. */
