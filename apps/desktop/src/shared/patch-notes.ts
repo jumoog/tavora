@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.124",
+    date: "2026-11-22",
+    title: "Overlays stay with the game",
+    notes: [
+      "When you alt-tab and overlays stay, they now sit right on top of the game's window, not on top of every window: a browser over the game covers them, just like the game.",
+      "Overlays for Everywhere still show above every window.",
+      "The setting is now called \"Keep overlays on the game when you alt-tab\" (Settings › Overlays), and the Overlay page's toolbar says Alt-tab: Stay on the game or Hide.",
+    ],
+    prs: [
+      { number: 878, title: "Overlays that stay sit right above the game, not above every window" },
+    ],
+    tags: ["overlays", "privacy", "website"],
+  },
+  {
     version: "0.24.123",
     date: "2026-11-22",
     title: "Overlays when you alt-tab",
