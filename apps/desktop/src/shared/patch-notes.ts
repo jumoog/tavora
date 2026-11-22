@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.133",
+    date: "2026-11-22",
+    title: "Notes: safer pasting",
+    notes: [
+      "Pasting something you copied on the whiteboard adds its pictures, not a wall of code.",
+      "Very long text pastes at once, and typing in a long note no longer freezes it.",
+      "A note too big to save says so and keeps what was saved before.",
+    ],
+    prs: [
+      { number: 885, title: "Notes: paste a whiteboard's pictures, long text without freezing" },
+    ],
+    tags: ["notes"],
+  },
+  {
     version: "0.24.132",
     date: "2026-11-22",
     title: "Panels that fit",
