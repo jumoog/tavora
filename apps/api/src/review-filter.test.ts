@@ -30,12 +30,140 @@ describe("the review word filter", () => {
       "wenig",
       "König",
       "Das ist schön.Me too",
-      "Modul.App läuft",
       "Mein Sofa got dirty",
       "Eine Uni gab Geld",
     ]) {
       expect(checkReviewText(text), text).toBe("ok");
     }
+  });
+
+  it("holds what may be an app address for a person, and never calls it a link outright", () => {
+    for (const text of ["freerobux.App now", "Modul.App läuft", "Das Modul.App läuft gut", "schön.App ist das"]) {
+      expect(checkReviewText(text), text).toBe("hold");
+    }
+    // A slur or a real link next to it still counts for what it is.
+    expect(checkReviewText("Modul.App läuft, you faggot")).toBe("words");
+    expect(checkReviewText("Modul.App läuft, see cheapgold.shop")).toBe("link");
+    for (const text of ["freerobux.App", "freerobux.App/win now", "FreeRobux.App now", "free-robux.App now", "freerobux.app now"]) {
+      expect(checkReviewText(text), text).toBe("link");
+    }
+  });
+
+  it("reads doubled letters, digits and letters of other alphabets back", () => {
+    for (const text of ["niigga", "faaggot", "ni99a", "ni66a", "nlgga", "nlgger", "nіgga", "fаggot", "ѕchwuchtel", "niigger", "niiggaa", "NIIGGA", "raape", "n 1 g g a", "n 1 9 9 a", "5lut", "r3tard", "k1ke", "f4ggot"]) {
+      expect(checkReviewText(text), JSON.stringify(text)).toBe("words");
+    }
+  });
+
+  it("keeps years and numbers as numbers, next to any short word", () => {
+    for (const text of [
+      "Released in 1994",
+      "Released on 1994",
+      "an 1994",
+      "en 1994",
+      "un 1994",
+      "Uni 994",
+      "Uni 1994",
+      "in 1994er",
+      "Released in1994",
+      "on1994",
+      "Das Spiel von 1996",
+      "ni 1994",
+      "in 99",
+      "Uni 99",
+      "Nintendo 64",
+      "x64",
+      "Win10 on 64 bit",
+      "Version 9.9.4",
+      "Top 10 in 2026",
+      "Kapitel 9 an 6 Tagen",
+      "1994",
+      "99",
+    ]) {
+      expect(checkReviewText(text), text).toBe("ok");
+      expect(checkModuleText(text), text).toBe("ok");
+    }
+  });
+
+  it("leaves model and part codes alone", () => {
+    for (const text of [
+      "BMW F46",
+      "BMW X1 F49",
+      "My F46 got repaired",
+      "#f49",
+      "FA6",
+      "FA9",
+      "FA6 got fixed",
+      "RTX 4090",
+      "i9",
+      "Core i9 14900K",
+      "X1",
+      "A4",
+      "B2",
+      "v1.9.9",
+      "x64 and x86",
+      "PS4",
+      "R6",
+      "i512600k",
+      "i912900k",
+      "i72600k",
+      "F462A",
+      "in1994er",
+      "den1994er Modellen",
+      "von1964er",
+    ]) {
+      expect(checkReviewText(text), text).toBe("ok");
+    }
+  });
+
+  it("reads digits between letters however many there are, and short spelled-out pieces", () => {
+    for (const text of ["f4990t", "fa990t", "ni999a", "n1999a", "n1 gg a", "n1g g4", "f4g", "ky5", "fa65"]) {
+      expect(checkReviewText(text), text).toBe("words");
+    }
+  });
+
+  it("reads Japanese and Chinese full stops as dots only with a Latin letter right behind them", () => {
+    for (const text of ["free。com", "free｡com", "free。com now", "free。ｃｏｍ", "freeｃｏｍ．ｃｏｍ"]) {
+      expect(checkReviewText(text), text).toBe("link");
+    }
+    for (const text of ["いいゲーム。", "いいゲーム。 とても楽しい", "良いゲーム。次も遊ぶ", "Great game。", "Great game。 Thanks", "好玩。再来一次", "このmod。Co-opも楽しい", "这个mod。Info很多", "良いgame。Link切れ"]) {
+      expect(checkReviewText(text), text).toBe("ok");
+    }
+  });
+
+  it("never reads a year as a letter, right after or joined to a short word", () => {
+    for (const word of ["in", "on", "an", "en", "un", "uni", "ani", "ini", "ni"]) {
+      for (let year = 1900; year < 2100; year++) {
+        expect(checkReviewText(`${word} ${year}`), `${word} ${year}`).toBe("ok");
+        expect(checkReviewText(`${word}${year}`), `${word}${year}`).toBe("ok");
+      }
+    }
+  });
+
+  it("gets through long spaced-out text quickly", () => {
+    expect(checkReviewText(`${"a ".repeat(10_000)}aa`)).toBe("ok");
+    expect(checkReviewText(`a${" ".repeat(20_000)}aa`)).toBe("ok");
+  });
+
+  it("holds a possible address written with a full-width dot, and reads the rest as a link", () => {
+    expect(checkReviewText("freerobux．App now")).toBe("hold");
+    expect(checkReviewText("cheapgold．shop now")).toBe("link");
+  });
+
+  it("leaves honest words with doubled letters and other alphabets alone", () => {
+    for (const text of [
+      "wenig", "König", "Boot", "Kaffee", "Dinge", "Saal", "Minigame", "Rappe", "Die Rappen laufen", "Moor", "Haare", "Meer", "Waage", "Zoo", "good book", "cool", "seen", "Niigata",
+      "Das Boot gab Kaffee", "Im Saal gab es Dinge", "Wenig Geld, viele Minigames",
+      "Хорошая игра",
+      "кот и сок",
+      "Καλό παιχνίδι",
+    ]) {
+      expect(checkReviewText(text), text).toBe("ok");
+    }
+  });
+
+  it("leaves two stray letters in front of a spread-out slur to reports", () => {
+    expect(checkReviewText("xxnig ga")).toBe("ok");
   });
 
   it("still refuses a slur spread over words, in any spelling it caught before", () => {
@@ -52,6 +180,7 @@ describe("the review word filter", () => {
 
   it("reads an address as a link when only a line break follows it", () => {
     for (const text of ["evil.Me\nnow", "evil.Me\r\nnow", "evil.At\n\nnow", "evil.App\nnow"]) {
+      // On one line it would go on as a sentence, or wait for a person.
       expect(checkReviewText(text), JSON.stringify(text)).toBe("link");
     }
   });
