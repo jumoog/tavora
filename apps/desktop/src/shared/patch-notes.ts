@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.127",
+    date: "2026-11-22",
+    title: "Unit cards",
+    notes: [
+      "Game modules can show a unit like the game does: its portrait, a title bar with a count, stats, spells and level.",
+      "Big numbers like 3.95E+12 line up neatly.",
+    ],
+    prs: [
+      { number: 879, title: "Tooltip: a unit layout for game units" },
+    ],
+    tags: ["privacy", "publishing", "sdk", "tooltips", "ui-kit", "website"],
+  },
+  {
     version: "0.24.126",
     date: "2026-11-22",
     title: "Clearer publishing",
