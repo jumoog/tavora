@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.128",
+    date: "2026-11-22",
+    title: "Safer cloud copy",
+    notes: [
+      "If Tavora can't open some of your data, it asks before your cloud copy changes.",
+      "A cloud copy that gets cut off while restoring finishes at the next start.",
+      "Big cloud copies upload and restore more reliably.",
+      "An older Tavora started in the middle of a restore leaves your cloud copy alone.",
+    ],
+    prs: [
+      { number: 860, title: "Cloud copy: protect against lost data, cut-off swaps and big copies" },
+    ],
+    tags: ["cloud-copy", "settings", "updates"],
+  },
+  {
     version: "0.24.127",
     date: "2026-11-22",
     title: "Unit cards",
