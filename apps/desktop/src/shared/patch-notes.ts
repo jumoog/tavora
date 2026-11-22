@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.143",
+    date: "2026-11-22",
+    title: "Trash stops overlays",
+    notes: [
+      "Overlays of a workspace you move to the Trash stop right away.",
+    ],
+    prs: [
+      { number: 907, title: "Trash follow-ups: dedupe bulk ids, stop overlay panels of trashed workspaces, warn on dropped account change" },
+    ],
+    tags: ["workspace"],
+  },
+  {
     version: "0.24.142",
     date: "2026-11-22",
     title: "Safer cloud copy restores",
