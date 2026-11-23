@@ -367,6 +367,8 @@ export interface DeveloperKeysView {
    */
   status: "loading" | "ready" | "none" | "ask" | "signed-out" | "offline";
   keys: { fingerprint: string }[];
+  /** A key file on this PC that may hold the account's key can't be opened: the recovery key is asked for, and why. */
+  keyBlocked: boolean;
   /** Whether this PC has the account's key (the recovery key opens it). */
   hasKey: boolean;
   /** The account's recovery key, while the user looks at it (made just now, or asked to see). */
@@ -534,7 +536,7 @@ export interface PairingView {
 }
 
 /** Why the cloud copy could not sync last time, worded by the host UI. */
-export type CloudCopyProblem = "offline" | "signed-out" | "too-big" | "failed" | "deleted" | "new-key" | "no-folder" | "folder-locked" | "not-arrived" | "disk-full";
+export type CloudCopyProblem = "offline" | "signed-out" | "too-big" | "failed" | "deleted" | "new-key" | "no-folder" | "folder-locked" | "not-arrived" | "disk-full" | "key-blocked";
 
 /** What the cloud copy is doing right now: one thing at a time, with how far an upload got (bytes read and sent of what changed). */
 export type CloudCopyActivity =
@@ -550,6 +552,8 @@ export type CloudCopyActivity =
 export interface CloudCopyView {
   /** False where this PC can't keep the key encrypted: the copy can't be turned on here. */
   canKeepKey: boolean;
+  /** A key file on this PC that may hold the key needed can't be opened: the recovery key is asked for, and why. */
+  keyBlocked: boolean;
   /** A development run in its own desktop-dev folder: turning on asks first, as the copy belongs in the installed app. */
   devData: boolean;
   on: boolean;
@@ -950,6 +954,11 @@ export interface HostViewState {
    * Tavora started that part fresh. The host UI says so once each time it grows.
    */
   keptAside: number;
+  /**
+   * How many sealed files (a sign-in or a key) couldn't be saved this run, as they couldn't be read (or moved aside):
+   * they are kept as they are. The host UI says so once each time it grows.
+   */
+  sealedHeld: number;
   /** The user's local profile. */
   profile: { name: string; initials: string; pictureUrl: string | null; ranks: ProfileRanksSetting; banner: ProfileBanner };
   /** A setting that only applies on start was changed since Tavora started. */

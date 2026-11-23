@@ -5,9 +5,10 @@ import path from "node:path";
 import { fingerprint as packFingerprint, LINK_STATEMENT, packModule, PUBLISH_STATEMENT } from "@tavora/pack";
 import { describe, expect, it } from "vitest";
 import type { AccountView } from "../shared/host-api";
-import { AccountClient, deviceOs, loadAccount, saveAccount, type ProfileData, type SavedAccount } from "./account";
+import { AccountClient, AccountFile, deviceOs, type ProfileData, type SavedAccount } from "./account";
 import type { Encryptor } from "./discord-store";
 import { UserError } from "./messages";
+import { SavedFileHeld } from "./saved-file";
 import { SignIn } from "./sign-in";
 
 // Stands in for safeStorage: reversible, and never the plain text.
@@ -16,6 +17,10 @@ const encryptor = (available = true): Encryptor => ({
   encrypt: (text) => Buffer.from([...Buffer.from(text)].map((byte) => byte ^ 0x5a)),
   decrypt: (data) => Buffer.from([...data].map((byte) => byte ^ 0x5a)).toString(),
 });
+
+/** One read or write of account.json, each by a store of its own, as at a start of Tavora. */
+const loadAccount = (file: string, encryptor: Encryptor) => new AccountFile(file, encryptor).load();
+const saveAccount = (file: string, encryptor: Encryptor, account: SavedAccount | null) => new AccountFile(file, encryptor).save(account);
 
 const TOKEN = "t".repeat(43);
 const SAVED: SavedAccount = { token: TOKEN, email: "me@example.com", discord: null, createdAt: "2026-10-16T12:00:00.000Z" };
@@ -54,7 +59,7 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 
 const EMPTY_PROFILE: ProfileData = { name: "", initials: "", picture: null, updatedAt: null };
 
-function client(fetchImpl: typeof fetch, options: { saved?: SavedAccount | null; deviceName?: string; rawDeviceName?: string; enabled?: boolean; canKeep?: boolean; profile?: ProfileData; discordLogin?: () => Promise<{ code: string; verifier: string }> } = {}) {
+function client(fetchImpl: typeof fetch, options: { saved?: SavedAccount | null; deviceName?: string; rawDeviceName?: string; enabled?: boolean; canKeep?: boolean; profile?: ProfileData; discordLogin?: () => Promise<{ code: string; verifier: string }>; save?: (value: SavedAccount | null) => Promise<void> } = {}) {
   const views: AccountView[] = [];
   const kept: (SavedAccount | null)[] = [];
   /** This PC's profile, and every profile the account put in its place. */
@@ -68,7 +73,7 @@ function client(fetchImpl: typeof fetch, options: { saved?: SavedAccount | null;
     ...(options.rawDeviceName ? { rawDeviceName: options.rawDeviceName } : {}),
     language: () => "de",
     canKeepSignIn: () => options.canKeep ?? true,
-    signIn: new SignIn({ enabled: options.enabled ?? true, load: async () => options.saved ?? null, save: async (value) => void kept.push(value) }),
+    signIn: new SignIn({ enabled: options.enabled ?? true, load: async () => options.saved ?? null, save: options.save ?? (async (value) => void kept.push(value)) }),
     onChange: (view) => views.push(view),
     ...(options.discordLogin ? { discordLogin: options.discordLogin } : {}),
     profile: {
@@ -86,6 +91,24 @@ const signedInAnswer = (status: "signed-in" | "created") => () =>
   json({ status, token: TOKEN, device: "dev1", account: { email: "me@example.com", createdAt: SAVED.createdAt } });
 
 describe("signing in", () => {
+  it("signed in while account.json can't be saved (it can't be read or moved): signed in for this run, and the window hears of it", async () => {
+    const { fetchImpl } = service({
+      "POST /code": () => json({ status: "sent" }, 202),
+      "POST /verify": signedInAnswer("signed-in"),
+      "GET /": () => json({ account: { email: "me@example.com", createdAt: SAVED.createdAt }, devices: [DEVICE] }),
+      "GET /profile": () => json({ profile: null }),
+    });
+    const held = async () => {
+      throw new SavedFileHeld("account.json", Object.assign(new Error("busy"), { code: "EBUSY" }));
+    };
+    const { account, views } = client(fetchImpl, { save: held });
+    await account.init();
+    await account.sendCode("me@example.com");
+    await account.verify("123456");
+    expect(account.view().account).toMatchObject({ email: "me@example.com" });
+    expect(views.at(-1)?.account).toMatchObject({ email: "me@example.com" });
+  });
+
   it("sends a code, then signs an existing account in and reads its devices", async () => {
     const { calls, fetchImpl } = service({
       "POST /code": () => json({ status: "sent" }, 202),

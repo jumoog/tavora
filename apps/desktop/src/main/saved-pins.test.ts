@@ -1,4 +1,5 @@
-// What each store of the user's files writes, pinned byte for byte as Tavora 0.24.147 (before saved-file.ts) wrote it:
+// What each store of the user's files writes, pinned byte for byte as Tavora 0.24.147 (before saved-file.ts) wrote it
+// (the account key and ai-usage.json as 0.24.151, before they moved to it):
 // from no file, from its saved sample, from a newer Tavora's file and from a damaged one, and what it does with a file
 // it can't read right now. saved-pins/ holds what that Tavora's own code wrote; a later Tavora must write the same, so
 // the files it writes open in the previous version, and it must read that version's files to the same result.
@@ -8,8 +9,10 @@ import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { loadAccount, saveAccount } from "./account";
-import { loadDiscordSecrets, saveDiscordSecrets, type Encryptor } from "./discord-store";
+import { AccountFile } from "./account";
+import { AccountKey } from "./account-key";
+import { AiUsageConnector } from "./ai-usage";
+import { DiscordSecretsFile, type Encryptor } from "./discord-store";
 import { DocumentStore } from "./documents";
 import { ChosenFolders } from "./folder-access";
 import { GameOverlayStore } from "./game-overlays";
@@ -272,26 +275,92 @@ const STORES: Pinned[] = [
     file: ["account.json"],
     sample: "",
     versionKey: "v",
-    open: async () => ({ account: await loadAccount(at("account.json"), encryptor) }),
+    open: async () => {
+      const file = new AccountFile(at("account.json"), encryptor);
+      return { file, account: await file.load() };
+    },
     read: ({ account }) => account,
-    change: () => saveAccount(at("account.json"), encryptor, { token: "t".repeat(24), email: "nik@example.com", discord: null, createdAt: "2026-11-01T00:00:00.000Z" }),
+    change: ({ file }) => file.save({ token: "t".repeat(24), email: "nik@example.com", discord: null, createdAt: "2026-11-01T00:00:00.000Z" }),
   },
   {
     name: "discord",
     file: ["discord.json"],
     sample: "",
     versionKey: "v",
-    open: async () => ({ secrets: await loadDiscordSecrets(at("discord.json"), encryptor) }),
+    open: async () => {
+      const file = new DiscordSecretsFile(at("discord.json"), encryptor);
+      return { file, secrets: await file.load() };
+    },
     read: ({ secrets }) => secrets,
-    change: () => saveDiscordSecrets(at("discord.json"), encryptor, { token: { accessToken: "a", refreshToken: "r", expiresAt: 1 } as never, last: null, games: {} }),
+    change: ({ file }) => file.save({ token: { accessToken: "a", refreshToken: "r", expiresAt: 1 } as never, last: null, games: {} }),
+  },
+  {
+    name: "account-key",
+    file: ["account-key.json"],
+    sample: "",
+    versionKey: "v",
+    open: async () => {
+      const key = accountKey();
+      await key.load();
+      return key;
+    },
+    read: (key: AccountKey) => key.copyKey()?.toString("hex") ?? null,
+    // A recovery key typed in, signed out: the same bytes each time.
+    change: (key: AccountKey) => key.takeHere(Buffer.alloc(32, 7)),
+  },
+  {
+    name: "ai-usage",
+    file: ["ai-usage.json"],
+    sample: "ai-usage.v2.json",
+    open: async () => {
+      const connector = aiUsage();
+      // Read as Settings first asks for it; a read that fails is what the store does with it.
+      const view = await connector.view().catch(failure);
+      return { connector, view };
+    },
+    read: ({ view }) => view,
+    change: ({ connector }) => connector.add("claude", "Home", inData(".claude-home")),
+    normalize: (text) => text.replace(/"id": ?"(?!9d2c1b5e|1a2b3c4d)[0-9a-f-]{36}"/g, '"id": "<new>"'),
   },
 ];
+
+/** The account's key as Tavora keeps it, signed out and offline (account-key.ts). */
+function accountKey(): AccountKey {
+  return new AccountKey({
+    file: at("account-key.json"),
+    legacyFile: at("cloud-copy-key.json"),
+    cacheFile: at("account-vault.bin"),
+    seenFile: at("account-vault-seen"),
+    encryptor,
+    baseUrl: "http://tavora.test/v1/account",
+    fetch: (async () => Promise.reject(new TypeError("offline"))) as unknown as typeof fetch,
+    token: () => null,
+    account: () => null,
+  });
+}
+
+/** The AI usage connector as host.ts makes it, without a provider or a login on this PC. */
+function aiUsage(): AiUsageConnector {
+  return new AiUsageConnector({
+    file: at("ai-usage.json"),
+    version: "9.9.9",
+    fetch: (async () => new Response("{}", { status: 500 })) as unknown as typeof fetch,
+    readText: (file) => readFile(file, "utf8").catch((error: NodeJS.ErrnoException) => (error.code === "ENOENT" ? null : Promise.reject(error))),
+    isDirectory: async () => true,
+    readCodex: async () => ({ signedIn: false, apiKey: false, email: null, limits: [] }) as never,
+    readClaudeEmail: async () => null,
+    detect: async () => [],
+    now: () => NOW.getTime(),
+    onChange: () => undefined,
+  });
+}
 
 /** A sealed file as Tavora writes it, its data sealed with the test's encryptor. */
 const sealedSample = (data: unknown) => JSON.stringify({ v: 1, data: encryptor.encrypt(JSON.stringify(data)).toString("base64") });
 const SEALED: Record<string, string> = {
   account: sealedSample({ token: "s".repeat(24), email: "old@example.com", discord: "nik", createdAt: "2026-10-01T00:00:00.000Z" }),
   discord: sealedSample({ token: { accessToken: "x", refreshToken: "y", expiresAt: 2 }, last: null, games: {} }),
+  "account-key": JSON.stringify({ v: 1, data: encryptor.encrypt(Buffer.alloc(32, 1).toString("base64")).toString("base64"), account: null }),
 };
 
 async function sampleText(store: Pinned): Promise<string> {

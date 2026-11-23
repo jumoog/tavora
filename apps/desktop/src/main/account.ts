@@ -6,11 +6,10 @@ import type { AccountDevice, AccountPending, AccountPrefix, AccountPublishToken,
 import type { Language, MessageKey } from "../shared/i18n";
 import { isIdPrefix } from "../shared/id-prefix";
 import type { Encryptor } from "./discord-store";
-import { writeFileAtomic } from "./fsutil";
-import { forgetSealedFile, openSealedFile } from "./json";
-import { STORE_VERSIONS } from "./saved-versions";
 import type { DiscordLoginResult } from "./discord-login";
 import { UserError } from "./messages";
+import { SavedFileHeld } from "./saved-file";
+import { SealedFile } from "./sealed-file";
 
 import type { SignIn } from "./sign-in";
 
@@ -48,19 +47,34 @@ function savedAccount(value: unknown): SavedAccount | null {
   return isToken(raw.token) && isText(raw.createdAt, 40) && (email || discord) ? { token: raw.token, email, discord, createdAt: raw.createdAt } : null;
 }
 
-export async function loadAccount(file: string, encryptor: Encryptor): Promise<SavedAccount | null> {
-  if (!encryptor.isAvailable()) return null;
-  // Missing, newer, damaged, or encrypted by another user or PC: signed out (openSealedFile keeps the file aside).
-  return openSealedFile(file, (data) => savedAccount(JSON.parse(encryptor.decrypt(Buffer.from(data, "base64")))));
-}
+/**
+ * account.json: the sign-in, sealed (sealed-file.ts). One that couldn't be read at start reads as signed out, and is
+ * never written over or removed: a save or sign-out moves it aside (kept) when it still can't be read.
+ */
+export class AccountFile {
+  private readonly sealed: SealedFile;
 
-export async function saveAccount(file: string, encryptor: Encryptor, account: SavedAccount | null): Promise<void> {
-  if (!account) {
-    await forgetSealedFile(file);
-    return;
+  constructor(
+    file: string,
+    private readonly encryptor: Encryptor,
+  ) {
+    // What it writes is the sign-in now, newer than one it couldn't read: that one moves aside instead of holding it up.
+    this.sealed = new SealedFile(file, { moveHeldAside: true });
   }
-  if (!encryptor.isAvailable()) return;
-  await writeFileAtomic(file, JSON.stringify({ v: STORE_VERSIONS.sealed, data: encryptor.encrypt(JSON.stringify(account)).toString("base64") }));
+
+  async load(): Promise<SavedAccount | null> {
+    if (!this.encryptor.isAvailable()) return null;
+    // Missing, newer, damaged, can't be read now, or encrypted by another user or PC: signed out (the file is kept).
+    const read = await this.sealed.open((data) => savedAccount(JSON.parse(this.encryptor.decrypt(Buffer.from(data, "base64")))));
+    return read.status === "opened" ? read.value : null;
+  }
+
+  /** Writes the sign-in down; null removes the file. */
+  async save(account: SavedAccount | null): Promise<void> {
+    if (!account) return this.sealed.forget();
+    if (!this.encryptor.isAvailable()) return;
+    await this.sealed.write({ data: this.encryptor.encrypt(JSON.stringify(account)).toString("base64") });
+  }
 }
 
 export function deviceOs(platform: NodeJS.Platform): DeviceOs {
@@ -851,14 +865,25 @@ export class AccountClient {
     this.saved = saved;
     this.pending = null;
     this.devices = null;
-    await this.keep();
-    this.changed();
+    try {
+      await this.keep();
+    } finally {
+      // Signed in either way: the host UI hears of it, also when the sign-in couldn't be written down.
+      this.changed();
+    }
     await this.refresh().catch(() => undefined);
     await this.syncProfile(true).catch(() => undefined);
   }
 
+  /**
+   * Writes the sign-in down. One that can't be written as account.json can't be read or moved aside (the user is told,
+   * sealed-file.ts) stays for this run only, as where the system can't keep it.
+   */
   private async keep(): Promise<void> {
-    if (this.options.canKeepSignIn()) await this.options.signIn.persist(this.saved);
+    if (!this.options.canKeepSignIn()) return;
+    await this.options.signIn.persist(this.saved).catch((error: unknown) => {
+      if (!(error instanceof SavedFileHeld)) throw error;
+    });
   }
 
   private async forget(): Promise<void> {
@@ -876,8 +901,11 @@ export class AccountClient {
     this.newPublishToken = null;
     this.prefixes = null;
     this.prefixCheck = null;
-    await this.options.signIn.persist(null);
-    this.changed();
+    try {
+      await this.options.signIn.persist(null);
+    } finally {
+      this.changed();
+    }
   }
 
   private changed(): void {
