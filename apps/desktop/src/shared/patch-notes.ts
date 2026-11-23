@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.146",
+    date: "2026-11-23",
+    title: "Smoother module updates",
+    notes: [
+      "Update all goes on with the next update when a module changes under it, instead of stopping.",
+      "Tavora remembers every account it saw on this PC, also when two sign-ins overlap.",
+    ],
+    prs: [
+      { number: 918, title: "Review leftovers: Update all, stale panels, popup watch, seen-file race" },
+    ],
+    tags: ["accounts", "modules", "privacy"],
+  },
+  {
     version: "0.24.145",
     date: "2026-11-23",
     title: "Safer module access",
