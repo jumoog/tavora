@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.158",
+    date: "2026-11-24",
+    title: "Safer cloud copy files",
+    notes: [
+      "Tavora never writes over a cloud copy file it can't read right now.",
+      "It keeps a copy of any cloud copy file that's damaged.",
+    ],
+    prs: [
+      { number: 934, title: "The cloud copy's own files move to SavedFile (part 6, last piece)" },
+    ],
+    tags: ["cloud-copy", "saved-data"],
+  },
+  {
     version: "0.24.157",
     date: "2026-11-23",
     title: "Overlay card stays clear",
