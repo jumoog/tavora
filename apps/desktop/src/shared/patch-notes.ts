@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.145",
+    date: "2026-11-23",
+    title: "Safer module access",
+    notes: [
+      "Access you allow goes only to the module copy you saw. If a development folder takes its place meanwhile, nothing is granted and the question closes.",
+    ],
+    prs: [
+      { number: 912, title: "Module access grants only the owner the dialog showed" },
+    ],
+    tags: ["modules", "privacy", "settings", "website"],
+  },
+  {
     version: "0.24.144",
     date: "2026-11-23",
     title: "Safer connector questions",
