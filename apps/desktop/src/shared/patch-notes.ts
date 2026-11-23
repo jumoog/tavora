@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.157",
+    date: "2026-11-23",
+    title: "Overlay card stays clear",
+    notes: [
+      "When you open the overlay in game, its card no longer shows over a panel for a moment.",
+    ],
+    prs: [
+      { number: 933, title: "e2e: the in-game layer over a stand-in game window" },
+    ],
+    tags: ["overlays"],
+  },
+  {
     version: "0.24.156",
     date: "2026-11-23",
     title: "New projects found",
