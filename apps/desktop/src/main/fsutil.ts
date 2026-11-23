@@ -3,8 +3,8 @@ import { lstat, mkdir, open, readdir, readFile, rm, stat } from "node:fs/promise
 import path from "node:path";
 import { renameHeld } from "./rename-held";
 
-/** The temp file writeFileAtomic writes first: `<file>.<12 hex>.tmp`. */
-const TEMP_NAME = /^(.+)\.[0-9a-f]{12}\.tmp$/;
+/** The temp file writeFileAtomic writes first, `<file>.<12 hex>.tmp`, or a write at quit, `<file>.now` (saved-file.ts). */
+const TEMP_NAME = /^(.+)(?:\.[0-9a-f]{12}\.tmp|\.now)$/;
 
 /**
  * Writes to a temp file, flushes it to the disk and renames it over the target, so readers never see half a file and a
@@ -13,6 +13,14 @@ const TEMP_NAME = /^(.+)\.[0-9a-f]{12}\.tmp$/;
  * removed by sweepWriteLeftovers at the next start.
  */
 export async function writeFileAtomic(file: string, body: string | Uint8Array): Promise<void> {
+  await writeFileUnlessReplaced(file, body, () => true);
+}
+
+/**
+ * writeFileAtomic, putting the new file in place only while `stillWanted` says yes (it is asked right before, so a
+ * newer write that took its place meanwhile wins). Answers whether the file was written.
+ */
+export async function writeFileUnlessReplaced(file: string, body: string | Uint8Array, stillWanted: () => boolean): Promise<boolean> {
   await mkdir(path.dirname(file), { recursive: true });
   const temp = `${file}.${randomBytes(6).toString("hex")}.tmp`;
   try {
@@ -23,11 +31,13 @@ export async function writeFileAtomic(file: string, body: string | Uint8Array): 
     } finally {
       await handle.close();
     }
-    await renameHeld(temp, file);
+    if (await renameHeld(temp, file, undefined, stillWanted)) return true;
   } catch (error) {
     await rm(temp, { force: true }).catch(() => undefined);
     throw error;
   }
+  await rm(temp, { force: true }).catch(() => undefined);
+  return false;
 }
 
 /** How old a temp must be to count as left over: a write takes moments, so no running write still owns one this old. */
@@ -44,10 +54,11 @@ const SWEEP_DEPTH = 8;
 
 /**
  * Removes the temps writeFileAtomic left when Tavora was stopped in the middle of a write, at a start. Only in the data
- * folder (never the cloud copy's folder, where another PC may be writing), only `<file>.<12 hex>.tmp` files more than an
- * hour old by the clock as each is looked at (a temp dated in the future stays), and only next to their file: then that
- * file is whole (the old content or the new), so nothing is lost. A temp whose file is missing stays, as it may be the
- * only copy. Links are never followed or removed. Answers what it removed.
+ * folder (never the cloud copy's folder, where another PC may be writing), only `<file>.<12 hex>.tmp` files (and the
+ * `<file>.now` of a write at quit, saved-file.ts) more than an hour old by the clock as each is looked at (a temp dated
+ * in the future stays), and only next to their file: then that file is whole (the old content or the new), so nothing
+ * is lost. A temp whose file is missing stays, as it may be the only copy. Links are never followed or removed.
+ * Answers what it removed.
  */
 export async function sweepWriteLeftovers(userData: string, clock: () => number = Date.now): Promise<string[]> {
   const removed: string[] = [];
