@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.152",
+    date: "2026-11-23",
+    title: "Fit skips side lists",
+    notes: [
+      "Double-click the line under a panel with a list beside its content: the panel now fits the content, and the list keeps scrolling.",
+    ],
+    prs: [
+      { number: 927, title: "Fit on double-click: pages can leave a side list out" },
+    ],
+    tags: ["workspace"],
+  },
+  {
     version: "0.24.151",
     date: "2026-11-23",
     title: "Safer cloud copy in a folder",
