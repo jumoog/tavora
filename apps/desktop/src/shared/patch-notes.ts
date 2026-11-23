@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.148",
+    date: "2026-11-23",
+    title: "A column per level on item cards",
+    notes: [
+      "Game modules can show each stat at level 1, 2 and 3 side by side on an item card, under their own headings.",
+    ],
+    prs: [
+      { number: 924, title: "Item cards: extra value columns with headings" },
+    ],
+    tags: ["publishing", "sdk", "tooltips", "ui-kit", "website"],
+  },
+  {
     version: "0.24.147",
     date: "2026-11-23",
     title: "Safer module questions",
