@@ -16,6 +16,8 @@ import {
   fileSha256,
   filledPlaces,
   lookCopyState,
+  NewestUnreadable,
+  openManifest,
   sortWrittenSince,
   swapInCopy,
   undoSwap,
@@ -29,7 +31,7 @@ import {
 } from "./cloud-copy";
 import { AccountKey } from "./account-key";
 import type { Encryptor } from "./discord-store";
-import { recoveryKey } from "./copy-crypto";
+import { copyKeys, parseRecoveryKey, recoveryKey } from "./copy-crypto";
 import { checkFolder, FolderStorage } from "./copy-folder";
 import { writeFileAtomic } from "./fsutil";
 import { COPY_STATUS_FILE, lookSwapPlan, lookSwapStatus, stepSwap, SWAP_IDLE, writeFlushed, writeSwapStatus, type SwapEvent, type SwapPlan, type SwapStatus } from "./cloud-copy-swap";
@@ -70,6 +72,8 @@ interface Staged {
   files: Record<string, Omit<SyncedFile, "mtimeMs">>;
   /** Its manifest sealed its version (a list from an older Tavora has none: not sealed). */
   sealed?: boolean;
+  /** Its manifest carried its mark (one from an older Tavora has none). */
+  marked?: boolean;
   /** In a `staged.json` an older Tavora left: the user chose it. Now that is the status `chosen`. */
   take?: boolean;
 }
@@ -158,6 +162,8 @@ export class CopySync {
   private account: string | null | undefined = undefined;
   /** The questions syncing waits on. They can be open together (a key asked for while a conflict stands), so it is a set. */
   private questions: ReadonlySet<Question> = new Set();
+  /** The newest list in the folder doesn't open with this key, though earlier ones do: the question says so (NewestUnreadable). */
+  private unreadable = false;
   private closing: Closing = { phase: "open" };
   private problem: CloudCopyProblem | null = null;
   /** Where putting a copy in place stands (cloud-copy-swap.ts); on disk, except `held`. */
@@ -210,7 +216,9 @@ export class CopySync {
   }
 
   private storageFor(folder: string | null): CopyStorage {
-    return folder === null ? this.service : (this.options.folderStorage ?? ((picked) => new FolderStorage(picked)))(folder);
+    return folder === null
+      ? this.service
+      : (this.options.folderStorage ?? ((picked) => new FolderStorage(picked, { unusedFile: path.join(this.options.userData, "cloud-copy-unused.json") })))(folder);
   }
 
   /** Signed out with the copy in a folder: the key stays on this PC, without the account's vault. */
@@ -345,7 +353,7 @@ export class CopySync {
         // Only when another account is signed in: that is what the question says.
         return !this.on && this.accountKeys.signedIn && !this.accountKeys.copyIsOf(this.options.account.id()) ? "waiting" : null;
       case "idle":
-        return null;
+        return this.unreadable ? "unreadable" : null;
       default:
         return assertNever(this.swap);
     }
@@ -624,10 +632,21 @@ export class CopySync {
       return false;
     }
     this.copy = { size: remote.size, savedAt: remote.updatedAt };
-    if (remote.version === this.state.version) return false;
+    if (remote.version === this.state.version) {
+      // Parts of this PC's own last save that went missing go back, or every other PC waits for them.
+      if (this.cloud.storage.arrivesLate) {
+        const put = await this.cloud.heal(this.key!, this.roots(), this.state, () => turn === this.turn).catch((error: unknown) => {
+          this.log(`cloud copy: missing parts not put back: ${error instanceof Error ? error.message : String(error)}`);
+          return 0;
+        });
+        if (put > 0) this.log(`cloud copy: put back ${put} missing part(s) of this PC's last save`);
+      }
+      return false;
+    }
     // Changed here, or this PC's last save lost against another PC's (in a synced folder): the user chooses.
     if (remote.follows === false || this.swap.phase === "asking" || (await hasLocalChanges(this.roots(), this.state))) {
       if (turn !== this.turn) return false;
+      this.unreadable = false;
       this.ask("conflict");
       this.changed();
       return false;
@@ -639,6 +658,7 @@ export class CopySync {
       // one. It isn't taken without the user: they choose, as when both changed.
       if (!(error instanceof CopyError) || error.reason !== "older") throw error;
       if (turn !== this.turn) return false;
+      this.unreadable = error instanceof NewestUnreadable;
       this.ask("conflict");
       this.changed();
       return false;
@@ -647,20 +667,21 @@ export class CopySync {
 
   /**
    * Downloads the copy into the staging folder, to be taken at the next start. A copy saved on top of an older
-   * version than `since` is refused ("older"); only the check at start passes one, the user's own choices take any.
+   * version than `since` is refused ("older"); only the check at start passes one. One that looks older or unmarked is
+   * refused too (CloudCopy.download), unless the user `chosen` it: their own choices take any.
    */
-  private async stage(since = 0): Promise<Staged | null> {
+  private async stage(since = 0, chosen = false): Promise<Staged | null> {
     this.refuseDuringSwap();
     const turn = this.turn;
     await rm(this.stagingDir, { recursive: true, force: true });
     let copy: Awaited<ReturnType<CloudCopy["download"]>>;
     try {
-      copy = await this.cloud.download(this.key!, this.roots(), this.stagedData, since, this.state.sealed === true, () => turn === this.turn);
+      copy = await this.cloud.download(this.key!, this.roots(), this.stagedData, since, { sealed: this.state.sealed === true, marked: this.state.marked === true, chosen }, () => turn === this.turn);
     } catch (error) {
       // The account's vault doesn't open with this PC's key either (another PC started over with a new key, or the
       // service sent something else): the copy goes off here, and turning it on asks for the new key. The key and the
       // vault this PC last read stay until a key that opens the account's is typed in (account-key.ts).
-      if (error instanceof CopyError && error.reason === "damaged" && !this.keyHere && !(await this.accountKeys.fits())) {
+      if (error instanceof CopyError && (error.reason === "damaged" || error instanceof NewestUnreadable) && !this.keyHere && !(await this.accountKeys.fits())) {
         await this.forget("new-key");
         throw new KeyChanged();
       }
@@ -683,10 +704,10 @@ export class CopySync {
     const list = await this.lookList();
     const staged = list.status === "present" ? list.value : null;
     const remote = staged ? await this.cloud.remote() : null;
-    if (!staged || !remote || remote.version !== staged.version) return this.stage();
+    if (!staged || !remote || remote.version !== staged.version) return this.stage(0, true);
     // Held counts as not whole here: the user asked for this copy, so it simply comes down again.
     const whole = await look(() => this.stagedWhole(staged));
-    return whole.status === "present" && whole.value ? staged : this.stage();
+    return whole.status === "present" && whole.value ? staged : this.stage(0, true);
   }
 
   /** The staged copy's list, also one an older Tavora left. A list that makes no sense is damaged, so held. */
@@ -890,8 +911,8 @@ export class CopySync {
 
   /**
    * Going back after an older Tavora turned the copy on during the swap: its cloud-copy.json beside the parked state is
-   * newer and wins, but it never knows `sealed`. When the copy is still kept where the swap's copy came from, this PC has
-   * seen a sealed one there, and keeps that: an unsealed list served there again stays refused. Where is the place and the
+   * newer and wins, but it never knows `sealed` or `marked`. When the copy is still kept where the swap's copy came from,
+   * this PC has seen a sealed (or marked) one there, and keeps that: an unsealed (or unmarked) list there stays refused. Where is the place and the
    * account signed in (the service keeps one copy per account). Null to leave it as it is.
    */
   private async sealedBeside(plan: SwapPlan): Promise<CopyState | null> {
@@ -899,8 +920,12 @@ export class CopySync {
     if (plan.place !== (await loadPlace(this.placeFile))) return null;
     const parked = await lookCopyState(this.parkedFile);
     const beside = await lookCopyState(this.stateFile);
-    if (parked.status !== "present" || parked.value.sealed !== true || beside.status !== "present" || beside.value.sealed === true) return null;
-    return { ...beside.value, sealed: true };
+    if (parked.status !== "present" || beside.status !== "present") return null;
+    // The same goes for a marked one.
+    const sealed = parked.value.sealed === true && beside.value.sealed !== true;
+    const marked = parked.value.marked === true && beside.value.marked !== true;
+    if (!sealed && !marked) return null;
+    return { ...beside.value, ...(parked.value.sealed === true ? { sealed: true } : {}), ...(parked.value.marked === true ? { marked: true } : {}) };
   }
 
   /**
@@ -991,8 +1016,8 @@ export class CopySync {
     // copy with pictures, which had begun to move them: those places are taken back first.
     if (resumed && !staged.pictures) await undoSwap(this.stagedData, roots.filter((root) => root.picture), plan.keepIn, { version: 0, pictures: true, files: {} }, plan.empty);
     const taken = await swapInCopy(this.stagedData, roots, plan.keepIn, staged, resumed);
-    // Once seen, a sealed copy stays seen, also after taking an older Tavora's copy.
-    const state = before.sealed === true ? { ...taken, sealed: true } : taken;
+    // Once seen, a sealed (or marked) copy stays seen, also after taking an older Tavora's copy.
+    const state = { ...taken, ...(before.sealed === true ? { sealed: true } : {}), ...(before.marked === true ? { marked: true } : {}) };
     await keepPcSettings(libraryFile(this.options.userData), plan.own, state);
     if (await sortWrittenSince(plan.keepIn, staged, before, await this.earlier(plan))) this.keptAside = plan.keepIn;
     // Turned off before the cut: the files are finished, and the copy stays off.
@@ -1099,6 +1124,8 @@ export class CopySync {
         } else if (result.version === 0) {
           await this.forget("deleted");
         } else {
+          // Which kind it is shows once the user answers (keep).
+          this.unreadable = false;
           this.ask("conflict");
         }
       } catch (error) {
@@ -1223,6 +1250,9 @@ export class CopySync {
   private async startCopy(turn: number): Promise<void> {
     if (this.swapOpen) throw new UserError("cloudCopy.error.restartFirst");
     let staged: Staged | null = null;
+    // A copy that isn't taken without asking (an unmarked list where marked ones are): nothing comes down before the
+    // user chooses, as for any copy that is there.
+    let asks = false;
     try {
       staged = await this.exclusive("downloading", async () => {
         const remote = await this.cloud.remote();
@@ -1233,9 +1263,15 @@ export class CopySync {
     } catch (error) {
       // Turned off meanwhile: nothing to say about a turn-on that no longer counts.
       if (turn !== this.turn) return;
-      // Sealed with another key: a copy from before the account had its key.
-      if (error instanceof CopyError && error.reason === "damaged") throw new UserError("cloudCopy.error.wrongKey");
-      throw CopySync.userError(this.noteProblem(error));
+      if (error instanceof CopyError && error.reason === "older") {
+        asks = true;
+        this.unreadable = error instanceof NewestUnreadable;
+      }
+      else {
+        // Sealed with another key: a copy from before the account had its key.
+        if (error instanceof CopyError && error.reason === "damaged") throw new UserError("cloudCopy.error.wrongKey");
+        throw CopySync.userError(this.noteProblem(error));
+      }
     }
     // Turned off (or signed out) while it looked: it stays off.
     if (turn !== this.turn) return;
@@ -1243,7 +1279,7 @@ export class CopySync {
     this.state = EMPTY_STATE;
     if (!(await this.keepState(turn)) || !(await this.keepPlace(turn, this.folder))) return;
     this.problem = null;
-    if (staged) {
+    if (staged || asks) {
       // This PC has its own data too: the user keeps one side.
       this.ask("conflict");
       this.changed();
@@ -1422,8 +1458,13 @@ export class CopySync {
     if (beside) await rm(this.stateFile, { force: true });
   }
 
-  /** Keeps one side when both changed. The other side is kept as a local backup. */
-  async keep(side: "pc" | "cloud"): Promise<void> {
+  /**
+   * Keeps one side when both changed. The other side is kept as a local backup. Over a newest list this PC's key doesn't
+   * open (NewestUnreadable) nothing can be kept of the other side, and another PC that started over with a new key couldn't
+   * open this PC's side either: only with `replace` (the user confirmed that) does this PC's side go on top. Without it, the
+   * question says so (`conflictKind` "unreadable") and nothing changes.
+   */
+  async keep(side: "pc" | "cloud", replace = false): Promise<void> {
     // A swap that stopped halfway is settled at a start, when nothing reads the data: finished, or taken back. Also with
     // the copy off, where this is the only way out of it.
     const swap = await this.swapForAnswer();
@@ -1457,11 +1498,29 @@ export class CopySync {
     }
     if (side === "cloud") return this.takeCopy(swap);
     const turn = this.turn;
+    let unconfirmed = false;
     await this.exclusive("downloading", async () => {
       try {
-        const staged = await this.stageCurrent();
+        // The newest list doesn't open with this key (NewestUnreadable): nothing of it can come down or be kept, and this
+        // PC's side goes on top of it, once the user confirmed it replaces another PC's newer copy.
+        let over: number | null = null;
+        const staged = await this.stageCurrent().catch((error: unknown) => {
+          if (!(error instanceof NewestUnreadable)) throw error;
+          over = error.version;
+          return null;
+        });
         if (turn !== this.turn) return;
-        if (staged) {
+        if (over !== null && !replace) {
+          unconfirmed = true;
+          await rm(this.stagingDir, { recursive: true, force: true });
+          return;
+        }
+        if (over !== null) {
+          await rm(this.stagingDir, { recursive: true, force: true });
+          // Where it was before: if that list can't be saved on top of, the save goes there (FolderStorage.makeRoom). Kept
+          // over the same list again (the save before had to ask), still where it was the first time.
+          this.state = { ...this.state, version: over, kept: true, keptFrom: this.state.keptFrom ?? this.state.version };
+        } else if (staged) {
           // The list goes first: a crash can't leave it naming files that moved. The upload below replaces the copy, so
           // it doesn't run unless the copy's side is safe in the backup.
           const backup = await this.backupFolder("cloud");
@@ -1471,10 +1530,12 @@ export class CopySync {
           // This PC's side goes up on top of the copy, even when nothing changed here since its last sync (the copy was
           // older, or made anew). Marked on disk, so it counts as changed until an upload succeeds, also across a restart;
           // the files keep their dates and parts, so a retry reads only what really changed.
-          this.state = { ...this.state, version: staged.version, kept: true };
+          const { keptFrom: _, ...rest } = this.state;
+          this.state = { ...rest, version: staged.version, kept: true };
         } else {
           this.state = EMPTY_STATE;
         }
+        this.unreadable = false;
         await rm(this.stagingDir, { recursive: true, force: true });
         await this.keepState(turn);
         // Choosing this PC's side also answers for data it lost: what is here now is what the user wants up.
@@ -1485,9 +1546,79 @@ export class CopySync {
       }
     });
     if (turn !== this.turn) return;
+    if (unconfirmed) {
+      this.unreadable = true;
+      return this.changed();
+    }
     this.clear("conflict");
     this.clear("restartToTake");
     await this.sync(true);
+  }
+
+  /**
+   * Signed out, the newest list in the folder doesn't open with this PC's key: the recovery key of another PC that started
+   * over is typed in. Only a key that opens that list is taken (one that doesn't leaves everything as it was, so a mistyped
+   * key never costs this PC the key it has), and only once its copy came down whole: parts a sync app hasn't brought yet
+   * ("not-arrived") leave everything as it was too, to try again later. That copy stays staged, and the user keeps one
+   * side as when turning the copy on (a newer list by then is downloaded and checked again when they answer).
+   */
+  async enterOtherKey(text: string): Promise<void> {
+    if (!this.on || !this.keyHere || !this.unreadable) throw new UserError("cloudCopy.error.wrongKey");
+    const key = parseRecoveryKey(text);
+    if (!key) throw new UserError("cloudCopy.error.badKey");
+    const turn = this.turn;
+    const opens = await this.exclusive("checking", async () => {
+      const current = await this.cloud.storage.manifest();
+      if (!current) return false;
+      try {
+        openManifest(copyKeys(key), current.sealed);
+        return true;
+      } catch {
+        return false;
+      }
+    }).catch((error: unknown) => {
+      throw CopySync.userError(this.noteProblem(error));
+    });
+    if (turn !== this.turn) return;
+    if (!opens) throw new UserError("cloudCopy.error.wrongKey");
+    await rm(this.stagingDir, { recursive: true, force: true });
+    const came = await this.exclusive("downloading", () => this.cloud.download(key, this.roots(), this.stagedData, 0, { chosen: true }, () => turn === this.turn)).catch(
+      async (error: unknown) => {
+        await rm(this.stagingDir, { recursive: true, force: true });
+        if (turn !== this.turn) return null;
+        throw CopySync.userError(this.noteProblem(error));
+      },
+    );
+    if (turn !== this.turn) return;
+    if (!came) {
+      // The folder's copy went away meanwhile: nothing changes, and the user hears so.
+      await rm(this.stagingDir, { recursive: true, force: true });
+      throw new UserError("cloudCopy.error.noCopy");
+    }
+    // Nothing of what this PC synced under the old key counts any more, as at turn-on: written before the key changes, so a
+    // crash in between never leaves the old key's parts noted under the new one (that is harmless the other way round).
+    // Not written (a full disk): this PC stays as it was, in memory too, with nothing staged.
+    const before = this.state;
+    this.state = EMPTY_STATE;
+    const written = await this.keepState(turn).catch((error: unknown) => {
+      this.state = before;
+      return rm(this.stagingDir, { recursive: true, force: true }).then(() => {
+        throw CopySync.userError(this.noteProblem(error));
+      });
+    });
+    if (!written) {
+      if (turn === this.turn) this.state = before;
+      await rm(this.stagingDir, { recursive: true, force: true });
+      return;
+    }
+    // The key, then the copy's list: a list staged under a key this PC doesn't have would be damaged at the next start.
+    await this.accountKeys.takeHere(key);
+    const staged: Staged = { v: 1, ...came };
+    await writeFileAtomic(this.listFile, JSON.stringify(staged));
+    this.unreadable = false;
+    this.problem = null;
+    this.ask("conflict");
+    this.changed();
   }
 
   /** This PC's side counts as changed until an upload succeeds (CopyState `kept`), wherever the state is now. */
@@ -1539,6 +1670,12 @@ export class CopySync {
       } catch (error) {
         if (error instanceof KeyChanged) throw CopySync.userError(this.noteProblem(error));
         if (error instanceof UserError) throw error;
+        // Nothing of it opens: only this PC's side can be the answer, and the question now says so.
+        if (error instanceof NewestUnreadable) {
+          this.unreadable = true;
+          this.changed();
+          throw new UserError("cloudCopy.error.unreadable");
+        }
         throw CopySync.userError(this.noteProblem(error));
       }
     });
@@ -1590,7 +1727,7 @@ export class CopySync {
     return this.exclusive("downloading", async () => {
       let copy: Awaited<ReturnType<CloudCopy["download"]>>;
       try {
-        copy = await this.cloud.download(this.key!, roots, incoming, 0, this.state.sealed === true, () => turn === this.turn);
+        copy = await this.cloud.download(this.key!, roots, incoming, 0, { sealed: this.state.sealed === true, marked: this.state.marked === true, chosen: true }, () => turn === this.turn);
       } catch (error) {
         await rm(incoming, { recursive: true, force: true });
         if (turn !== this.turn) return null;
@@ -1714,6 +1851,7 @@ export class CopySync {
     this.copyOn = false;
     this.state = EMPTY_STATE;
     this.shownKey = null;
+    this.unreadable = false;
     this.clear("askKey");
     this.clear("conflict");
     this.clear("restartToTake");

@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { readdir, readFile, rm, stat } from "node:fs/promises";
+import { lstat, readdir, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import type { PairingView } from "../shared/host-api";
 import type { CopySync } from "./cloud-copy-sync";
@@ -28,6 +28,12 @@ import { UserError } from "./messages";
 
 /** How long a request through the folder lasts: a sync app can be slow. */
 export const FOLDER_PAIRING_MS = 24 * 60 * 60_000;
+/**
+ * How far the asking PC's clock may be ahead (a day: clocks that are off by hours, or a time zone set wrong). A request
+ * in the folder that says it lasts longer than FOLDER_PAIRING_MS and this from now wasn't made by Tavora (anyone who can
+ * write the folder can plant one): it is removed, never answered. One within it that stays can't hide others (`skip`).
+ */
+export const CLOCK_AHEAD_MS = 24 * 60 * 60_000;
 /** How often a PC that asks looks for an answer. */
 const ASK_EVERY_MS = { service: 3_000, folder: 5_000 };
 /** How often a PC with the key looks for a PC that asks. */
@@ -64,8 +70,11 @@ export interface PairingRequest {
 /** Where the messages go: Tavora's service, or the cloud copy's folder. */
 export interface PairingTransport {
   readonly via: "service" | "folder";
-  /** The request this PC asked, or one it may answer (or answered); null when there is none. */
-  read(): Promise<PairingRequest | null>;
+  /**
+   * The request this PC asked, or one it may answer (or answered); null when there is none. Of several, none in `skip`
+   * (requests this PC turned down or let go of), so one that stays can't hide the others.
+   */
+  read(skip?: ReadonlySet<string>): Promise<PairingRequest | null>;
   ask(commit: string): Promise<{ id: string; expiresAt: number }>;
   /** False when another PC answered first. */
   answer(id: string, publicKey: string): Promise<boolean>;
@@ -419,13 +428,13 @@ export class Pairing {
   private async lookAt(transport: PairingTransport): Promise<void> {
     let request: PairingRequest | null;
     try {
-      request = await transport.read();
+      request = await transport.read(this.refused);
     } catch {
       return;
     }
     const answering = this.answering;
-    if (answering && answering.transport.via === transport.via && (!request || request.id !== answering.id || request.declined)) {
-      // Done, given up or answered by another PC: not answered again.
+    if (answering && answering.transport.via === transport.via && (!request || request.id !== answering.id || request.declined || this.now() >= request.expiresAt)) {
+      // Done, given up, run out or answered by another PC: not answered again.
       this.refused.add(answering.id);
       this.answering = null;
       this.changed();
@@ -711,8 +720,16 @@ export class FolderPairing implements PairingTransport {
     return path.join(this.dir, `${id}.${step}.json`);
   }
 
+  /** A step's file as it is, not what a link in its place leads to: null when it is a link or anything else than a file. */
+  private async ownFile(id: string, step: Step) {
+    const info = await lstat(this.file(id, step)).catch(() => null);
+    return info?.isFile() ? info : null;
+  }
+
   private async readStep(id: string, step: Step): Promise<Record<string, unknown> | null> {
     try {
+      // A link in a step's place leads out of the folder: not read, as if a sync app hadn't finished it.
+      if (!(await this.ownFile(id, step))) return null;
       const value = JSON.parse(await readFile(this.file(id, step), "utf8")) as unknown;
       return typeof value === "object" && value !== null && !Array.isArray(value) && (value as { v?: unknown }).v === 1 ? (value as Record<string, unknown>) : null;
     } catch {
@@ -720,8 +737,22 @@ export class FolderPairing implements PairingTransport {
     }
   }
 
+  /**
+   * The pairing folder and the "Tavora" one it is in, when neither is a link or junction: one would lead out of the
+   * folder, and nothing there is read, written or cleaned up ("other"). lstat, as in copy-folder.ts.
+   */
+  private async kind(): Promise<"dir" | "missing" | "other"> {
+    for (const dir of [path.dirname(this.dir), this.dir]) {
+      const info = await lstat(dir).catch(() => null);
+      if (!info) return "missing";
+      if (info.isSymbolicLink() || !info.isDirectory()) return "other";
+    }
+    return "dir";
+  }
+
   private async write(id: string, step: Step, value: Record<string, unknown>): Promise<void> {
     if (!(await stat(path.dirname(this.dir)).catch(() => null))?.isDirectory()) throw new CopyError("no-folder", "the cloud copy folder is not there");
+    if ((await this.kind()) === "other") throw new CopyError("folder-locked", "the cloud copy folder holds a link where Tavora keeps its files");
     await writeFileAtomic(this.file(id, step), JSON.stringify({ v: 1, ...value }));
   }
 
@@ -729,8 +760,8 @@ export class FolderPairing implements PairingTransport {
     for (const step of ["request", "answer", "reveal", "key", "declined"] as const) await rm(this.file(id, step), { force: true });
   }
 
-  async read(): Promise<PairingRequest | null> {
-    const names = await readdir(this.dir).catch(() => [] as string[]);
+  async read(skip: ReadonlySet<string> = new Set()): Promise<PairingRequest | null> {
+    const names = (await this.kind()) === "dir" ? await readdir(this.dir).catch(() => [] as string[]) : [];
     const steps = new Map<string, Set<Step>>();
     for (const name of names) {
       const match = STEP_FILE.exec(name);
@@ -759,7 +790,8 @@ export class FolderPairing implements PairingTransport {
         continue;
       }
       const expiresAt = request.expiresAt;
-      if (expiresAt <= this.now()) {
+      // Run out, or lasting longer than any request Tavora makes: one planted there would never go.
+      if (expiresAt <= this.now() || expiresAt > this.now() + FOLDER_PAIRING_MS + CLOCK_AHEAD_MS) {
         await this.remove(id);
         continue;
       }
@@ -786,8 +818,10 @@ export class FolderPairing implements PairingTransport {
         ...(typeof key?.sealed === "string" ? { sealed: key.sealed } : {}),
       };
       if (own) return seen;
-      // Of several, the newest one.
-      if (!found || seen.expiresAt > found.expiresAt) found = seen;
+      // Of several, the newest one this PC hasn't let go of; the one it answers comes first.
+      if (skip.has(id) && !this.answered.has(id)) continue;
+      if (this.answered.has(id)) found = seen;
+      else if (!found || (!this.answered.has(found.id) && seen.expiresAt > found.expiresAt)) found = seen;
     }
     return found;
   }
@@ -798,7 +832,7 @@ export class FolderPairing implements PairingTransport {
 
   /** Written longer ago than any request lasts. */
   private async isOld(id: string, step: Step): Promise<boolean> {
-    const info = await stat(this.file(id, step)).catch(() => null);
+    const info = await lstat(this.file(id, step)).catch(() => null);
     return info !== null && this.now() - info.mtimeMs > FOLDER_PAIRING_MS;
   }
 
@@ -813,7 +847,7 @@ export class FolderPairing implements PairingTransport {
 
   async answer(id: string, publicKey: string): Promise<boolean> {
     // Any answer there, readable yet or not, is another PC's.
-    if (await stat(this.file(id, "answer")).catch(() => null)) return false;
+    if (await lstat(this.file(id, "answer")).catch(() => null)) return false;
     const by = randomBytes(8).toString("hex");
     // One request at a time: the one answered before is done with.
     this.answered.clear();

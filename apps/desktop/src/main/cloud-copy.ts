@@ -1,11 +1,11 @@
 import { apiReason } from "@tavora/module-schema";
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { cp, mkdir, open as openFile, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isOwnerId } from "@tavora/module-schema";
 import { DATA_DIRS, PICTURE_DIRS } from "./backup";
-import { copyKeys, open, PART_ID_BYTES, partId, seal } from "./copy-crypto";
+import { copyKeys, keyFingerprint, manifestMark, open, PART_ID_BYTES, partId, seal, type CopyKeys } from "./copy-crypto";
 import { writeFileAtomic } from "./fsutil";
 import { DamagedFile, look, lookBytes, lookNames, lookStat, unlessHeld, type Looked } from "./file-look";
 import { renameHeld } from "./rename-held";
@@ -92,6 +92,23 @@ export interface CopyState {
    * start treats it as older. An older Tavora ignores it (and drops it when it saves; then the check is as before).
    */
   sealed?: boolean;
+  /**
+   * This PC has seen a copy whose manifest carries its mark (Manifest.mark): one uploaded from here or taken. From then
+   * on, a manifest without one is an older Tavora's or a part put in a manifest's place, and the check at start treats it
+   * as older, as for `sealed`. An older Tavora ignores it (and drops it when it saves).
+   */
+  marked?: boolean;
+  /**
+   * The user kept this PC's side over a newest list its key doesn't open (`version` is that list's, and `kept` is set): the
+   * version this PC had followed before. Where that list can't be saved on top of, the save goes on top of this one, and
+   * only when it is still the newest left (FolderStorage.makeRoom). An older Tavora ignores it.
+   */
+  keptFrom?: number;
+  /**
+   * Which key `files` were synced with (copy-crypto.ts `keyFingerprint`). Under another key their part ids mean nothing, so
+   * an upload with it sends every file again. A state without it (an older Tavora's) can't tell, and counts as the same.
+   */
+  keyId?: string;
 }
 
 export const EMPTY_STATE: CopyState = { version: 0, pictures: true, files: {} };
@@ -106,10 +123,84 @@ interface Manifest {
    * a newer one there either. Copies saved before Tavora sealed it have none.
    */
   base?: number;
+  /**
+   * In a folder: the version it was saved on top of, which its file name says too, unchecked. Not `base`: an older Tavora
+   * reads that as the service's and would refuse a folder's copy that two PCs saved at once.
+   */
+  parent?: number;
   /** False when pictures were left out to fit; a restore keeps this PC's pictures then. */
   pictures: boolean;
   files: { path: string; size: number; sha256: string; parts: string[] }[];
+  /**
+   * The manifest's mark over the rest (copy-crypto.ts `manifestMark`): Tavora wrote this as a manifest, rather than a part
+   * being put in its place. Manifests of an older Tavora have none; it ignores this one.
+   */
+  mark?: string;
 }
+
+/** What a manifest's mark covers, in a fixed order. */
+const markedFields = (manifest: Manifest): string =>
+  JSON.stringify([manifest.v, manifest.version ?? null, manifest.base ?? null, manifest.parent ?? null, manifest.pictures, manifest.files.map((file) => [file.path, file.size, file.sha256, file.parts])]);
+
+const HEX_ID = /^[0-9a-f]{64}$/;
+const isVersion = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
+
+/**
+ * A sealed manifest, opened and checked: it opens with the key, is a list, and its mark (when it has one) is right. Throws
+ * "damaged" otherwise. `marked` says whether it has one; one without is an older Tavora's, or a part in its place.
+ */
+export function openManifest(keys: CopyKeys, sealed: Uint8Array): { manifest: Manifest; marked: boolean } {
+  let manifest: Manifest;
+  try {
+    manifest = JSON.parse(open(keys, sealed).toString("utf8")) as Manifest;
+  } catch {
+    // Sealed with another key: the recovery key typed in is not this copy's, or the copy was changed.
+    throw new CopyError("damaged", "the copy could not be opened with this key");
+  }
+  if (typeof manifest !== "object" || manifest === null || manifest.v !== 1 || !Array.isArray(manifest.files)) throw new CopyError("damaged", "the copy's list is off");
+  const wellFormed = manifest.files.every(
+    (file) =>
+      typeof file === "object" &&
+      file !== null &&
+      typeof file.path === "string" &&
+      Number.isSafeInteger(file.size) &&
+      file.size >= 0 &&
+      typeof file.sha256 === "string" &&
+      HEX_ID.test(file.sha256) &&
+      Array.isArray(file.parts) &&
+      file.parts.length > 0 &&
+      file.parts.every((id) => typeof id === "string" && HEX_ID.test(id)),
+  );
+  if (!wellFormed) throw new CopyError("damaged", "the copy's list is off");
+  if (manifest.version !== undefined && (!isVersion(manifest.version) || manifest.version < 1)) throw new CopyError("damaged", "the copy's list is off");
+  if (manifest.parent !== undefined && (!isVersion(manifest.parent) || manifest.version === undefined || manifest.parent >= manifest.version)) throw new CopyError("damaged", "the copy's list is off");
+  if (manifest.mark === undefined) return { manifest, marked: false };
+  const mark = typeof manifest.mark === "string" ? Buffer.from(manifest.mark) : Buffer.alloc(0);
+  const right = Buffer.from(manifestMark(keys, markedFields(manifest)));
+  if (mark.length !== right.length || !timingSafeEqual(mark, right)) throw new CopyError("damaged", "the copy's list is not one Tavora wrote");
+  return { manifest, marked: true };
+}
+
+/** The check a storage cleans up by, with these keys. */
+function checkWith(keys: CopyKeys): ManifestCheck {
+  return (sealed) => {
+    try {
+      const { manifest, marked } = openManifest(keys, sealed);
+      return { ...(manifest.version !== undefined ? { version: manifest.version } : {}), ...(manifest.parent !== undefined ? { parent: manifest.parent } : {}), marked, parts: manifestParts(manifest) };
+    } catch {
+      return null;
+    }
+  };
+}
+
+/** Every part a manifest uses, once each, in order. */
+export const manifestParts = (manifest: Pick<Manifest, "files">): string[] => [...new Set(manifest.files.flatMap((file) => file.parts))];
+
+/**
+ * Checks one of the manifests a storage keeps, with the key: what it says about itself and which parts it uses, or null
+ * when it isn't one this key opens (or its mark is off). The folder cleans up by this, never by what is outside the seal.
+ */
+export type ManifestCheck = (sealed: Uint8Array) => { version?: number; parent?: number; marked: boolean; parts: string[] } | null;
 
 export class CopyError extends Error {
   constructor(
@@ -117,6 +208,17 @@ export class CopyError extends Error {
     message: string = reason,
   ) {
     super(message);
+  }
+}
+
+/**
+ * In a folder, the newest manifest can't be used with this key, though earlier ones open with it: junk put on top, a list
+ * changed on the way, or one sealed with the key from before Start over. It isn't taken ("older": the user is asked); they
+ * may keep this PC's side, which saves on top of `version` (CopySync.keep).
+ */
+export class NewestUnreadable extends CopyError {
+  constructor(readonly version: number) {
+    super("older", "the newest list in the folder doesn't open with this key, though earlier ones do");
   }
 }
 
@@ -239,10 +341,26 @@ export interface CopyStorage {
   readonly arrivesLate: boolean;
   /** The current copy, or null when there is none. `known` is the version this PC last synced. */
   remote(known?: number): Promise<RemoteCopy | null>;
-  /** The current version and its sealed manifest, or null when there is none. */
-  manifest(): Promise<{ version: number; sealed: Uint8Array } | null>;
+  /**
+   * The current version and its sealed manifest, or null when there is none. A folder also says which version its file
+   * name says it was saved on top of (`base`): a marked manifest has to say the same inside.
+   */
+  manifest(): Promise<{ version: number; base?: number; sealed: Uint8Array } | null>;
+  /**
+   * A folder only: the sealed manifests kept besides the current one, newest first, all of them (those it can read now;
+   * one it can't is skipped). Asked only when the current one has no mark, to see whether this storage holds marked
+   * ones: whoever can write the folder may put any number of files before them, so there is no cap.
+   */
+  earlierManifests?(): AsyncIterable<Uint8Array>;
   /** Stores parts it does not have yet. */
   putParts(parts: { id: Buffer; data: Buffer }[]): Promise<void>;
+  /** A folder only: which of these parts aren't there (another PC's clean-up took them, or they never arrived). */
+  missingParts?(ids: string[]): Promise<string[]>;
+  /**
+   * A folder only: the version to save on top of instead of `base` (a list put there that this PC's key doesn't open, which
+   * it doesn't climb on), or null when the user has to choose first. `followed` is CopyState `keptFrom`.
+   */
+  makeRoom?(base: number, followed: number | undefined, check: ManifestCheck): Promise<number | null>;
   /** Some of the asked parts, at least one when any of them is there. */
   getParts(ids: string[]): Promise<{ id: string; data: Uint8Array }[]>;
   /**
@@ -250,8 +368,11 @@ export interface CopyStorage {
    * numbers versions itself (the service), so the manifest can't know its own.
    */
   nextVersion(base: number): number | null;
-  /** Makes the manifest with these parts the new version, if the copy is still at `base`. */
-  swap(base: number, version: number | null, ids: string[], sealed: Uint8Array): Promise<SwapAnswer>;
+  /**
+   * Makes the manifest with these parts the new version, if the copy is still at `base`. `check` opens the manifests kept
+   * there, for a storage that cleans up after itself (a folder).
+   */
+  swap(base: number, version: number | null, ids: string[], sealed: Uint8Array, check?: ManifestCheck): Promise<SwapAnswer>;
   /** Deletes the copy. */
   remove(): Promise<void>;
 }
@@ -391,8 +512,17 @@ export class CloudCopy {
    * again, and parts the copy already has are not sent again. Returns the state to keep on success.
    * `progress` hears how much of what changed is read and sent so far.
    */
-  async upload(copyKey: Uint8Array, roots: CopyRoot[], state: CopyState, progress?: (done: number, total: number) => void): Promise<UploadResult> {
+  async upload(copyKey: Uint8Array, roots: CopyRoot[], last: CopyState, progress?: (done: number, total: number) => void): Promise<UploadResult> {
     const keys = copyKeys(copyKey);
+    const keyId = keyFingerprint(copyKey);
+    // Synced under another key: none of its parts are this key's. A second safeguard: taking another key already writes
+    // the empty state before the key changes (CopySync.enterOtherKey).
+    const synced = last.keyId !== undefined && last.keyId !== keyId ? { ...last, files: {} } : last;
+    // Kept over a list put there that the key doesn't open (FolderStorage.makeRoom): on top of where this PC was before, when
+    // nothing else came meanwhile; otherwise the user chooses.
+    const base = this.storage.makeRoom ? await this.storage.makeRoom(synced.version, synced.keptFrom, checkWith(keys)) : synced.version;
+    if (base === null) return { status: "conflict", version: (await this.storage.remote())?.version ?? 0 };
+    const state = base === synced.version ? synced : { ...synced, version: base, kept: true };
     const limit = this.storage.limit;
     let found = await scanCopy(roots);
     let pictures = true;
@@ -453,12 +583,20 @@ export class CloudCopy {
 
       // Where the PC picks the version, it goes inside the sealed manifest too, so an older manifest can't pose as a newer one.
       // Where the service picks it, the version this one follows goes in instead.
+      // In a folder, the version it was saved on top of goes in too, so its file name can't say another. The mark goes over
+      // all of it, so a part can't pose as a manifest.
       const version = this.storage.nextVersion(state.version);
-      const manifest: Manifest = { v: 1, ...(version !== null ? { version } : { base: state.version }), pictures, files: Object.entries(files).map(([name, file]) => ({ path: name, size: file.size, sha256: file.sha256, parts: file.parts })) };
+      const manifest: Manifest = {
+        v: 1,
+        ...(version !== null ? { version, parent: state.version } : { base: state.version }),
+        pictures,
+        files: Object.entries(files).map(([name, file]) => ({ path: name, size: file.size, sha256: file.sha256, parts: file.parts })),
+      };
+      manifest.mark = manifestMark(keys, markedFields(manifest));
       const sealed = seal(keys, Buffer.from(JSON.stringify(manifest)));
-      const ids = [...new Set(manifest.files.flatMap((file) => file.parts))];
-      const answer = await this.storage.swap(state.version, version, ids, sealed);
-      if (answer.status === "saved") return { status: "uploaded", state: { version: answer.version, pictures, files, sealed: true }, pictures, size: answer.size };
+      const ids = manifestParts(manifest);
+      const answer = await this.storage.swap(state.version, version, ids, sealed, checkWith(keys));
+      if (answer.status === "saved") return { status: "uploaded", state: { version: answer.version, pictures, files, sealed: true, marked: true, keyId }, pictures, size: answer.size };
       if (answer.status === "conflict") return { status: "conflict", version: answer.version };
       if (answer.status === "too-big") return { status: "too-big", size: answer.size ?? total };
       return "missing-parts";
@@ -472,45 +610,98 @@ export class CloudCopy {
     return second;
   }
 
+  /** Whether the storage keeps marked manifests besides the current one (a folder; the service keeps only one). */
+  private async holdsMarked(keys: CopyKeys): Promise<boolean> {
+    if (!this.storage.earlierManifests) return false;
+    // Only one that opens with the key and has a right mark counts; the first ends the look.
+    for await (const sealed of this.storage.earlierManifests()) if (checkWith(keys)(sealed)?.marked === true) return true;
+    return false;
+  }
+
+  /**
+   * Puts parts of this PC's last synced version back where they went missing (a folder: another PC's clean-up took them
+   * before that PC had this version's manifest), from this PC's own files when they are still as synced. Other PCs would
+   * wait for them ("not-arrived") until this PC saved again. Returns how many went back.
+   */
+  async heal(copyKey: Uint8Array, roots: CopyRoot[], state: CopyState, wanted: () => boolean = () => true): Promise<number> {
+    if (!this.storage.missingParts || state.version === 0) return 0;
+    const missing = new Set(await this.storage.missingParts([...new Set(Object.values(state.files).flatMap((file) => file.parts))]));
+    if (missing.size === 0) return 0;
+    const keys = copyKeys(copyKey);
+    let put = 0;
+    for (const file of await scanCopy(roots)) {
+      const synced = state.files[file.path];
+      // Changed since: the next upload sends it anyway.
+      if (!synced || synced.size !== file.size || synced.mtimeMs !== file.mtimeMs || !synced.parts.some((id) => missing.has(id))) continue;
+      const content = unlessHeld(await lookBytes(file.file));
+      if (content === null) continue;
+      // Turned off or deleted meanwhile: nothing more goes into the folder.
+      if (!wanted()) return put;
+      const parts: { id: Buffer; data: Buffer }[] = [];
+      for (let index = 0; index < Math.max(1, Math.ceil(content.length / PART_BYTES)); index++) {
+        const plain = content.subarray(index * PART_BYTES, (index + 1) * PART_BYTES);
+        const id = partId(keys, plain);
+        if (!missing.delete(id.toString("hex"))) continue;
+        parts.push({ id, data: seal(keys, plain) });
+      }
+      if (!wanted()) return put;
+      await this.storage.putParts(parts);
+      put += parts.length;
+    }
+    return put;
+  }
+
   /**
    * Downloads the copy into `staging` (emptied first), checking every part and file against the key and the
    * manifest, and returns its version and the files as they will be synced once swapped in. Nothing outside
    * `staging` is touched; null when there is no copy. `synced` is the version this PC last synced: a copy the
    * service saved on top of an older one is refused ("older"), and so is one without a sealed version once this PC has
-   * seen a sealed one (`sealedSeen`): a list from before Tavora sealed it can only be an old one served again. Once
-   * `wanted` says no (the copy was turned off meanwhile) it stops writing and answers null.
+   * seen a sealed one (`seen.sealed`): a list from before Tavora sealed it can only be an old one served again. Likewise
+   * one without a mark once this PC has seen a marked one (`seen.marked`) or the folder holds one: an older Tavora's, or
+   * a part put in its place. In a folder (where versions only grow) a copy older than `synced` is refused too: newer
+   * manifests were deleted, or the folder was put back to an earlier day. Those two are asked about unless the user chose
+   * this copy (`seen.chosen`). Once `wanted` says no (the copy was turned off meanwhile) it stops writing and answers null.
    */
-  async download(copyKey: Uint8Array, roots: CopyRoot[], staging: string, synced = 0, sealedSeen = false, wanted: () => boolean = () => true): Promise<DownloadedCopy | null> {
+  async download(
+    copyKey: Uint8Array,
+    roots: CopyRoot[],
+    staging: string,
+    synced = 0,
+    seen: Pick<CopyState, "sealed" | "marked"> & { chosen?: boolean } = {},
+    wanted: () => boolean = () => true,
+  ): Promise<DownloadedCopy | null> {
     const keys = copyKeys(copyKey);
     const current = await this.storage.manifest();
     if (!current || !wanted()) return null;
     const { version } = current;
-    let manifest: Manifest;
+    let opened: ReturnType<typeof openManifest>;
     try {
-      manifest = JSON.parse(open(keys, current.sealed).toString("utf8")) as Manifest;
-    } catch {
-      // Sealed with another key: the recovery key typed in is not this copy's, or the copy was changed.
-      throw new CopyError("damaged", "the copy could not be opened with this key");
+      opened = openManifest(keys, current.sealed);
+      if (opened.manifest.version !== undefined && opened.manifest.version !== version) throw new CopyError("damaged", "the copy's list belongs to another version");
+      // A folder's file name says what the manifest was saved on top of; a marked one says so inside, and the two agree.
+      if (opened.marked && current.base !== undefined && opened.manifest.parent !== current.base) throw new CopyError("damaged", "the copy's list belongs to another version");
+    } catch (error) {
+      // Earlier ones open with this key, so the key is right and the newest is what's off: the user may put their data on
+      // top of it. Otherwise the key typed in isn't this copy's.
+      if (error instanceof CopyError && error.reason === "damaged" && (await this.holdsMarked(keys))) throw new NewestUnreadable(version);
+      throw error;
     }
-    if (manifest?.v !== 1 || !Array.isArray(manifest.files)) throw new CopyError("damaged", "the copy's list is off");
-    if (manifest.version !== undefined && manifest.version !== version) throw new CopyError("damaged", "the copy's list belongs to another version");
+    const { manifest, marked } = opened;
     if (manifest.base !== undefined && (!Number.isSafeInteger(manifest.base) || manifest.base < 0 || manifest.base >= version)) throw new CopyError("damaged", "the copy's list belongs to another version");
     // Saved on top of an older version than this PC has: an old copy served as a new one, or a copy made anew after a
     // delete. The two look the same, so the caller asks instead of taking it. Not "damaged", which can mean a new key.
     if (manifest.base !== undefined && manifest.base < synced) throw new CopyError("older", "the copy was saved on top of an older version than this PC has");
     const sealed = manifest.version !== undefined || manifest.base !== undefined;
-    if (!sealed && sealedSeen && synced > 0) throw new CopyError("older", "the copy's list has no sealed version, though this PC has seen one that has");
-    const files = manifest.files.filter(
-      (file) =>
-        safeCopyPath(file?.path, roots) &&
-        Number.isSafeInteger(file.size) &&
-        file.size >= 0 &&
-        /^[0-9a-f]{64}$/.test(file.sha256) &&
-        Array.isArray(file.parts) &&
-        file.parts.length > 0 &&
-        file.parts.every((id) => typeof id === "string" && /^[0-9a-f]{64}$/.test(id)),
-    );
-    if (files.length !== manifest.files.length) throw new CopyError("damaged", "the copy's list is off");
+    if (!sealed && seen.sealed === true && synced > 0) throw new CopyError("older", "the copy's list has no sealed version, though this PC has seen one that has");
+    // In a folder the PC picks versions, and each is above the one it was saved on: one below what this PC synced is an
+    // older copy, whatever its name says it follows.
+    if (current.base !== undefined && seen.chosen !== true && version < synced) throw new CopyError("older", "the copy is older than the one this PC last synced");
+    // Without a mark it may be a part put in the manifest's place (one a module saved, shaped like a list), so it isn't
+    // taken on its own once this PC knows marked ones, or the folder holds one: the user chooses, as for an older list.
+    // Asked, they may take it.
+    if (!marked && seen.chosen !== true && (seen.marked === true || (await this.holdsMarked(keys)))) throw new CopyError("older", "the copy's list has no mark, though marked ones are known");
+    const { files } = manifest;
+    if (!files.every((file) => safeCopyPath(file.path, roots))) throw new CopyError("damaged", "the copy's list is off");
 
     // The parts, checked against their names, then the files, checked against their hashes. Parts wait on disk, next to
     // the staging folder: a copy in a folder has no size limit, so it may not fit in memory.
@@ -551,7 +742,7 @@ export class CloudCopy {
         await joinParts(partsDir, file, target);
         result[file.path] = { size: file.size, sha256: file.sha256, parts: file.parts };
       }
-      return { version, pictures: manifest.pictures !== false, files: result, ...(sealed ? { sealed: true } : {}) };
+      return { version, pictures: manifest.pictures !== false, files: result, ...(sealed ? { sealed: true } : {}), ...(marked ? { marked: true } : {}), keyId: keyFingerprint(copyKey) };
     } finally {
       await rm(partsDir, { recursive: true, force: true }).catch(() => undefined);
     }
@@ -587,6 +778,10 @@ export interface DownloadedCopy {
   files: Record<string, Omit<SyncedFile, "mtimeMs">>;
   /** Its manifest sealed its version. */
   sealed?: boolean;
+  /** Its manifest carried its mark. */
+  marked?: boolean;
+  /** The key it came down with (CopyState `keyId`). */
+  keyId?: string;
 }
 
 /**
@@ -831,7 +1026,7 @@ export async function swapInCopy(staging: string, roots: CopyRoot[], keepIn: str
     const same = !resumed || (found.size === synced.size && (await fileSha256(found.file)) === synced.sha256);
     files[found.path] = { ...synced, mtimeMs: same ? found.mtimeMs : CHANGED_SINCE };
   }
-  return { version: copy.version, pictures: copy.pictures, files, ...(copy.sealed ? { sealed: true } : {}) };
+  return { version: copy.version, pictures: copy.pictures, files, ...(copy.sealed ? { sealed: true } : {}), ...(copy.marked ? { marked: true } : {}), ...(copy.keyId !== undefined ? { keyId: copy.keyId } : {}) };
 }
 
 // What this PC keeps about the copy: the state in cloud-copy.json (paths, sizes, hashes and part ids,
@@ -853,7 +1048,7 @@ export async function lookCopyState(file: string): Promise<Looked<CopyState>> {
   if (typeof saved.v === "number" && saved.v > STORE_VERSIONS.cloudCopy) return { status: "present", value: EMPTY_STATE };
   if (saved.v !== STORE_VERSIONS.cloudCopy) return damaged;
   if (typeof saved.version !== "number" || typeof saved.files !== "object" || saved.files === null) return damaged;
-  return { status: "present", value: { version: saved.version, pictures: saved.pictures !== false, files: saved.files as Record<string, SyncedFile>, ...(saved.kept === true ? { kept: true } : {}), ...(saved.sealed === true ? { sealed: true } : {}) } };
+  return { status: "present", value: { version: saved.version, pictures: saved.pictures !== false, files: saved.files as Record<string, SyncedFile>, ...(saved.kept === true ? { kept: true } : {}), ...(saved.sealed === true ? { sealed: true } : {}), ...(saved.marked === true ? { marked: true } : {}), ...(typeof saved.keptFrom === "number" && Number.isSafeInteger(saved.keptFrom) ? { keptFrom: saved.keptFrom } : {}), ...(typeof saved.keyId === "string" ? { keyId: saved.keyId } : {}) } };
 }
 
 /** The state as saved, or the empty one when it can't be used. */
@@ -864,5 +1059,5 @@ export async function loadCopyState(file: string): Promise<CopyState> {
 
 /** Writes the state. During a swap it goes to another file than cloud-copy.json (CopySync.parkState). */
 export async function saveCopyState(file: string, state: CopyState): Promise<void> {
-  await writeFileAtomic(file, JSON.stringify({ v: STORE_VERSIONS.cloudCopy, version: state.version, pictures: state.pictures, files: state.files, ...(state.kept ? { kept: true } : {}), ...(state.sealed ? { sealed: true } : {}) }));
+  await writeFileAtomic(file, JSON.stringify({ v: STORE_VERSIONS.cloudCopy, version: state.version, pictures: state.pictures, files: state.files, ...(state.kept ? { kept: true } : {}), ...(state.sealed ? { sealed: true } : {}), ...(state.marked ? { marked: true } : {}), ...(state.keptFrom !== undefined ? { keptFrom: state.keptFrom } : {}), ...(state.keyId !== undefined ? { keyId: state.keyId } : {}) }));
 }
