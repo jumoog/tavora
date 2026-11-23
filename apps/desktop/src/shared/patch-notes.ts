@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.156",
+    date: "2026-11-23",
+    title: "New projects found",
+    notes: [
+      "A project you create in a development folder right after Tavora looked at it is now found too.",
+    ],
+    prs: [
+      { number: 931, title: "Steady tests on slow Windows runners; find projects made while watchers start" },
+    ],
+    tags: ["catalog", "service"],
+  },
+  {
     version: "0.24.155",
     date: "2026-11-23",
     title: "Cloud copy in a folder asks before taking over",
