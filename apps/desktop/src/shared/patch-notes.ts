@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.147",
+    date: "2026-11-23",
+    title: "Safer module questions",
+    notes: [
+      "A module's question for a connection shows only for the copy that asked, also in Tavora's window.",
+    ],
+    prs: [
+      { number: 916, title: "One session per panel: the connectors and their watches move out of ModuleView" },
+    ],
+    tags: ["modules", "privacy", "workspace"],
+  },
+  {
     version: "0.24.146",
     date: "2026-11-23",
     title: "Smoother module updates",
