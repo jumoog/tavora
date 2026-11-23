@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.154",
+    date: "2026-11-23",
+    title: "Keys stay safe",
+    notes: [
+      "Tavora no longer replaces a key or a sign-in it couldn't read, like while a virus scan held it.",
+      "If it can't open your key, or a newer Tavora saved it, Tavora asks for your recovery key. Starting over keeps the old key on this PC.",
+      "Signing in or out still works then. Tavora keeps the old sign-in aside.",
+    ],
+    prs: [
+      { number: 929, title: "Sealed files and ai-usage.json move to SavedFile" },
+    ],
+    tags: ["accounts", "ai-usage", "cloud-copy", "discord", "publishing", "settings"],
+  },
+  {
     version: "0.24.153",
     date: "2026-11-23",
     title: "Quieter game card",
