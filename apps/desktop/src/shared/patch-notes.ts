@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.155",
+    date: "2026-11-23",
+    title: "Cloud copy in a folder asks before taking over",
+    notes: [
+      "If your last save lost against another PC's, Tavora asks which side to keep, also after weeks away.",
+      "Once your PC has seen a list with a line, renaming or deleting files in the folder can't make Tavora take another PC's copy without asking.",
+      "A PC that missed a lot of saves asks before catching up.",
+    ],
+    prs: [
+      { number: 930, title: "Cloud copy in a folder: lineage inside the seal" },
+    ],
+    tags: ["cloud-copy", "privacy", "website"],
+  },
+  {
     version: "0.24.154",
     date: "2026-11-23",
     title: "Keys stay safe",
