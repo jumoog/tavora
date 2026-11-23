@@ -18,6 +18,8 @@ const made = vi.hoisted(() => ({
   beforeRequest: undefined as ((details: { url: string; webContentsId?: number }, callback: (answer: { cancel: boolean }) => void) => void) | undefined,
   /** The id the next page gets. */
   nextId: 1,
+  /** Closes the newest port, as Electron does when its page reloads or goes. */
+  closePort: undefined as (() => void) | undefined,
 }));
 
 vi.mock("electron", () => {
@@ -76,7 +78,12 @@ vi.mock("electron", () => {
     clipboard: {},
     ClipboardItem: class {},
     MessageChannelMain: class {
-      port1 = { on: () => undefined, postMessage: () => undefined, start: () => undefined, close: () => undefined };
+      port1 = {
+        on: (event: string, listener: () => void) => void (event === "close" && (made.closePort = listener)),
+        postMessage: () => undefined,
+        start: () => undefined,
+        close: () => undefined,
+      };
       port2 = {};
     },
     session: { fromPartition: () => ses },
@@ -93,8 +100,12 @@ const { BLOB_PATH, CLIPBOARD_PATH, FILE_OPEN_PATH, FILE_SAVE_PATH, JSON_EXPORT_P
 /** How the window holding a panel says it is over the game: taking input or not, faded and zoomed as `look` says. */
 const over = (takesInput: boolean, look: Partial<OverGame> = {}): OverGame => ({ takesInput, opacity: 100, zoom: 1, ...look });
 
+/** What ModuleViewOptions groups: the connectors the session gates, and Tavora's dialogs. A test names them flat. */
+const CONNECTOR_KEYS = new Set(["networkHosts", "connectors", "folders", "aiUsage", "leaderboards", "systemInfo", "connection", "media", "discord", "overlay", "hotkeys", "testHosts"]);
+const FILE_KEYS = new Set(["savePicture", "saveJson", "openJson", "saveFile", "openFile", "pickReadOnly"]);
+
 function make(extra: Record<string, unknown> = {}) {
-  const options = {
+  const flat: Record<string, unknown> = {
     instanceId: "11111111-1111-4111-8111-111111111111",
     module: { owner: "official", root: "/nowhere", provenance: "official", manifest: { id: "tavora.todos", entry: "dist/index.html", permissions: {} } },
     panelType: null,
@@ -107,9 +118,17 @@ function make(extra: Record<string, unknown> = {}) {
     openJson: async () => null,
     saveFile: async () => null,
     openFile: async () => null,
+    pickReadOnly: async () => [],
+    pickGame: () => "elden",
     discord: { release: () => undefined },
     ...extra,
   };
+  const options: Record<string, unknown> = { connectors: {}, files: {} };
+  for (const [key, value] of Object.entries(flat)) {
+    const group = CONNECTOR_KEYS.has(key) ? "connectors" : FILE_KEYS.has(key) ? "files" : null;
+    if (group) (options[group] as Record<string, unknown>)[key] = value;
+    else options[key] = value;
+  }
   return new ModuleView(options as never);
 }
 
@@ -346,9 +365,10 @@ describe("folders.showInFolder", () => {
   it("shows nothing once the grant is taken back while the folder was looked at", async () => {
     let granted = true;
     const { view, show } = folderView({ path: "/docs/a.SC2Replay", kind: "file" });
-    (view as unknown as { options: { folders: { granted(): boolean; reveal(): Promise<Target> } } }).options.folders.granted = () => granted;
-    const reveal = (view as unknown as { options: { folders: { reveal(): Promise<Target> } } }).options.folders.reveal;
-    (view as unknown as { options: { folders: { reveal(): Promise<Target> } } }).options.folders.reveal = async () => ((granted = false), reveal());
+    const folders = (view as unknown as { options: { connectors: { folders: { granted(): boolean; reveal(): Promise<Target> } } } }).options.connectors.folders;
+    folders.granted = () => granted;
+    const reveal = folders.reveal;
+    folders.reveal = async () => ((granted = false), reveal());
     view.noteGesture();
     await show();
     expect(shell.showItemInFolder).not.toHaveBeenCalled();
@@ -806,7 +826,7 @@ describe("guarded calls", () => {
     setDialog: vi.fn(),
     leaderboardsShow: vi.fn(async () => true),
     leaderboardsHide: vi.fn(async () => true),
-    pickReadOnlyFile: vi.fn(async () => []),
+    pickReadOnly: vi.fn(async () => []),
     showMenu: vi.fn(async () => null),
     copyLink: vi.fn(async () => "copied"),
     showOverGame: vi.fn(async () => true),
@@ -872,7 +892,7 @@ describe("guarded calls", () => {
       setMaximized: spies.setMaximized,
       setDialog: spies.setDialog,
       leaderboards: { status: async () => null, show: spies.leaderboardsShow, hide: spies.leaderboardsHide },
-      pickReadOnlyFile: spies.pickReadOnlyFile,
+      pickReadOnly: spies.pickReadOnly,
       showMenu: spies.showMenu,
       overlay: { copyLink: spies.copyLink, copyNeedsWindow: () => true, showOverGame: spies.showOverGame, preview: spies.preview, openPage: spies.openPage },
       hotkeys: { list: () => [], set: spies.setHotkey, remove: () => undefined },
@@ -1131,5 +1151,196 @@ describe("the storage guard", () => {
       vi.useRealTimers();
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("a page's watches", () => {
+  type Context = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** A connected panel whose connectors note what they were asked and keep their listeners; `granted` is what the user allowed. */
+  function watching(extra: Record<string, unknown> = {}) {
+    const notes: string[] = [];
+    const granted = new Set(["media", "system-info", "discord"]);
+    let folderGrant = true;
+    const heard: { media?: (state: unknown) => void; system?: { snapshot(s: unknown): void; drivesChanged(): void; connectionChanged(c: unknown): void }; discord?: { state(s: unknown): void; event(e: unknown): void }; folders: ((change: unknown) => void)[] } = { folders: [] };
+    /** folders.watch's starts, which the test lets finish. */
+    const starts: { folder: string; finish(): void }[] = [];
+    const view = make({
+      launch: () => ({ reason: "reload" }),
+      data: { blobs: {}, documents: { on: () => undefined, off: () => undefined } },
+      networkHosts: () => new Set(),
+      connectors: () => granted,
+      media: {
+        subscribe: (listener: (state: unknown) => void) => {
+          notes.push("media subscribe");
+          heard.media = listener;
+          return { state: () => ({ sessions: [] }), control: async () => true, close: () => void notes.push("media close") };
+        },
+      },
+      systemInfo: {
+        info: () => ({}),
+        subscribe: (listener: NonNullable<typeof heard.system>) => {
+          notes.push("system subscribe");
+          heard.system = listener;
+          return { watch: (request: unknown) => void notes.push(`system watch ${JSON.stringify(request)}`), setSuspended: (on: boolean) => void notes.push(`system suspended ${on}`), close: () => void notes.push("system close") };
+        },
+      },
+      discord: {
+        use: async (_id: string, listener: NonNullable<typeof heard.discord>) => void (heard.discord = listener),
+        release: (id: string) => void notes.push(`discord release ${id}`),
+        state: () => ({ status: "off" }),
+      },
+      folders: {
+        granted: () => folderGrant,
+        watch: (folder: string, notify: (change: unknown) => void) =>
+          new Promise((resolve) => {
+            heard.folders.push(notify);
+            starts.push({ folder, finish: () => resolve({ close: () => void notes.push(`folder close ${folder}`) }) });
+          }),
+      },
+      ...extra,
+    });
+    view.connect();
+    // Connecting lets go of what an earlier port held (nothing yet): only what follows counts.
+    notes.length = 0;
+    const inner = view as unknown as { bridge: { context: Context; emit(event: string, data: unknown): void } };
+    const bridge = inner.bridge;
+    const emitted: unknown[][] = [];
+    bridge.emit = (event, data) => void emitted.push([event, data]);
+    /** A new document in the view: the old page's port goes. */
+    const navigate = () => made.handlers["did-start-navigation"]!({ isMainFrame: true, isSameDocument: false });
+    return { view, context: bridge.context, notes, granted, heard, emitted, starts, navigate, revokeFolders: () => (folderGrant = false) };
+  }
+
+  it("media: one watch however often it is asked, its changes reach the page, and it ends with the page's port", () => {
+    const { context, notes, heard, emitted, navigate } = watching();
+    expect(context.media.watch(true)).toEqual({ sessions: [] });
+    context.media.watch(true);
+    expect(notes).toEqual(["media subscribe"]);
+    heard.media!({ sessions: ["a"] });
+    expect(emitted).toEqual([["media.changed", { sessions: ["a"] }]]);
+    navigate();
+    expect(notes).toEqual(["media subscribe", "media close", "discord release 11111111-1111-4111-8111-111111111111"]);
+  });
+
+  it("media: watch(false) ends the watch and answers null; a revoke ends it at its next change, and the page hears nothing", () => {
+    const first = watching();
+    first.context.media.watch(true);
+    expect(first.context.media.watch(false)).toBeNull();
+    expect(first.notes).toEqual(["media subscribe", "media close"]);
+
+    const second = watching();
+    second.context.media.watch(true);
+    second.granted.delete("media");
+    second.heard.media!({ sessions: ["a"] });
+    expect(second.emitted).toEqual([]);
+    expect(second.notes).toEqual(["media subscribe", "media close"]);
+    // A control with nothing watched answers false.
+    return expect(second.context.media.control("s", "playPause")).resolves.toBe(false);
+  });
+
+  it("system info: one subscription, paused with the panel, and a snapshot refused ends it while other news doesn't", () => {
+    const { view, context, notes, heard, emitted, granted } = watching();
+    view.suspend();
+    context.systemInfo.watch({ blocks: ["cpu"] });
+    context.systemInfo.watch({ blocks: ["memory"] });
+    // Made while hidden: it starts paused.
+    expect(notes).toEqual(["system subscribe", "system suspended true", 'system watch {"blocks":["cpu"]}', 'system watch {"blocks":["memory"]}']);
+    view.resume();
+    view.suspend();
+    expect(notes.slice(4)).toEqual(["system suspended false", "system suspended true"]);
+    expect(emitted).toEqual([
+      ["lifecycle.suspend", null],
+      ["lifecycle.resume", null],
+      ["lifecycle.suspend", null],
+    ]);
+    emitted.length = 0;
+    heard.system!.snapshot({ cpu: 1 });
+    heard.system!.drivesChanged();
+    heard.system!.connectionChanged({ online: true });
+    expect(emitted).toEqual([
+      ["systemInfo.snapshot", { cpu: 1 }],
+      ["systemInfo.drivesChanged", null],
+      ["systemInfo.connectionChanged", { online: true }],
+    ]);
+    granted.delete("system-info");
+    heard.system!.drivesChanged();
+    expect(notes).not.toContain("system close");
+    heard.system!.snapshot({ cpu: 2 });
+    expect(notes.at(-1)).toBe("system close");
+    expect(emitted).toHaveLength(3);
+  });
+
+  it("folders: only the newest call for a folder keeps its watch, a revoke ends every watch at the next change, and the page going ends them all", async () => {
+    const { context, notes, heard, emitted, starts, navigate, revokeFolders } = watching();
+    const slow = context.folders.watch("Documents/Game", true);
+    // Turned off before the first start finished: that watch closes as soon as it is there.
+    await context.folders.watch("Documents/Game", false);
+    starts[0]!.finish();
+    await slow;
+    expect(notes).toEqual(["folder close Documents/Game"]);
+
+    const kept = context.folders.watch("Documents/Game", true);
+    starts[1]!.finish();
+    await kept;
+    const other = context.folders.watch("Saved Games/Other", true);
+    starts[2]!.finish();
+    await other;
+    heard.folders[1]!({ added: ["a.sav"] });
+    expect(emitted).toEqual([["folders.changed", { added: ["a.sav"] }]]);
+    revokeFolders();
+    heard.folders[1]!({ added: ["b.sav"] });
+    expect(emitted).toHaveLength(1);
+    expect(notes.slice(1)).toEqual(["folder close Documents/Game", "folder close Saved Games/Other"]);
+
+    const again = context.folders.watch("Documents/Game", true);
+    starts[3]!.finish();
+    await again;
+    navigate();
+    expect(notes.slice(3)).toEqual(["folder close Documents/Game", "discord release 11111111-1111-4111-8111-111111111111"]);
+  });
+
+  it("a page whose port closes (a reload) ends every watch it started and lets go of Discord, while the panel stays open", async () => {
+    const { context, notes, starts } = watching();
+    context.media.watch(true);
+    context.systemInfo.watch({ blocks: ["cpu"] });
+    await context.discord.state();
+    const watch = context.folders.watch("Documents/Game", true);
+    starts[0]!.finish();
+    await watch;
+    notes.length = 0;
+    made.closePort!();
+    expect(notes.sort()).toEqual(["discord release 11111111-1111-4111-8111-111111111111", "folder close Documents/Game", "media close", "system close"]);
+  });
+
+  it("folders: a watch that finishes starting after its page went is closed, not kept", async () => {
+    const { context, notes, starts } = watching();
+    const watch = context.folders.watch("Documents/Game", true);
+    made.closePort!();
+    notes.length = 0;
+    starts[0]!.finish();
+    await watch;
+    expect(notes).toEqual(["folder close Documents/Game"]);
+  });
+
+  it("opens the module's linked files as the owner and module its page runs as, in its workspace", async () => {
+    const { ReadOnlyFiles } = await import("./read-only-files");
+    const { view } = watching();
+    const files = (view as unknown as { session: { options: { readOnlyFiles(): unknown } } }).session.options.readOnlyFiles() as { file: string };
+    expect(files.file).toBe((new ReadOnlyFiles("/nowhere", "official", "tavora.todos", "elden") as unknown as { file: string }).file);
+  });
+
+  it("discord: what it tells reaches the page while granted, and closing the panel lets go of the connection", async () => {
+    const { view, context, notes, heard, emitted, granted } = watching();
+    await context.discord.state();
+    heard.discord!.state({ status: "connected" });
+    heard.discord!.event({ evt: "SPEAKING_START" });
+    granted.delete("discord");
+    heard.discord!.event({ evt: "SPEAKING_STOP" });
+    expect(emitted).toEqual([
+      ["discord.state", { status: "connected" }],
+      ["discord.event", { evt: "SPEAKING_START" }],
+    ]);
+    await view.dispose(true);
+    expect(notes).toContain("discord release 11111111-1111-4111-8111-111111111111");
   });
 });
