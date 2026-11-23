@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.149",
+    date: "2026-11-23",
+    title: "Tags on item card pictures",
+    notes: [
+      "Game modules can put small tags on a card's picture, like its kind and rarity.",
+      "A stat that doesn't change at a level now shows a faint dash.",
+    ],
+    prs: [
+      { number: 925, title: "Item cards: tags over the picture, faint \"–\" cells" },
+    ],
+    tags: ["privacy", "publishing", "sdk", "tooltips", "ui-kit", "website"],
+  },
+  {
     version: "0.24.148",
     date: "2026-11-23",
     title: "A column per level on item cards",
