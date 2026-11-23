@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { onUnreadableFileKept, unreadableFilesKept } from "./json";
-import { RawJson, SavedFile, SavedFileHeld, type SavedFileKind } from "./saved-file";
+import { RawJson, SavedFile, SavedFileHeld, SLOW_TURN_MS, type SavedFileKind } from "./saved-file";
 
 /** The calls of the file system's sync functions a write at quit makes, in order. */
 const syncCalls = vi.hoisted(() => [] as string[]);
@@ -25,14 +25,14 @@ vi.mock("node:fs", async (original) => {
  * What comes at the next renames of a written file, one each, in turn: `before` it is tried (it still looks whether it
  * is wanted), or `during` it (it was asked for already: nothing looks again). `landed` says, per rename, whether it went.
  */
-const renames = vi.hoisted(() => ({ next: [] as { at: "before" | "during"; run: () => void }[], landed: [] as boolean[] }));
+const renames = vi.hoisted(() => ({ next: [] as { at: "before" | "during"; run: () => void | Promise<void> }[], landed: [] as boolean[] }));
 vi.mock("./rename-held", async (original) => {
   const real = await original<typeof import("./rename-held")>();
   return {
     ...real,
     renameHeld: async (from: string, to: string, waits?: readonly number[], stillWanted?: () => boolean) => {
       const hook = renames.next.shift();
-      hook?.run();
+      await hook?.run();
       const landed = await real.renameHeld(from, to, waits, hook?.at === "during" ? undefined : stillWanted);
       renames.landed.push(landed);
       return landed;
@@ -350,7 +350,7 @@ describe("writeNow, for the moment Tavora quits", () => {
   it("never puts a write being made in place, not even for a moment, once it came", async () => {
     const saved = new SavedFile(file, V1);
     await saved.read();
-    renames.next = [{ at: "before", run: () => saved.writeNow({ a: "at quit" }) }];
+    renames.next = [{ at: "before", run: () => void saved.writeNow({ a: "at quit" }) }];
     await saved.write({ a: "older" });
     expect(renames.landed).toEqual([false]);
     expect(JSON.parse(await text())).toEqual({ version: 1, a: "at quit" });
@@ -425,5 +425,56 @@ describe("writeNow, for the moment Tavora quits", () => {
     await writeFile(file, '{"version":2}');
     expect(new SavedFile(file, V1).writeNow({ a: 1 })).toBe(false);
     expect(await text()).toBe('{"version":2}');
+  });
+});
+
+describe("a turn that takes long", () => {
+  /** Lets real file work go on while the timers are fake. */
+  const settle = async (until: () => boolean) => {
+    for (let n = 0; n < 500 && !until(); n++) await new Promise((resolve) => setImmediate(resolve));
+    expect(until()).toBe(true);
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is noted in the log once, and still goes on in its place: the next turn waits for it", async () => {
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const saved = new SavedFile(file, V1);
+    await saved.read();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    renames.next = [{ at: "before", run: () => held }];
+    const slow = saved.write({ a: "slow" });
+    const next = saved.write({ a: "next" });
+    await settle(() => renames.next.length === 0);
+    await vi.advanceTimersByTimeAsync(SLOW_TURN_MS * 3);
+    expect(warned).toHaveBeenCalledTimes(1);
+    expect(warned).toHaveBeenCalledWith(`[tavora] ${file} still being saved after 30 s`);
+    // Nothing gave up: the next write still waits, and the slow one lands first.
+    expect(renames.landed).toEqual([]);
+    release();
+    await slow;
+    await next;
+    expect(renames.landed).toEqual([true, true]);
+    expect(JSON.parse(await text())).toEqual({ version: 1, a: "next" });
+    expect(warned).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves no timer behind, and says nothing, once a turn ends in time", async () => {
+    const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const saved = new SavedFile(file, V1);
+    await saved.write({ a: 1 });
+    await saved.read();
+    await expect(saved.update(() => {
+      throw new Error("refused");
+    })).rejects.toThrow("refused");
+    await saved.flush();
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(SLOW_TURN_MS * 2);
+    expect(warned).not.toHaveBeenCalled();
   });
 });
