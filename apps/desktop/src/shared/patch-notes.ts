@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.153",
+    date: "2026-11-23",
+    title: "Quieter game card",
+    notes: [
+      "The running game's card no longer names the modules that run with the game.",
+    ],
+    prs: [
+      { number: 928, title: "Rail: drop the \"runs with the game\" line from the running game's card" },
+    ],
+    tags: ["games", "privacy", "website"],
+  },
+  {
     version: "0.24.152",
     date: "2026-11-23",
     title: "Fit skips side lists",
