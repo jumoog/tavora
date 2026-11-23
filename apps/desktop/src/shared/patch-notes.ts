@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.150",
+    date: "2026-11-23",
+    title: "Tidier item cards",
+    notes: [
+      "On a card with a picture, the name and its badges line up with the tags on the picture.",
+    ],
+    prs: [
+      { number: 926, title: "Item cards: the name row lines up with the picture's tags" },
+    ],
+    tags: ["ui-kit"],
+  },
+  {
     version: "0.24.149",
     date: "2026-11-23",
     title: "Tags on item card pictures",
