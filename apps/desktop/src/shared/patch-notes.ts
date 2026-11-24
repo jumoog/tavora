@@ -28,6 +28,30 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.10",
+    date: "2026-11-25",
+    title: "Sharper tiles",
+    notes: [
+      "Game, workspace and rail tiles have slightly less rounded corners.",
+    ],
+    prs: [
+      { number: 974, title: "Make the rail tiles slightly less rounded (20% instead of 25%)" },
+    ],
+    tags: ["accounts", "icons", "rail"],
+  },
+  {
+    version: "0.25.9",
+    date: "2026-11-25",
+    title: "Your picture fits its frame",
+    notes: [
+      "The edge around your picture in the open rail now hugs it, without a gap at the bottom.",
+    ],
+    prs: [
+      { number: 973, title: "Fit the edge around the profile picture in the open rail" },
+    ],
+    tags: ["accounts"],
+  },
+  {
     version: "0.25.8",
     date: "2026-11-24",
     title: "Websites on DNS64 networks",
