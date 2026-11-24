@@ -1,6 +1,7 @@
 import { isGameId } from "@tavora/module-schema";
 import { isSnowflake } from "./discord-parse";
 import { SealedFile } from "./sealed-file";
+import { Serial } from "./serial";
 
 // The Discord sign-in (token), kept in discord.json in the user data folder and
 // encrypted with the operating system's key store (Electron's safeStorage: DPAPI
@@ -11,9 +12,16 @@ import { SealedFile } from "./sealed-file";
 // workspace remembers; Tavora moves those into the Discord module once (host.ts).
 
 export interface Encryptor {
+  /**
+   * Asks the system's key store whether it can seal (and caches the answer for `isAvailable`). Asked where something is
+   * sealed or opened, not at start; a no is asked again next time. Never waits longer than a few seconds.
+   */
+  ready(): Promise<boolean>;
+  /** The answer of the last `ready()`: false until it has run. For getters that can't wait. */
   isAvailable(): boolean;
-  encrypt(text: string): Buffer;
-  decrypt(data: Buffer): string;
+  encrypt(text: string): Promise<Buffer>;
+  /** `note.stale` is set when the system says the data should be sealed again (its key moved on). */
+  decrypt(data: Buffer, note?: { stale: boolean }): Promise<string>;
 }
 
 export interface DiscordToken {
@@ -90,6 +98,7 @@ function games(value: unknown): Record<string, DiscordGame> {
  */
 export class DiscordSecretsFile {
   private readonly sealed: SealedFile;
+  private readonly order = new Serial();
 
   constructor(
     file: string,
@@ -101,10 +110,11 @@ export class DiscordSecretsFile {
 
   async load(): Promise<DiscordSecrets> {
     const encryptor = this.encryptor;
-    if (!encryptor.isAvailable()) return EMPTY;
+    if (!(await encryptor.ready())) return EMPTY;
     // Missing, newer, damaged, can't be read now, or encrypted by another user or PC: start without (the file is kept).
-    const read = await this.sealed.open((data) => {
-      const value: unknown = JSON.parse(encryptor.decrypt(Buffer.from(data, "base64")));
+    const note = { stale: false };
+    const read = await this.sealed.open(async (data) => {
+      const value: unknown = JSON.parse(await encryptor.decrypt(Buffer.from(data, "base64"), note));
       if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("not Discord's secrets");
       return value as Record<string, unknown>;
     });
@@ -112,17 +122,20 @@ export class DiscordSecretsFile {
     const raw = read.value;
     try {
       const secrets = { token: token(raw.token), last: last(raw.last), games: games(raw.games) };
-      // A file from before 0.6.1 holds a Client Secret: write it again without.
-      if ("secret" in raw) await this.save(secrets).catch(() => undefined);
+      // A file from before 0.6.1 holds a Client Secret: write it again without. Also when the system's key moved on.
+      if ("secret" in raw || note.stale) await this.save(secrets).catch(() => undefined);
       return secrets;
     } catch {
       return EMPTY;
     }
   }
 
-  async save(secrets: DiscordSecrets): Promise<void> {
-    if (!secrets.token && !secrets.last && Object.keys(secrets.games ?? {}).length === 0) return this.sealed.forget();
-    if (!this.encryptor.isAvailable()) throw new Error("No secure storage on this PC.");
-    await this.sealed.write({ data: this.encryptor.encrypt(JSON.stringify(secrets)).toString("base64") });
+  /** In the order asked: sealing takes a moment, and a removal asked after a save must not be undone by it. */
+  save(secrets: DiscordSecrets): Promise<void> {
+    return this.order.run(async () => {
+      if (!secrets.token && !secrets.last && Object.keys(secrets.games ?? {}).length === 0) return this.sealed.forget();
+      if (!(await this.encryptor.ready())) throw new Error("No secure storage on this PC.");
+      await this.sealed.write({ data: (await this.encryptor.encrypt(JSON.stringify(secrets))).toString("base64") });
+    });
   }
 }
