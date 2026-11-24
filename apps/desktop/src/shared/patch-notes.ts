@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.8",
+    date: "2026-11-24",
+    title: "Websites on DNS64 networks",
+    notes: [
+      "Websites and modules that go online load again on networks that use DNS64 (some IPv6-only mobile and home networks).",
+      "A few texts in the account settings are shorter.",
+    ],
+    prs: [
+      { number: 971, title: "Fix NAT64 hex addresses, shorten code-sent texts, align WebP readers" },
+    ],
+    tags: ["catalog", "icons", "modules", "privacy", "service"],
+  },
+  {
     version: "0.25.7",
     date: "2026-11-24",
     title: "Safer account recovery",
