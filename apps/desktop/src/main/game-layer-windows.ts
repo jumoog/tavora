@@ -377,12 +377,16 @@ export class LayerWindows {
 
   /**
    * A window's page is gone. A panel's page is the panel's own: its view goes back to Panel views, which shows its crash
-   * screen in the slot, and its window stays until the next look (`panel`). Any other window goes (`window`).
+   * screen in the slot (`panel`). The window is destroyed and forgotten: the next look lends the panel into a new
+   * one. Any other window goes (`window`).
    */
   ended(id: string): "panel" | "window" {
     const entry = this.open.get(id);
     if (entry?.kind === "panel") {
       entry.loan?.giveBack();
+      // Its page may be gone while the window lives on (render-process-gone): destroyed, safe when it is gone already.
+      entry.window.destroy();
+      this.open.delete(id);
       return "panel";
     }
     this.drop(id);
