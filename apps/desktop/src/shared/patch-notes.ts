@@ -28,6 +28,17 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.0",
+    date: "2026-11-24",
+    title: "Steadier and safer",
+    notes: [
+      "A big round of work under the hood: your cloud copy, sign-in and saved files are safer.",
+    ],
+    prs: [
+      { number: 944, title: "Tavora 0.25: minor release note" },
+    ],
+  },
+  {
     version: "0.24.163",
     date: "2026-11-24",
     title: "Discord sign-in kept after a slow start",
