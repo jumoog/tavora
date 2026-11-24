@@ -8,7 +8,7 @@ import path from "node:path";
 const ICACLS = path.win32.join(process.env.SystemRoot && path.win32.isAbsolute(process.env.SystemRoot) ? process.env.SystemRoot : "C:\\Windows", "System32", "icacls.exe");
 
 // Publisher keys in files, for publishing from CI. The pack command never makes a key; Tavora does, and
-// exports it for CI (Settings > Publishing > Publisher keys and CI).
+// exports it for CI (Settings > Developer > Publishing > Publisher keys and CI).
 
 /** A publisher's private key from a file, which must exist. */
 export async function loadExistingKey(file: string): Promise<{ key: KeyObject }> {
