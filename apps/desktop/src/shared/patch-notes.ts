@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.2",
+    date: "2026-11-24",
+    title: "Steadier turn-off and in-game panels",
+    notes: [
+      "Turning the cloud copy off now sticks, even when a virus scan holds a file for a moment. If it can't be turned off, you're told and it stays on.",
+      "A panel that runs with your game starts again after a crash, even if it couldn't right away.",
+      "A panel in the game overlay comes back after its window closes on its own.",
+    ],
+    prs: [
+      { number: 950, title: "Fix turn-off coming back after a busy file, failed panel restart, dead panel windows" },
+    ],
+    tags: ["cloud-copy", "in-game"],
+  },
+  {
     version: "0.25.1",
     date: "2026-11-24",
     title: "Smoother cloud copy, adding a PC and connector answers",
