@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.163",
+    date: "2026-11-24",
+    title: "Discord sign-in kept after a slow start",
+    notes: [
+      "Connecting Discord while your computer's key store is still waking up is now saved as soon as it answers, so Tavora doesn't go back to your old account after a restart.",
+    ],
+    prs: [
+      { number: 943, title: "Discord: keep a sign-in made while the key store was slow" },
+    ],
+    tags: ["discord"],
+  },
+  {
     version: "0.24.162",
     date: "2026-11-24",
     title: "A slow keyring no longer holds things up",
