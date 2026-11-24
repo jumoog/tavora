@@ -28,6 +28,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.5",
+    date: "2026-11-24",
+    title: "Fewer lost inputs",
+    notes: [
+      "A code, a name or an address you're typing stays put when Tavora refreshes your account in the background.",
+      "Messages: a new conversation opens right away, and if a reload fails you keep what you read and can try again.",
+      "Your profile name can't bring back an old name after you took your account's profile.",
+      "Enter and Space work on the buttons in the hotkey window.",
+      "Typing \"uber\" in the overlay sources finds \"Über\".",
+    ],
+    prs: [
+      { number: 958, title: "Renderer bug hunt B: six Medium and the Low fixes" },
+    ],
+    tags: ["accounts", "hotkeys", "overlays", "privacy", "publishing", "rail", "settings", "workspace"],
+  },
+  {
     version: "0.25.4",
     date: "2026-11-24",
     title: "Your pictures stay put",
