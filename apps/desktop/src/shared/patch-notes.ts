@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.1",
+    date: "2026-11-24",
+    title: "Smoother cloud copy, adding a PC and connector answers",
+    notes: [
+      "A cloud copy with lots of small files now counts its size the way the cloud does, so it leaves pictures out when it needs to instead of getting stuck.",
+      "If your key is out of date, Add on another PC says so once and doesn't ask again.",
+      "Answering a connector question now always brings your panels back, even if saving your answer didn't work.",
+    ],
+    prs: [
+      { number: 946, title: "Fix cloud copy size count, repeated Add question, panels after failed grant save" },
+    ],
+    tags: ["cloud-copy", "privacy", "workspace"],
+  },
+  {
     version: "0.25.0",
     date: "2026-11-24",
     title: "Steadier and safer",
