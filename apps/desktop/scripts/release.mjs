@@ -19,6 +19,8 @@
 // with the update key (TAVORA_UPDATE_KEY, a file made by `pnpm tavora-update-key key`) into latest.yml. The app installs
 // an update only with that signature by one of the keys pinned in src/main/update-keys.ts, so a release stops before
 // anything is built while the app pins no real keys or the key here is not one of them. --dry-run needs no key.
+// A second line (tavoraSignature2) also signs the channel, the platform and an issue time and expiry 30 days apart,
+// so an app can tell a fresh feed from one held back; `pnpm release:refresh` signs it again when no release came out.
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -26,11 +28,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline/promises";
-import { AFTER_RELEASE, CHECKLIST, asksHandChecks, checkCi, checkDownload, checkInstalled, checkRelease, failedJobsHint, findDispatchedRun, lastReleased, readCiHashes, releaseFiles, releaseNotes, releaseRunTitle, releaseTitle } from "./release-guards.mjs";
+import { AFTER_RELEASE, CHECKLIST, asksHandChecks, checkCi, checkDownload, checkInstalled, checkRelease, clockProblem, failedJobsHint, findDispatchedRun, issuedAfterLiveProblem, lastReleased, readCiHashes, releaseFiles, releaseNotes, releaseRunTitle, releaseTitle } from "./release-guards.mjs";
 import { hello, publish } from "../../../scripts/deploy-client.mjs";
 import { installedVersion } from "./installed-version.mjs";
-import { lockPath, mainCheckoutOf, takeLock } from "./release-lock.mjs";
-import { checkPinChange, describeSigned, feedProblem, loadUpdateSigningKey, readPinsFromSource, signLatestYml } from "./update-feed.mjs";
+import { holdLock } from "./release-lock.mjs";
+import { checkPinChange, describeSigned, feedProblem, fetchLiveFeed, freshStatement, loadUpdateSigningKey, readLatestYml, releasePins, signLatestYml, sourceAtTag } from "./update-feed.mjs";
 import { PINNED_UPDATE_KEYS } from "../src/main/update-keys.ts";
 import { rawUpdatePublicKey, readPinnedUpdateKeys } from "../src/main/update-signature.ts";
 
@@ -81,27 +83,12 @@ process.on("SIGINT", () => {
 if (!dryRun) {
   const lockVersion = JSON.parse(readFileSync(path.join(desktop, "package.json"), "utf8")).version;
   // The releases folder sits next to the main checkout, which is the first path git lists, also from a worktree.
-  let main = null;
-  try {
-    main = mainCheckoutOf(spawnSync("git", ["worktree", "list", "--porcelain"], { cwd: repo, encoding: "utf8" }).stdout);
-  } catch {}
-  const file = lockPath(repo, process.env, main);
-  // No lock means nothing would stop a merge during the release, so this stops instead of going on without one.
-  if (!file) {
-    console.error(`No releases folder found next to the main checkout or above this one, so there is nowhere to put the RELEASE-RUNNING lock. Create the releases folder, or set TAVORA_RELEASE_LOCK to the lock's path.
-Nothing was built or published.`);
+  const lock = holdLock(repo, lockVersion, spawnSync("git", ["worktree", "list", "--porcelain"], { cwd: repo, encoding: "utf8" }).stdout);
+  if (lock.problem) {
+    console.error(`${lock.problem}\nNothing was built or published.`);
     process.exit(1);
   }
-  {
-    const lock = takeLock(file, lockVersion);
-    if (lock.problem) {
-      console.error(`${lock.problem}
-Nothing was built or published.`);
-      process.exit(1);
-    }
-    process.on("exit", lock.release);
-    console.log(`Release lock: ${file}`);
-  }
+  console.log(`Release lock: ${lock.file}`);
 }
 
 const feed = "https://updates.mytavora.app";
@@ -154,17 +141,15 @@ console.log("Version, branch, tags and patch notes are in order.");
 // Installed apps check this release against the keys their own build pins: those of the last release, not this checkout.
 {
   const previousVersion = lastReleased(git("tag", "--list", "v*").split(/\r?\n/).filter(Boolean));
-  let previousSource = null;
+  let previous = null;
   if (previousVersion) {
+    // A release from before signed updates has no update-keys.ts; one that has it must read as two keys.
     try {
-      previousSource = git("show", `v${previousVersion}:apps/desktop/src/main/update-keys.ts`);
-    } catch {
-      // That release was from before signed updates.
+      previous = releasePins(previousVersion, (file) => sourceAtTag(repo, previousVersion, file)).pins;
+    } catch (error) {
+      fail(`${error.message} Nothing was built or published.`);
     }
   }
-  const previous = readPinsFromSource(previousSource);
-  // A release is shipped only with real pins, so a file that is there must read as two keys.
-  if (previousSource !== null && !previous) fail(`Can't read the update keys ${previousVersion} pins. Nothing was built or published.`);
   const signingPublic = signing.problem ? null : rawUpdatePublicKey(signing.key);
   const pins = checkPinChange(previous, PINNED_UPDATE_KEYS, signingPublic);
   if (pins.problems.length) {
@@ -286,7 +271,30 @@ const signed = { version, file: installer, sha512: downloaded.get(installer).sha
 // The update server takes only electron-builder's exact feed for this installer: find out now, not at the upload.
 const feedLayout = feedProblem(latestYml, signed, { signed: false });
 if (feedLayout) fail(`The update server would refuse this latest.yml: ${feedLayout}. Nothing was signed, published or tagged.`);
-console.log(describeSigned(signed).map((line) => `  ${line}`).join("\n"));
+// The second signature also dates the feed (update-signature.ts, tavoraSignature2): this PC's clock must agree with the
+// server's, and the statement must be later than the live one, or the server refuses the upload.
+const statement = freshStatement(new Date());
+// A dry run goes on when the clock can't be checked, but then signs no dated statement with the real key: the local
+// latest.yml gets the first signature only.
+let clockChecked = false;
+{
+  let live = null;
+  try {
+    live = await fetchLiveFeed(feed);
+  } catch (error) {
+    if (!dryRun) fail(`Can't read the live feed to check this PC's clock (${error.message}). Nothing was signed, published or tagged.`);
+    console.warn(`Dry run: can't read the live feed (${error.message}); the clock check is left out.`);
+  }
+  if (live) {
+    const problem = clockProblem(live.date) ?? issuedAfterLiveProblem(live.text ? readLatestYml(live.text).signature2 : null, statement);
+    if (problem && !dryRun) fail(`Not releasing ${version}: ${problem} Nothing was signed, published or tagged.`);
+    if (problem) console.warn(`Dry run: a real release would stop here: ${problem}`);
+    clockChecked = !problem;
+  }
+}
+const signedStatement = clockChecked ? statement : null;
+if (!signedStatement && !signing.problem) console.warn("Dry run: the clock check didn't pass, so the local latest.yml gets no second signature.");
+console.log(describeSigned(signed, statement).map((line) => `  ${line}`).join("\n"));
 if (signing.problem) {
   console.log(`\nDry run: this is what a release signs. A real release would stop before building: ${signing.problem}`);
   console.log("Nothing was signed, published or tagged.");
@@ -295,9 +303,13 @@ if (signing.problem) {
 }
 try {
   const latestPath = path.join(releaseDir, "latest.yml");
-  const { text, key } = signLatestYml({ latestYml, ...signed, privateKey: signing.key, pinned: PINNED_UPDATE_KEYS });
+  const { text, key } = signLatestYml({ latestYml, ...signed, privateKey: signing.key, pinned: PINNED_UPDATE_KEYS, statement: signedStatement });
   writeFileSync(latestPath, text);
-  console.log(`Signed with the ${key} key; latest.yml carries the signature, and it checks out against the app's pinned keys.`);
+  console.log(
+    signedStatement
+      ? `Signed with the ${key} key; latest.yml carries both signatures (fresh until ${signedStatement.expiresAt}), and they check out against the app's pinned keys.`
+      : `Signed with the ${key} key; latest.yml carries the first signature only (dry run), and it checks out against the app's pinned keys.`,
+  );
 } catch (error) {
   fail(`Signing failed (${error.message}). Nothing was published or tagged.`);
 }
