@@ -466,6 +466,20 @@ export class DiscordConnector {
 
   // ── Telling ──────────────────────────────────────────────────────────
 
+  /** The system's key store answered late (it can keep the sign-in after all): what couldn't be read at start is, and the page is told. */
+  async keyStoreChanged(): Promise<void> {
+    await this.loaded;
+    const isEmpty = () => !this.secrets.token && !this.secrets.last && Object.keys(this.secrets.games ?? {}).length === 0;
+    if (isEmpty()) {
+      const read = await this.deps.load().catch(() => null);
+      if (read && isEmpty()) {
+        this.secrets = read;
+        if (this.wanted && read.token && this.status === "signed-out") void this.start(false);
+      }
+    }
+    this.emit();
+  }
+
   private emit(): void {
     if (this.emitTimer) return;
     this.emitTimer = this.setTimer(() => this.emitNow(), EMIT_MS);

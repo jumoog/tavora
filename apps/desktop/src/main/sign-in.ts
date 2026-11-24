@@ -15,6 +15,8 @@ export interface SignInOptions {
  */
 export class SignIn {
   private saved: SavedAccount | null = null;
+  /** Raised whenever the sign-in is set, so a read that started before a sign-in or sign-out doesn't undo it. */
+  private changes = 0;
 
   constructor(private readonly options: SignInOptions) {}
 
@@ -23,11 +25,25 @@ export class SignIn {
     this.saved = this.options.enabled ? await this.options.load() : null;
   }
 
+  /**
+   * Reads the saved sign-in again when there is none (the key store answered late). A sign-in made meanwhile stays; true
+   * when one was found.
+   */
+  async loadIfSignedOut(): Promise<boolean> {
+    if (!this.options.enabled || this.saved) return false;
+    const before = this.changes;
+    const read = await this.options.load();
+    if (this.saved || !read || this.changes !== before) return false;
+    this.saved = read;
+    return true;
+  }
+
   get current(): SavedAccount | null {
     return this.saved;
   }
 
   set current(account: SavedAccount | null) {
+    this.changes++;
     this.saved = account;
   }
 

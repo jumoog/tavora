@@ -28,6 +28,7 @@ vi.mock("electron", () => ({ safeStorage: fake }));
 const { osEncryptor } = await import("./os-encryptor");
 
 beforeEach(() => {
+  fake.isAsyncEncryptionAvailable = () => (fake.hang ? new Promise<boolean>(() => undefined) : Promise.resolve(fake.available));
   fake.available = true;
   fake.backend = "gnome_libsecret";
   fake.reEncrypt = 0;
@@ -63,8 +64,70 @@ describe("the system key store, async", () => {
     fake.hang = true;
     const encryptor = osEncryptor(false, 20);
     expect(await encryptor.ready()).toBe(false);
-    fake.hang = false;
+    expect(encryptor.isAvailable()).toBe(false);
+  });
+
+  it("while a timed-out check is still pending, later calls say no at once, and the late answer is told", async () => {
+    fake.hang = true;
+    let answer!: (value: boolean) => void;
+    fake.isAsyncEncryptionAvailable = () => new Promise<boolean>((resolve) => (answer = resolve));
+    const told = vi.fn();
+    const encryptor = osEncryptor(false, 20, told);
+    expect(await encryptor.ready()).toBe(false);
+    const started = Date.now();
+    expect(await encryptor.ready()).toBe(false);
+    expect(await encryptor.ready()).toBe(false);
+    expect(Date.now() - started).toBeLessThan(15);
+    expect(told).not.toHaveBeenCalled();
+    answer(true);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(encryptor.isAvailable()).toBe(true);
+    expect(told).toHaveBeenCalledTimes(1);
     expect(await encryptor.ready()).toBe(true);
+  });
+
+  it("a check that never answers is asked again when the user acts, or after a long while", async () => {
+    fake.isAsyncEncryptionAvailable = () => new Promise<boolean>(() => undefined);
+    const encryptor = osEncryptor(false, 10, undefined, 60);
+    expect(await encryptor.ready()).toBe(false);
+    // The keyring is unlocked since: the user acting (Turn on) asks again.
+    fake.isAsyncEncryptionAvailable = () => Promise.resolve(true);
+    expect(await encryptor.ready()).toBe(false);
+    expect(await encryptor.ready(true)).toBe(true);
+    // The same after the long wait, without the user acting.
+    const patient = osEncryptor(false, 10, undefined, 40);
+    fake.isAsyncEncryptionAvailable = () => new Promise<boolean>(() => undefined);
+    expect(await patient.ready()).toBe(false);
+    fake.isAsyncEncryptionAvailable = () => Promise.resolve(true);
+    expect(await patient.ready()).toBe(false);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(await patient.ready()).toBe(true);
+  });
+
+  it("an older question that answers no after a newer one said yes leaves it yes", async () => {
+    let first: (answer: boolean) => void = () => undefined;
+    fake.isAsyncEncryptionAvailable = () => new Promise<boolean>((resolve) => (first = resolve));
+    const encryptor = osEncryptor(false, 10);
+    expect(await encryptor.ready()).toBe(false);
+    const stale = first;
+    fake.isAsyncEncryptionAvailable = () => Promise.resolve(true);
+    expect(await encryptor.ready(true)).toBe(true);
+    stale(false);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(encryptor.isAvailable()).toBe(true);
+    expect(await encryptor.ready()).toBe(true);
+  });
+
+  it("asks no more while two questions are still open, so keyring prompts don't stack", async () => {
+    let asked = 0;
+    fake.isAsyncEncryptionAvailable = () => {
+      asked++;
+      return new Promise<boolean>(() => undefined);
+    };
+    const encryptor = osEncryptor(false, 10);
+    expect(await encryptor.ready()).toBe(false);
+    for (let i = 0; i < 4; i++) expect(await encryptor.ready(true)).toBe(false);
+    expect(asked).toBe(2);
   });
 
   it("is not available before it is asked, and is the answer of the last ask after", async () => {
