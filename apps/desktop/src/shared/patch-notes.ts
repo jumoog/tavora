@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.161",
+    date: "2026-11-24",
+    title: "Clearer cloud copy turn-off",
+    notes: [
+      "If turning the cloud copy off fails while you use the cloud copy, Tavora now stays open and tells you the copy is still on.",
+    ],
+    prs: [
+      { number: 941, title: "Cloud copy: show a failed turn-off; keep the swap plan back once a turn-off is asked" },
+    ],
+    tags: ["cloud-copy"],
+  },
+  {
     version: "0.24.160",
     date: "2026-11-24",
     title: "Sturdier saved sign-ins",
