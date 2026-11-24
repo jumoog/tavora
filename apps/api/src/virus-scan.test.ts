@@ -9,6 +9,9 @@ describe("clamd's answers", () => {
   it("reads OK as clean and FOUND as the threat's name, and anything else as an error", () => {
     expect(parseClamdReply("stream: OK\0")).toBeNull();
     expect(parseClamdReply("stream: Win.Test.EICAR_HDB-1 FOUND\0")).toBe("Win.Test.EICAR_HDB-1");
+    // The alerts AlertExceedsMax and AlertEncrypted turn on are FOUND answers too, with these names.
+    expect(parseClamdReply("stream: Heuristics.Limits.Exceeded.MaxFileSize FOUND\0")).toBe("Heuristics.Limits.Exceeded.MaxFileSize");
+    expect(parseClamdReply("stream: Heuristics.Encrypted.Zip FOUND\0")).toBe("Heuristics.Encrypted.Zip");
     for (const bad of ["INSTREAM size limit exceeded. ERROR\0", "stream: Can't open file ERROR\0", "", "stream: OK but not really", "OK"]) {
       expect(() => parseClamdReply(bad), bad).toThrow(/clamd answered/);
     }

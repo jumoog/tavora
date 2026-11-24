@@ -28,6 +28,7 @@ const CHECK_LINES: Record<MailLanguage, Record<string, string>> = {
     compare: "We couldn't compare it with every module, so a person takes a look.",
     code: "Its code has parts that need a closer look.",
     virus: "The virus scan found something, or couldn't run.",
+    "virus-unscannable": "We couldn't scan all of it (an encrypted or very large file), so a person takes a look.",
     "first-module": "It's your first module.",
     pictures: "It has a new icon or new screenshots.",
     "taken-down": "This module was taken down. It stays off the catalog until Tavora puts it back.",
@@ -39,6 +40,7 @@ const CHECK_LINES: Record<MailLanguage, Record<string, string>> = {
     compare: "Wir konnten es nicht mit jedem Modul vergleichen, darum schaut es sich jemand an.",
     code: "Sein Code hat Stellen, die einen genaueren Blick brauchen.",
     virus: "Der Virenscan hat etwas gefunden oder ließ sich nicht ausführen.",
+    "virus-unscannable": "Wir konnten nicht alles scannen (eine verschlüsselte oder sehr große Datei), darum schaut es sich jemand an.",
     "first-module": "Es ist dein erstes Modul.",
     pictures: "Es hat ein neues Icon oder neue Screenshots.",
     "taken-down": "Dieses Modul wurde aus dem Katalog genommen. Es bleibt draußen, bis Tavora es zurückholt.",
@@ -52,7 +54,7 @@ type ModuleRef = { id: string; name: string; version: string };
 
 /** Sent to the developer when a version waits for a person instead of listing. */
 export function waitingMail(to: string, module: ModuleRef, reasons: readonly ReviewReason[], language: MailLanguage): Mail {
-  const lines = [...new Set(reasons.map((reason) => CHECK_LINES[language][reason.check] ?? reason.text))].map((line) => `- ${line}`).join("\n");
+  const lines = [...new Set(reasons.map((reason) => CHECK_LINES[language][reason.kind ? `${reason.check}-${reason.kind}` : reason.check] ?? reason.text))].map((line) => `- ${line}`).join("\n");
   return language === "de"
     ? {
         to,
