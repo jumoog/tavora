@@ -9,8 +9,9 @@ import path from "node:path";
 import { isModuleId, isReleaseVersion, needsNewerTavora } from "@tavora/module-schema";
 import { DEFAULT_THEME_FONT, OPTIONAL_THEME_TOKENS, THEME_TOKENS, type TabOverflow, type TavoraStyle, type TavoraTheme, type ThemeFont, type ThemeToken, type ToastPosition } from "@tavora/sdk/protocol";
 import { THEME } from "./games";
-import { compareModuleVersions } from "../shared/module-version";
 import { OFFICIAL_PREFIX, type Provenance } from "./registry";
+import { isRecord } from "../shared/is-record";
+import { compareModuleVersions } from "../shared/module-version";
 
 export const THEME_MANIFEST = "tavora.theme.json";
 
@@ -262,7 +263,6 @@ export function glassOpacity(variation: Pick<ThemeVariation, "colors" | "contras
 
 type Fields = Record<string, unknown>;
 
-const isRecord = (value: unknown): value is Fields => typeof value === "object" && value !== null && !Array.isArray(value);
 const optionalText = (value: unknown, max: number) => value === undefined || (typeof value === "string" && value.trim().length > 0 && value.length <= max);
 const name = (value: unknown, max: number): value is string => typeof value === "string" && value.trim().length > 0 && value.length <= max;
 const optionalToken = (token: ThemeToken): ThemeToken | undefined => (OPTIONAL_THEME_TOKENS as Partial<Record<ThemeToken, ThemeToken>>)[token];

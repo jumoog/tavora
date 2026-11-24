@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
-import { closeSync, createReadStream, fstatSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, createReadStream, fstatSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync } from "node:fs";
 import { open, stat, type FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { allowsPersonalWorkspaces, catalogListingProblem, folderKey, isGameId, isReleaseVersion, LOCAL_OWNER, manifestFiles, MAX_README_BYTES, MAX_SCREENSHOT_BYTES, validateChangelog, validateManifest, type LeaderboardBoard, type ModuleManifest } from "@tavora/module-schema";
 import { MANIFEST_FILE, privateKeyFile, readZip, SIGNATURE_FILE, signedHash, verifyFiles, ZIP_LIMITS, zipDirectory, zipDirectoryAt, ZipError, zipFiles, type ZipFile } from "@tavora/pack";
+import { writeFileAtomicSync } from "./fs-atomic.ts";
 import { inspectPng, isWebp } from "./png.ts";
 import { FREE_AFTER_BYTES, freeMemory, MAX_MANIFEST_BYTES, MAX_SIGNATURE_BYTES, metadataProblem, UPLOAD_MEMORY_BYTES, uploadMemory } from "./upload-memory.ts";
+import { sha256Hex } from "./hash.ts";
+import { compareModuleVersions } from "../../desktop/src/shared/module-version.ts";
 
 /**
  * The module catalog (Milestone E, docs/catalog-threat-model.md): community modules, each with the
@@ -150,32 +153,6 @@ export type SignedList = (typeof SIGNED_LISTS)[number];
 export const MAX_LIST_BYTES = 1024 * 1024;
 export const isSignedList = (value: string): value is SignedList => (SIGNED_LISTS as readonly string[]).includes(value);
 
-/**
- * Version order, newest last. The same order as `compareModuleVersions` in the app's installer,
- * which decides on the user's PC whether a catalog version is an update.
- */
-export function compareModuleVersions(a: string, b: string): number {
-  const split = (version: string) => {
-    const [core = "", pre] = version.split(/-(.*)/s);
-    return { core: core.split(".").map(Number), pre: pre === undefined ? [] : pre.split(".") };
-  };
-  const x = split(a);
-  const y = split(b);
-  for (let i = 0; i < 3; i++) if (x.core[i] !== y.core[i]) return x.core[i]! - y.core[i]!;
-  if (x.pre.length === 0 || y.pre.length === 0) return y.pre.length - x.pre.length;
-  for (let i = 0; i < Math.min(x.pre.length, y.pre.length); i++) {
-    const p = x.pre[i]!;
-    const q = y.pre[i]!;
-    if (p === q) continue;
-    const pn = /^\d+$/.test(p);
-    const qn = /^\d+$/.test(q);
-    if (pn && qn) return Number(p) - Number(q);
-    if (pn !== qn) return pn ? -1 : 1;
-    return p < q ? -1 : 1;
-  }
-  return x.pre.length - y.pre.length;
-}
-
 export interface CheckedZip {
   manifest: ModuleManifest;
   /** The publisher key's fingerprint: whose data the module gets on a user's PC. */
@@ -247,7 +224,7 @@ export const MIN_COPY_FILE_BYTES = 64;
 export function copyHashes(files: readonly ZipFile[]): [string, number][] {
   return files
     .filter((file) => file.name !== MANIFEST_FILE && file.name !== SIGNATURE_FILE && file.data.length >= MIN_COPY_FILE_BYTES)
-    .map((file): [string, number] => [createHash("sha256").update(file.data).digest("hex"), file.data.length]);
+    .map((file): [string, number] => [sha256Hex(file.data), file.data.length]);
 }
 
 /** Checks a module zip the way the app's installer does, and refuses what the catalog does not take. */
@@ -302,7 +279,7 @@ export function checkCatalogZip(bytes: Buffer, options: { official?: boolean } =
     if (!type || !name.endsWith(`.${type}`)) {
       throw new CatalogError(`Its screenshot ${name} is not a ${name.endsWith(".webp") ? "WebP" : "PNG"} of at most ${MAX_SCREENSHOT_BYTES / 1024 / 1024} MB and ${MAX_SCREENSHOT_PIXELS} px.`);
     }
-    return { sha256: createHash("sha256").update(data).digest("hex"), type, size: data.length, data };
+    return { sha256: sha256Hex(data), type, size: data.length, data };
   });
   let readme: string | null = null;
   if (manifest.readme !== undefined) {
@@ -313,8 +290,8 @@ export function checkCatalogZip(bytes: Buffer, options: { official?: boolean } =
   }
   const iconData = manifest.icon === undefined ? undefined : file(manifest.icon)?.data;
   const kind = iconData ? iconType(iconData) : null;
-  const icon = iconData && kind && manifest.icon!.endsWith(`.${kind}`) ? { sha256: createHash("sha256").update(iconData).digest("hex"), type: kind, size: iconData.length, data: iconData } : null;
-  return { manifest, owner: verified.owner, sha256: createHash("sha256").update(bytes).digest("hex"), size: bytes.length, notes, screenshots, icon, readme, files };
+  const icon = iconData && kind && manifest.icon!.endsWith(`.${kind}`) ? { sha256: sha256Hex(iconData), type: kind, size: iconData.length, data: iconData } : null;
+  return { manifest, owner: verified.owner, sha256: sha256Hex(bytes), size: bytes.length, notes, screenshots, icon, readme, files };
 }
 
 /** What a user sees of a module in the catalog, at its newest version. */
@@ -578,13 +555,8 @@ export class CatalogStore {
     const module = this.db.prepare("select owner from modules where id = ?").get(manifest.id) as { owner: string } | undefined;
 
     // The files first, under their hashes, so a row never points at a file that is not there.
-    const write = (target: string, data: Buffer) => {
-      const temporary = `${target}.${process.pid}.tmp`;
-      writeFileSync(temporary, data);
-      renameSync(temporary, target);
-    };
-    write(path.join(this.zips, `${sha256}.zip`), bytes);
-    for (const shot of [...checked.screenshots, ...(checked.icon ? [checked.icon] : [])]) write(path.join(this.shots, `${shot.sha256}.${shot.type}`), shot.data);
+    writeFileAtomicSync(path.join(this.zips, `${sha256}.zip`), bytes);
+    for (const shot of [...checked.screenshots, ...(checked.icon ? [checked.icon] : [])]) writeFileAtomicSync(path.join(this.shots, `${shot.sha256}.${shot.type}`), shot.data);
     const screenshots = checked.screenshots.map(({ sha256: hash, type, size }) => ({ sha256: hash, type, size }));
     const icon = checked.icon ? { sha256: checked.icon.sha256, type: checked.icon.type, size: checked.icon.size } : null;
     const at = now.toISOString();
@@ -783,7 +755,7 @@ export class CatalogStore {
   private storedZip(sha256: string): Buffer | "gone" | "unreadable" {
     try {
       const bytes = readFileSync(this.zipPath(sha256));
-      return createHash("sha256").update(bytes).digest("hex") === sha256 ? bytes : "gone";
+      return sha256Hex(bytes) === sha256 ? bytes : "gone";
     } catch (error) {
       return (error as NodeJS.ErrnoException).code === "ENOENT" ? "gone" : "unreadable";
     }
@@ -1061,7 +1033,7 @@ export class CatalogStore {
     if (!this.db.prepare("select 1 from versions where status = 'waiting' and (screenshots like ? or icon like ?)").get(pattern, pattern)) return null;
     try {
       const bytes = readFileSync(path.join(this.shots, `${sha256}.${type}`));
-      return createHash("sha256").update(bytes).digest("hex") === sha256 ? bytes : null;
+      return sha256Hex(bytes) === sha256 ? bytes : null;
     } catch {
       return null;
     }
@@ -1428,9 +1400,7 @@ export class CatalogStore {
       throw new CatalogError("That is not JSON. Upload the file tavora-catalog-sign wrote, unchanged.");
     }
     const target = path.join(this.lists, `${name}.json`);
-    const temporary = `${target}.${process.pid}.tmp`;
-    writeFileSync(temporary, bytes);
-    renameSync(temporary, target);
+    writeFileAtomicSync(target, bytes);
   }
 
   /** A signed list's bytes as they were stored, or null before there is one. */
@@ -1448,7 +1418,7 @@ export class CatalogStore {
     if (!this.db.prepare("select 1 from versions where icon like ?").get(`%"${sha256}"%`)) return null;
     try {
       const bytes = readFileSync(path.join(this.shots, `${sha256}.${type}`));
-      return createHash("sha256").update(bytes).digest("hex") === sha256 ? bytes : null;
+      return sha256Hex(bytes) === sha256 ? bytes : null;
     } catch {
       return null;
     }
@@ -1469,7 +1439,7 @@ export class CatalogStore {
     if (!listed) return null;
     try {
       const bytes = readFileSync(path.join(this.shots, `${sha256}.${type}`));
-      return createHash("sha256").update(bytes).digest("hex") === sha256 ? bytes : null;
+      return sha256Hex(bytes) === sha256 ? bytes : null;
     } catch {
       return null;
     }
@@ -1566,7 +1536,7 @@ export class CatalogStore {
     try {
       const bytes = readFileSync(path.join(this.zips, `${sha256}.zip`));
       // Never hand out a file that is not what its name says.
-      return createHash("sha256").update(bytes).digest("hex") === sha256 ? bytes : null;
+      return sha256Hex(bytes) === sha256 ? bytes : null;
     } catch {
       return null;
     }

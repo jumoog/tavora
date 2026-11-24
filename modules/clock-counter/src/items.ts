@@ -6,7 +6,8 @@
 import { keepOverlayTextBox, readOverlayTextBox, type OverlayTextBoxSettings } from "@tavora/official-ui/overlay-text";
 import type { JsonValue } from "@tavora/sdk";
 import { compile, COUNT, defaultText, legacyText, segments, TIME, type Member, type Segment } from "./template";
-import { DEFAULT_FORMAT, formatSeconds, isFormat } from "./time";
+import { DEFAULT_FORMAT, isFormat } from "./time";
+import { isRecord } from "@tavora/official-ui/lib/utils";
 
 export const LIST_ID = "items";
 export const LIST_TITLE = "Clocks and counters";
@@ -172,7 +173,6 @@ export type ItemList = {
   items: Item[];
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const text = (value: unknown, max: number, fallback = "") => (typeof value === "string" ? value.slice(0, max) : fallback);
 const whole = (value: unknown, min: number, max: number, fallback: number) =>
   typeof value === "number" && Number.isFinite(value) ? Math.min(max, Math.max(min, Math.round(value))) : fallback;
@@ -308,11 +308,6 @@ export function readClock(clock: Clock, now: number): ClockReading {
 /** Whether a clock still counts at `now`, so the panel's time must tick: a countdown that reached 0 has stopped. */
 export function clocksRunning(items: readonly Item[], now: number): boolean {
   return items.some((item) => item.kind !== "counter" && readClock(item, now).running);
-}
-
-/** The clock's time as its format shows it. */
-export function clockText(clock: Clock, now: number): string {
-  return formatSeconds(readClock(clock, now).seconds, clock.format);
 }
 
 /** A finished countdown starts over from the full time; anything else starts or pauses. */

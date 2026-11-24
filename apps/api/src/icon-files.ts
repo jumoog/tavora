@@ -1,8 +1,9 @@
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
+import { writeFileAtomicSync } from "./fs-atomic.ts";
 import { isIconId } from "./icons.ts";
 import { icoToPng, inspectPng } from "./png.ts";
+import { sha256Hex } from "./hash.ts";
 
 /**
  * Changes to the hosted icon folder: adding an icon (a PNG, or an .ico whose
@@ -32,8 +33,7 @@ function readIndex(dir: string): IconRecord[] {
 function writeIndex(dir: string, icons: IconRecord[]): void {
   const sorted = [...icons].sort((a, b) => a.id.localeCompare(b.id));
   const file = path.join(dir, "index.json");
-  writeFileSync(`${file}.tmp`, `${JSON.stringify({ icons: sorted }, null, 2)}\n`);
-  renameSync(`${file}.tmp`, file);
+  writeFileAtomicSync(file, `${JSON.stringify({ icons: sorted }, null, 2)}\n`);
 }
 
 export interface AddIconInput {
@@ -58,9 +58,8 @@ export function addIcon(dir: string, input: AddIconInput): { id: string; sha256:
 
   mkdirSync(dir, { recursive: true });
   const target = path.join(dir, `${input.id}.png`);
-  writeFileSync(`${target}.tmp`, png);
-  renameSync(`${target}.tmp`, target);
-  const sha256 = createHash("sha256").update(png).digest("hex");
+  writeFileAtomicSync(target, png);
+  const sha256 = sha256Hex(png);
   const record: IconRecord = { id: input.id, names, sha256, source: input.source.trim(), addedAt: (input.now ?? new Date()).toISOString() };
   writeIndex(dir, [...readIndex(dir).filter((icon) => icon.id !== input.id), record]);
   return { id: input.id, sha256, size: png.byteLength };

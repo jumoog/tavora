@@ -3,7 +3,6 @@ import { translateManifest } from "@tavora/module-schema";
 import type { CatalogListResult, CatalogPageResult, CatalogReviews, CatalogReviewsResult, ModulePageResult, ReleaseStatus } from "../shared/host-api";
 import { translate, type Language } from "../shared/i18n";
 import { askKey, type AskedGame } from "../shared/module-request";
-import { compareModuleVersions } from "../shared/module-version";
 import { catalogView, type CatalogClient, type CatalogScope } from "./catalog-client";
 import { parseReadme, readmeAllowsLink } from "./catalog-readme";
 import { CHECK_INTERVAL_MS, type CatalogUpdater } from "./catalog-updates";
@@ -17,6 +16,7 @@ import { readModulePage } from "./module-page";
 import { supportTarget } from "./module-support";
 import { isReleaseCopies, releaseStatuses } from "./release-pending";
 import { learnGameIds, workspaceGameIds, type ListedGame } from "./workspace-game";
+import { compareModuleVersions } from "../shared/module-version";
 
 /** How long after start the first update check waits, so it never slows the start. */
 const FIRST_CHECK_MS = 30_000;

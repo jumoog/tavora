@@ -1,15 +1,17 @@
-import { createHash, type KeyObject } from "node:crypto";
+import type { KeyObject } from "node:crypto";
 import { execFile } from "node:child_process";
 import { appendFile, mkdtemp, readdir, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { isModuleId, validateChangelog, validateManifest } from "@tavora/module-schema";
+import { isModuleId, validateManifest } from "@tavora/module-schema";
 import { collectFiles, fingerprint, packModule, PackError, PrivateKeyError, readZip, SIGNATURE_FILE, type Published } from "@tavora/pack";
 import { assertNever } from "../shared/assert-never";
 import type { OfficialBuildStep, OfficialPublishOverview, OfficialPublishPreview, OfficialPublishRow, OfficialPublishRun, OfficialUploadStep } from "../shared/host-api";
-import { compareModuleVersions } from "../shared/module-version";
+import { readProjectChangelog } from "./module-changelog";
 import { UserError } from "./messages";
 import { BROWSER_MODULE_ID, OFFICIAL_PREFIX } from "./registry";
+import { sha256Hex } from "./hash";
+import { compareModuleVersions } from "../shared/module-version";
 
 // The dev build's publish flow for a built-in module (Settings > Development, dev builds only). Tavora's own modules
 // update from the catalogue only when signed by the pinned Tavora key, so this is where that signing happens. It builds
@@ -449,7 +451,7 @@ export class OfficialPublisher {
         size: files.reduce((sum, file) => sum + file.data.length, 0),
       };
       if (abort.signal.aborted) throw new PublishCancelled();
-      this.set({ phase: "preview", prepared: { name, worktree, moduleDir, commit: head.commit, preview, hashes: new Map(files.map((file) => [file.name, sha256Of(file.data)])) } });
+      this.set({ phase: "preview", prepared: { name, worktree, moduleDir, commit: head.commit, preview, hashes: new Map(files.map((file) => [file.name, sha256Hex(file.data)])) } });
       worktree = undefined;
       return preview;
     } catch (error) {
@@ -517,12 +519,12 @@ export class OfficialPublisher {
         if (error instanceof PackError) throw new UserError("officialPublish.error.pack", { message: error.message });
         throw error;
       });
-      const sha256 = createHash("sha256").update(zip).digest("hex");
+      const sha256 = sha256Hex(zip);
       if (!this.options.trusted(fingerprint(key), sha256)) throw new UserError("officialPublish.error.wrongKey");
       // What goes up is what the preview showed: same names, same sizes, nothing added.
       const packed = readZip(zip).filter((file) => file.name !== SIGNATURE_FILE);
       const shown = prepared.preview.files;
-      if (packed.length !== shown.length || packed.some((file, index) => file.name !== shown[index]!.name || prepared.hashes.get(file.name) !== sha256Of(file.data))) {
+      if (packed.length !== shown.length || packed.some((file, index) => file.name !== shown[index]!.name || prepared.hashes.get(file.name) !== sha256Hex(file.data))) {
         done = true;
         throw new UserError("officialPublish.error.changed");
       }
@@ -752,18 +754,9 @@ export class OfficialPublisher {
 
   /** The patch notes the changelog has for this version; none when it has no entry or no changelog. */
   private async notes(moduleDir: string, changelog: string | undefined, version: string): Promise<string[]> {
-    if (!changelog) return [];
-    try {
-      const result = validateChangelog(JSON.parse(await readFile(path.join(moduleDir, changelog), "utf8")));
-      return result.ok ? (result.entries.find((entry) => entry.version === version)?.notes ?? []) : [];
-    } catch {
-      return [];
-    }
+    const entries = await readProjectChangelog(moduleDir, changelog || undefined);
+    return entries.find((entry) => entry.version === version)?.notes ?? [];
   }
-}
-
-function sha256Of(data: Uint8Array): string {
-  return createHash("sha256").update(data).digest("hex");
 }
 
 /** Deletes a folder with retries: on Windows an antivirus scan or a closing build tool can hold a file for a moment. */

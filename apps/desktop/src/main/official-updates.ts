@@ -7,11 +7,11 @@
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { isModuleId, isOfficialSigner, OFFICIAL_PINS, officialOn, type OfficialPins } from "@tavora/module-schema";
-import { compareModuleVersions } from "../shared/module-version";
 import type { SavedRecord } from "./json";
 import { FolderChecks, type Verified } from "./module-folder-check";
 import { SAVED_FILES, SavedFile } from "./saved-file";
 import type { SafetyCheck } from "./safety-lists";
+import { compareModuleVersions } from "../shared/module-version";
 
 export const OFFICIAL_UPDATES_DIR = "official-updates";
 export const OFFICIAL_UPDATES_FILE = "official-updates.json";
