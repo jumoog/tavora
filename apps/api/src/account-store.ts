@@ -1,6 +1,7 @@
 import { randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { sha256Hex } from "./hash.ts";
+import { openStateDb } from "./sqlite.ts";
 
 /**
  * Accounts: the only user data the service keeps (decided 2026-10-16). An
@@ -290,7 +291,7 @@ export class AccountStore {
   private askersSweptAt = 0;
 
   constructor(path: string) {
-    this.db = new DatabaseSync(path);
+    this.db = openStateDb(path);
     this.db.exec(`
       pragma foreign_keys = on;
       create table if not exists accounts (
@@ -1181,6 +1182,14 @@ export class AccountStore {
   countMail(day: string): void {
     this.db.prepare("insert into mail_days (day, sent) values (?, 1) on conflict (day) do update set sent = sent + 1").run(day);
     this.db.prepare("delete from mail_days where day < ?").run(new Date(Date.parse(`${day}T00:00:00Z`) - 7 * DAY_MS).toISOString().slice(0, 10));
+  }
+
+  /**
+   * Gives back an email countMail counted for one that then didn't go out. A send is counted before it goes, so sends
+   * at the same time see each other against the day's limit. Never below 0.
+   */
+  uncountMail(day: string): void {
+    this.db.prepare("update mail_days set sent = sent - 1 where day = ? and sent > 0").run(day);
   }
 
   /**

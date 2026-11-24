@@ -11,6 +11,7 @@ import { banned, requireSignIn, tooMany, type SignedInEnv } from "./sign-in.ts";
 import { checkReviewText } from "./review-filter.ts";
 import { MIN_ACCOUNT_AGE_MS, ownsModule } from "./reviews.ts";
 import { BUILT_IN_TEXTS, CONTACT_KINDS, cleanContactValue, contactFromLegacy, contactToLegacy, type Contact, type ContactKind } from "../../desktop/src/shared/conversations.ts";
+import { openStateDb } from "./sqlite.ts";
 
 /**
  * Conversations (decided 2026-10-27, "Conversations" in the design doc). Two kinds exist and nothing else, so
@@ -157,7 +158,7 @@ export class ConversationStore {
   private readonly db: DatabaseSync;
 
   constructor(path: string) {
-    this.db = new DatabaseSync(path);
+    this.db = openStateDb(path);
     this.db.exec(`
       pragma journal_mode = wal;
       pragma foreign_keys = on;
@@ -340,6 +341,18 @@ export class ConversationStore {
         .run(now, id);
     }
     return closed;
+  }
+
+  /**
+   * Blocks a developer conversation: an open one closes with `blocked`; a closed one is marked `blocked` too (keeping when
+   * it closed, unless an account left it), and the block is recorded either way, so no new one starts about the module.
+   */
+  block(id: string, now: number): void {
+    if (this.closeConversation(id, "blocked", now)) return;
+    this.db.prepare("update conversations set close_reason = 'blocked' where id = ? and kind = 'developer' and state = 'closed' and close_reason is not 'left'").run(id);
+    this.db
+      .prepare("insert or ignore into conversation_blocks (user_account_id, module_id, at) select user_account_id, module_id, ? from conversations where id = ? and kind = 'developer' and user_account_id is not null and module_id is not null")
+      .run(now, id);
   }
 
   /** The admin reopens its own conversation. Its last activity moves to now. */
@@ -954,7 +967,8 @@ export function conversationRoutes({ conversations, catalog, accounts, clientKey
     if (!input || Object.keys(input).some((key) => key !== "report")) return bad(context, "Send { report?: { reason, note? } }.");
     const report = input.report === undefined || input.report === null ? null : reportInput(input.report);
     if (input.report !== undefined && input.report !== null && !report) return bad(context, reportError);
-    conversations.closeConversation(found.conversation.id, "blocked", now());
+    // A closed conversation can still be blocked, so its user can't start a new one about the module.
+    conversations.block(found.conversation.id, now());
     if (report) conversations.report(found.conversation.id, context.get("account").id, report.reason, report.note, now());
     return context.json(detail(conversations.get(found.conversation.id)!, found.role));
   });
