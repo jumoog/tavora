@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.162",
+    date: "2026-11-24",
+    title: "A slow keyring no longer holds things up",
+    notes: [
+      "If your system's key store is slow to answer, Tavora starts without waiting for it again and again.",
+      "When it answers later, Tavora picks up your saved sign-in and Discord connection, and keeps a Tavora sign-in you just made.",
+      "Signing out can't be undone by a sign-in that was still being refreshed.",
+    ],
+    prs: [
+      { number: 942, title: "Key store follow-ups from #940: no key re-seal, guarded sign-in re-seal, one timeout per start" },
+    ],
+    tags: ["accounts", "cloud-copy", "discord"],
+  },
+  {
     version: "0.24.161",
     date: "2026-11-24",
     title: "Clearer cloud copy turn-off",
