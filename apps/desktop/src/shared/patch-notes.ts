@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.3",
+    date: "2026-11-24",
+    title: "Safer cloud copy folder",
+    notes: [
+      "Adding a PC through your cloud copy folder answers the PC that asked first, so a request someone else put there can't get ahead of yours.",
+      "Deleting a folder copy never touches anything outside your folder.",
+    ],
+    prs: [
+      { number: 952, title: "Security audit run 6: linear code check, linked copy folder, capped folder pairing" },
+    ],
+    tags: ["catalog", "cloud-copy", "modules", "privacy", "service", "website", "workspace"],
+  },
+  {
     version: "0.25.2",
     date: "2026-11-24",
     title: "Steadier turn-off and in-game panels",
