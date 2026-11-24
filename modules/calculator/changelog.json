@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.1.42",
+    "date": "2026-11-24",
+    "notes": [
+      "Keys pressed in a value's menu no longer change the sum.",
+      "You can type @ with AltGr or Option, as on a German keyboard."
+    ]
+  },
+  {
     "version": "0.1.41",
     "date": "2026-11-24",
     "notes": [

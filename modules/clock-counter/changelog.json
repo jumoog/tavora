@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.1.48",
+    "date": "2026-11-24",
+    "notes": [
+      "Ctrl+Z brings back a clock or counter you just deleted.",
+      "A deleted clock or counter's hotkeys go once the delete is final, or the next time the panel opens if it was closed before that."
+    ]
+  },
+  {
     "version": "0.1.47",
     "date": "2026-11-24",
     "notes": [

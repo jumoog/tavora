@@ -12,7 +12,7 @@ import { Progress } from "@tavora/official-ui/components/ui/progress";
 import { Popover, PopoverContent, PopoverTrigger } from "@tavora/official-ui/components/ui/popover";
 import { TabStrip, type StripTab } from "@tavora/official-ui/components/ui/tabs";
 import { Toaster, toast } from "@tavora/official-ui/components/ui/toast";
-import { TavoraError, type TavoraSDK } from "@tavora/sdk";
+import { TavoraError, type JsonValue, type TavoraSDK } from "@tavora/sdk";
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import FileList from "./FileList.vue";
 import ImagePane from "./ImagePane.vue";
@@ -21,7 +21,7 @@ import { ACCEPT_ATTRIBUTE, formatBytes, PICK_EXTENSIONS, sortPicked, versionOf, 
 import { setLanguage, t } from "./i18n";
 import { de, en } from "./locales";
 import { createFilesStore, FileProblem, type FilesStore } from "./store";
-import { closeTab, emptyTabs, followRenamed, keepExisting, openTab, parseTabState, reorderTabs, type TabState } from "./tabs";
+import { closeTab, emptyTabs, followRenamed, keepExisting, openTab, parseTabState, reorderTabs, savedTabState, type TabState } from "./tabs";
 
 const TOAST_MS = 8000;
 
@@ -63,15 +63,26 @@ function notice(message: string) {
   toast({ title: message, duration: TOAST_MS, testid: "notice-toast" });
 }
 
+/** The panel went while it was still starting: what arrives after that is closed again, not kept. */
+let unmounted = false;
+
 onMounted(async () => {
   try {
     const connection = await connectModule({ texts: { en, de } });
     if (connection.status !== "ready" || !connection.sdk) throw connection.error;
+    if (unmounted) {
+      connection.dispose();
+      return;
+    }
     const connected = connection.sdk;
     setLanguage(connection.language);
     cleanup.push(connection.onLanguage(setLanguage), connection.dispose);
     starting.value = 60;
     const opened = await createFilesStore(connected, { title: () => t("files.title") });
+    if (unmounted) {
+      void opened.dispose();
+      return;
+    }
     const saved = parseTabState(await connected.panel.getState<unknown>());
     tabState.value = keepExisting(saved, (id) => opened.find(id) !== undefined);
     // Asking about an id nobody linked tells whether this Tavora has the call at all; an older one doesn't know it.
@@ -93,6 +104,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  unmounted = true;
   cleanup.forEach((fn) => fn());
   void store.value?.dispose();
 });
@@ -108,7 +120,7 @@ watch(files, () => {
 /** Writes which files this panel has open and which one it shows. */
 function saveTabs(): Promise<void> {
   const state = tabState.value;
-  return sdk.value ? sdk.value.panel.setState({ tabs: [...state.tabs], active: state.active }).catch(() => undefined) : Promise.resolve();
+  return sdk.value ? sdk.value.panel.setState(savedTabState(state) as JsonValue).catch(() => undefined) : Promise.resolve();
 }
 
 async function flushNow() {
@@ -237,15 +249,27 @@ async function reloadActive() {
 async function skipActive() {
   const file = active.value;
   if (!file) return;
+  const before = statuses.value.get(file.id);
   statuses.value.set(file.id, "skipped");
-  await store.value?.skip(file.id).catch(() => undefined);
+  try {
+    await store.value?.skip(file.id);
+  } catch {
+    // Not saved: the question about this version comes back, and the user hears why.
+    if (before === undefined) statuses.value.delete(file.id);
+    else statuses.value.set(file.id, before);
+    notice(t("save.skipFailed", { name: file.name }));
+    void checkOriginal(file.id);
+  }
 }
 
 async function keepActive() {
   const file = active.value;
   if (!file) return;
   statuses.value.delete(file.id);
-  await store.value?.unlink(file.id).catch((reason) => notice(errorMessage(reason)));
+  await store.value?.unlink(file.id).catch(() => {
+    notice(t("save.keepFailed", { name: file.name }));
+    void checkOriginal(file.id);
+  });
 }
 
 async function removeActive() {
@@ -255,8 +279,8 @@ async function removeActive() {
     await store.value.remove(file.id);
     tabState.value = closeTab(tabState.value, file.id);
     statuses.value.delete(file.id);
-  } catch (reason) {
-    notice(errorMessage(reason));
+  } catch {
+    notice(t("save.removeFailed", { name: file.name }));
   }
 }
 
@@ -312,7 +336,8 @@ function askRename(id: string) {
 
 async function rename(id: string, name: string) {
   renaming.value = null;
-  await store.value?.rename(id, name).catch((reason) => notice(errorMessage(reason)));
+  const before = byId.value.get(id)?.name ?? name;
+  await store.value?.rename(id, name).catch(() => notice(t("save.renameFailed", { name: before })));
 }
 
 function askRemove(id: string) {
@@ -330,9 +355,9 @@ async function remove() {
     await store.value.remove(file.id);
     tabState.value = closeTab(tabState.value, file.id);
     removing.value = null;
-  } catch (reason) {
+  } catch {
     removing.value = null;
-    notice(errorMessage(reason));
+    notice(t("save.removeFailed", { name: file.name }));
   } finally {
     busy.value = false;
   }
