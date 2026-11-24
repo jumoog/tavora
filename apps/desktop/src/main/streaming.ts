@@ -28,6 +28,10 @@ export interface HotkeyListener {
   moduleId: string;
   /** When the user last used the panel; a press goes to the module's panel used last. */
   usedAt: number;
+  /** False while it runs only with its game, out of sight: a press goes to a panel in sight first. True when left out. */
+  inSight?(): boolean;
+  /** The panel's workspace: a press goes to one of the workspace shown first (not one lent from another to the game layer). */
+  readonly workspaceId?: string;
   hotkeyPressed(binding: HotkeyBinding): void;
 }
 
@@ -310,11 +314,19 @@ export class Streaming {
     this.registrar.apply(wanted);
   }
 
-  /** One press is one action: it goes to one panel of the module, the one used last, so several panels don't each act on it. */
+  /**
+   * One press is one action: it goes to one panel of the module, the one used last, so several panels don't each act on
+   * it. A panel of the workspace shown comes first (not one lent from another workspace to the game layer), then one in
+   * sight: one running only with its game can't act on what needs the user (PanelGate), so the press would be lost there.
+   */
   private pressed(record: HotkeyRecord): void {
     if (isOverlayAction(record.action)) return this.overlayKeys?.pressed(record);
     if (this.options.workspaceId() !== record.workspaceId) return;
-    const panel = this.panelListeners().filter((item) => item.moduleId === record.moduleId).sort((a, b) => b.usedAt - a.usedAt)[0];
+    const here = (item: HotkeyListener) => ((item.workspaceId ?? record.workspaceId) === record.workspaceId ? 1 : 0);
+    const inSight = (item: HotkeyListener) => (item.inSight?.() ?? true ? 1 : 0);
+    const panel = this.panelListeners()
+      .filter((item) => item.moduleId === record.moduleId)
+      .sort((a, b) => here(b) - here(a) || inSight(b) - inSight(a) || b.usedAt - a.usedAt)[0];
     panel?.hotkeyPressed({ action: record.action, target: record.target });
   }
 

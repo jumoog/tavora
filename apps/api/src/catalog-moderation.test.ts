@@ -15,6 +15,7 @@ import { createHostedStore } from "./hosted-store.ts";
 import { IconState } from "./icon-state.ts";
 import { createTestInbox } from "./mail.ts";
 import { moderationRoutes } from "./moderation-admin.ts";
+import { signsIn } from "./moderation.ts";
 import { encodePng } from "./png.ts";
 import { keyFingerprint } from "./publishers.ts";
 import { createRateLimiter } from "./rate-limit.ts";
@@ -254,6 +255,8 @@ describe("check 4: warning signs in the code", { timeout: 30_000 }, () => {
       "import(url)",
       "import(url)\n{ run() }",
       "const a = 1; // import(x) below\nimport(url)",
+      "// import(x)\n// import(y)\nrun(); import(url)",
+      "// import(x)\r\n  import(url)",
       "import x from 'https://cdn.example/x.js'",
       "importScripts('x.js')",
       "document.createElement('script')",
@@ -263,6 +266,105 @@ describe("check 4: warning signs in the code", { timeout: 30_000 }, () => {
     }
     expect(await flagged('<script src="https://cdn.example/lib.js"></script>', "page.html")).toBe("code");
     expect(await flagged('<svg xmlns="http://www.w3.org/2000/svg"><script href="https://cdn.example/x.js"/></svg>', "pic.svg")).toBe("code");
+    for (const [text, name] of [
+      ["<SCRIPT type=\"module\" SRC = '//cdn.example/x.js'></SCRIPT>", "page.html"],
+      ["<script async src=https://cdn.example/x.js></script>", "page.htm"],
+      ['<script src="app.js"></script><p>hi</p><script\n  defer\n  src="http://cdn.example/x.js"></script>', "page.html"],
+      ['<script <script src="//cdn.example/x.js">', "page.html"],
+      ['<script type="module" src="//cdn.example/x.js"', "page.html"],
+      ['const page = `<script src="https://cdn.example/x.js"></script>`', "app.js"],
+      ['<svg><script xlink:href="//cdn.example/x.js"/></svg>', "pic.svg"],
+      ['<script type="text/javascript" href="https://cdn.example/x.js"></script>', "page.xhtml"],
+      // A > in a quoted value doesn't end the tag.
+      ['<script data-x=">" src="//cdn.example/x.js"></script>', "page.html"],
+      ["<script data-x='a>b' src=//cdn.example/x.js></script>", "page.html"],
+      // The address as a browser reads it: entities, spaces and tabs around it, backslashes, no slashes after https:.
+      ['<script src="&#47;&#47;cdn.example/x.js"></script>', "page.html"],
+      ['<script src="&#x2F;&sol;cdn.example/x.js"></script>', "page.html"],
+      ['<script src=" \t//cdn.example/x.js"></script>', "page.html"],
+      ['<script src="ht\ttps://cdn.example/x.js"></script>', "page.html"],
+      ['<script src="https:cdn.example/x.js"></script>', "page.html"],
+      ['<script src="HTTP&colon;cdn.example/x.js"></script>', "page.html"],
+      ['<script src="\\\\cdn.example/x.js"></script>', "page.html"],
+      ['<svg><script href="&#47;/cdn.example/x.js"/></svg>', "pic.svg"],
+      // A quote only opens after `=`, and a script's own text is no tag: neither hides the tag after it.
+      ["<script a=it's></script><script b='>' src=//cdn.example/x.js></script>", "page.html"],
+      ['<script a"b></script><script c=">" src=//cdn.example/x.js></script>', "page.html"],
+      ["<script>var s=\"<script a='\";</script><script b='>' src=//cdn.example/x.js></script>", "page.html"],
+      ['<SCRIPT>x = "</scrip" + "<script a=\'"</SCRIPT ><script b=\'>\' src=//cdn.example/x.js></script>', "page.html"],
+      // A <script> that is no tag (in a comment, a textarea, an attribute, an SVG script) doesn't hide the one after it.
+      ["<!-- <script> --> <script src=//cdn.example/x.js></script>", "page.html"],
+      ['<textarea><script></textarea><script src="//cdn.example/x.js"></script>', "page.html"],
+      ['<div title="<script>"></div><script src="//cdn.example/x.js"></script>', "page.html"],
+      ['<svg><script><script href="//cdn.example/x.js"/></script></svg>', "pic.svg"],
+      // A tag whose first > is in a quoted value is held, whatever its src: real ones have none there.
+      ['<script data-x=">" src="app.js"></script>', "page.html"],
+      // One in a comment that leaves a quote open: held for that.
+      ["<!-- <script a=' --><script b='>' src=//cdn.example/x.js></script>", "page.html"],
+      // Entities with any number of leading zeros.
+      ['<script src="&#00000047;&#00000047;cdn.example/x.js"></script>', "page.html"],
+      ['<script src="&#x000002F;&#X000002f;cdn.example/x.js"></script>', "page.html"],
+      // A tag far longer than any real one.
+      [`<script data-pad="${"a".repeat(17 * 1024)}" src="app.js"></script>`, "page.html"],
+    ]) {
+      expect(await flagged(text!, name), text).toBe("code");
+    }
+  });
+
+  it("finds a script element's src only inside its own tag, as before", async () => {
+    for (const [text, name] of [
+      ['<script>const src = "//cdn.example/x"</script>', "page.html"],
+      ['<script src="app.js"></script><img src="//cdn.example/x.png">', "page.html"],
+      ['<scripts src="//cdn.example/x.js">', "page.html"],
+      ['<script src="./app.js"></script><script src="/lib/x.js"></script>', "page.html"],
+      ['<script src="app.js?from=https://example.org"></script>', "page.html"],
+      ['<script data-x="a=b" src="app.js"></script><script>if (a > b) x = "</p>"</script>', "page.html"],
+      // href on a script element counts only in svg and html files.
+      ['const svg = \'<script href="//cdn.example/x.js"/>\'', "app.js"],
+    ]) {
+      expect(await flagged(text!, name), text).toBe("listed");
+    }
+  });
+
+  it("reads a big file made to slow the check down in well under a second", () => {
+    const size = 1024 * 1024;
+    const spaces = " ".repeat(size);
+    const handler = "function(){var t=d.createElement('script');t.onreadystatechange=function(){u()";
+    for (const [name, text] of [
+      ["app.js", `function(${spaces}x`],
+      ["app.js", `function(e${spaces}x`],
+      ["app.js", `${handler}${spaces}x`],
+      ["app.js", `${handler};${spaces}x`],
+      ["app.js", `${handler}}${spaces}x`],
+      ["app.js", `${handler}},d.body.appendChild(t)${spaces}x`],
+      ["app.js", "function(".repeat(size / 9)],
+      ["page.html", `<script ${spaces}x`],
+      ["page.html", "<script ".repeat(size / 8)],
+      ["pic.svg", "<script ".repeat(size / 8)],
+      ["page.html", `<script ${"src ".repeat(size / 4)}`],
+      ["page.html", `<script>${"src=".repeat(size / 4)}`],
+      ["page.html", `<script a=">${"src=".repeat(size / 4)}`],
+      ["page.html", `<script a=b ${'src="&#32;'.repeat(size / 10)}`],
+      ["page.html", '<script a="b">'.repeat(size / 14)],
+      ["page.html", `<script src="${" ".repeat(size)}`],
+      ["pic.svg", `<script ${"href=".repeat(size / 5)}`],
+      ["page.html", "<script x>".repeat(size / 10)],
+      ["page.html", "<script a='x'>".repeat(size / 14)],
+      ["page.html", '<script a="'.repeat(size / 11)],
+      ["page.html", "<script></script>".repeat(size / 17)],
+      ["page.html", `<script a=${" ".repeat(size)}x>`],
+      ["page.html", `<script src="&#${"0".repeat(size)}47;">`],
+      ["page.html", `<script src=&#x${"0".repeat(size)}`],
+      ["app.js", `//${"import(a;".repeat(size / 9)}`],
+      ["app.js", `import(${spaces})`],
+      ["app.js", `new${spaces}x`],
+      ["app.js", `Function(${spaces}x`],
+      ["app.js", `atob(x); "${"A".repeat(size)}`],
+    ] as const) {
+      const started = performance.now();
+      signsIn(name, text);
+      expect(performance.now() - started, `${name}: ${text.slice(0, 40)}…`).toBeLessThan(1000);
+    }
   });
 
   it("holds packed and obfuscated code", async () => {
@@ -287,6 +389,7 @@ describe("check 4: warning signs in the code", { timeout: 30_000 }, () => {
       "class Maps { import(name: string, world?: Snapshot): Promise<void> { return save(name) } }",
       "repository.import(file)",
       "// node types come from the checked import (gameSkillData.json)",
+      "  // import(x) here\n\t// and import(y) there\n//import(z)",
     ];
     for (const text of honest) expect(await flagged(text), text).toBe("listed");
     expect(await flagged('<p>hello</p><script src="app.js"></script>', "page.html")).toBe("listed");
@@ -306,6 +409,17 @@ describe("check 4: warning signs in the code", { timeout: 30_000 }, () => {
   it("leaves known pieces of popular libraries alone", async () => {
     for (const text of libraryExcerpts) expect(await flagged(text), text).toBe("listed");
     expect(await flagged(libraryExcerpts.join(";\n"))).toBe("listed");
+  });
+
+  it("knows the empty script element however it is spaced and ended", async () => {
+    for (const text of [
+      "function ( e ) { var t = u.createElement( 'script' ) ; t.onreadystatechange = function () { p(e) ; t.onreadystatechange = null ; i.removeChild(t) ; t = null ; } ; i.appendChild(t) ; }",
+      "function( ){let t=u.createElement(\"script\");t.onreadystatechange=function(){p();t=null;},i.appendChild(t);}",
+      "function(){const t=u.createElement(`script`);t.onreadystatechange=function(){p()}\ni.appendChild(t)}",
+      "function(e){var t=u.createElement('script');t.onreadystatechange=function(){p(e),t=null}\n,\ni.appendChild(t)\n}",
+    ]) {
+      expect(await flagged(text), text).toBe("listed");
+    }
   });
 
   it("still holds anything that only looks like those pieces", async () => {
