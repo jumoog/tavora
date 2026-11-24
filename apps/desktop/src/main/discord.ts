@@ -191,9 +191,20 @@ export class DiscordConnector {
     // Paused: nothing offers it, and the saved sign-in waits as it is for when Discord voice comes back.
     if (this.paused) return;
     this.secrets = { token: null };
-    await this.deps.save(this.secrets);
-    this.user = null;
-    this.stop(this.wanted ? "signed-out" : "off");
+    const secrets = this.secrets;
+    this.keepPending = false;
+    try {
+      await this.deps.save(secrets);
+    } catch (error) {
+      // The file couldn't be removed (held): the late yes removes it again, and never reads it over this sign-out.
+      if (this.secrets === secrets) this.keepPending = true;
+      throw error;
+    }
+    finally {
+      // Disconnected either way: the connection ends even when the file couldn't be removed.
+      this.user = null;
+      this.stop(this.wanted ? "signed-out" : "off");
+    }
   }
 
   /**
@@ -418,9 +429,15 @@ export class DiscordConnector {
   }
 
   private async saveToken(token: DiscordToken | null): Promise<void> {
-    this.secrets = { ...this.secrets, token };
-    await this.deps.save(this.secrets).catch(() => undefined);
+    const secrets = (this.secrets = { ...this.secrets, token });
+    // A sign-in that can't be written (the key store isn't ready) stays in memory only, and is written on the late yes (keyStoreChanged).
+    // (A refused token that can't be removed is retried the same way.) A newer save or a disconnect asked meanwhile has replaced `this.secrets`: its answer is the one that counts.
+    const failed = await this.deps.save(secrets).then(() => false, () => true);
+    if (this.secrets === secrets) this.keepPending = failed;
   }
+
+  /** `secrets` (a sign-in, or a sign-out) couldn't be written because the key store couldn't be asked: written on the late yes. Never written unsealed. */
+  private keepPending = false;
 
   // ── Events ───────────────────────────────────────────────────────────
 
@@ -469,6 +486,15 @@ export class DiscordConnector {
   /** The system's key store answered late (it can keep the sign-in after all): what couldn't be read at start is, and the page is told. */
   async keyStoreChanged(): Promise<void> {
     await this.loaded;
+    if (this.keepPending) {
+      // A sign-in made while the key store couldn't be asked: written now, through the same queue as every save. Not replaced by a read.
+      const secrets = this.secrets;
+      await this.deps.save(secrets).then(
+        () => void (this.secrets === secrets && (this.keepPending = false)),
+        () => undefined,
+      );
+      return this.emit();
+    }
     const isEmpty = () => !this.secrets.token && !this.secrets.last && Object.keys(this.secrets.games ?? {}).length === 0;
     if (isEmpty()) {
       const read = await this.deps.load().catch(() => null);

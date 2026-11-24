@@ -107,6 +107,76 @@ describe("DiscordConnector", () => {
     expect(fake.commands.some((c) => c.cmd === "AUTHENTICATE")).toBe(true);
   });
 
+  describe("a sign-in made while the key store couldn't be asked", () => {
+    /** The file holds the old account X, unreadable and unwritable until `ready.yes`; a read gives what was written last. */
+    async function blocked() {
+      const made = await setup();
+      const ready = { yes: false, removeFails: false };
+      const written: DiscordSecrets[] = [];
+      let disk: DiscordSecrets | null = { token: { accessToken: "x-old", refreshToken: "rx", expiresAt: Date.now() + 1e9 } };
+      const dep = (made.connector as unknown as { deps: { load(): Promise<DiscordSecrets>; save(s: DiscordSecrets): Promise<void> } }).deps;
+      dep.load = async () => (ready.yes ? (disk ?? { token: null }) : { token: null });
+      dep.save = async (next) => {
+        const empty = !next.token && !next.last;
+        if (empty ? ready.removeFails : !ready.yes) throw new Error("No secure storage on this PC.");
+        written.push(next);
+        disk = empty ? null : next;
+      };
+      await made.connector.use("p1", panel().listener);
+      return { ...made, ready, written };
+    }
+
+    it("is written on the late yes, and the old one isn't read over it", async () => {
+      const { connector, ready, written } = await blocked();
+      await connector.connectNow();
+      await until(() => connector.state().status === "connected");
+      expect(written).toEqual([]);
+      ready.yes = true;
+      await connector.keyStoreChanged();
+      expect(written.at(-1)?.token).toMatchObject({ accessToken: "good", refreshToken: "r1" });
+    });
+
+    it("a disconnect in the meantime is never undone by the late yes", async () => {
+      const { connector, fake, ready, written } = await blocked();
+      await connector.connectNow();
+      await until(() => connector.state().status === "connected");
+      await connector.signOut();
+      fake.commands.length = 0;
+      ready.yes = true;
+      await connector.keyStoreChanged();
+      expect(written.some((s) => s.token)).toBe(false);
+      expect(connector.state().status).toBe("signed-out");
+      expect(fake.commands.filter((c) => c.cmd === "AUTHENTICATE")).toEqual([]);
+    });
+
+    it("a disconnect that couldn't remove the file is made again on the late yes, and the old account isn't read", async () => {
+      const { connector, fake, ready, written } = await blocked();
+      await connector.connectNow();
+      await until(() => connector.state().status === "connected");
+      ready.removeFails = true;
+      await expect(connector.signOut()).rejects.toThrow();
+      fake.commands.length = 0;
+      ready.yes = true;
+      ready.removeFails = false;
+      await connector.keyStoreChanged();
+      expect(written.at(-1)).toEqual({ token: null });
+      expect(connector.state().status).not.toBe("connected");
+      expect(fake.commands.filter((c) => c.cmd === "AUTHENTICATE")).toEqual([]);
+    });
+
+    it("the newest sign-in wins", async () => {
+      const { connector, ready, written } = await blocked();
+      await connector.connectNow();
+      await until(() => connector.state().status === "connected");
+      await connector.signOut();
+      await connector.connectNow();
+      await until(() => connector.state().status === "connected");
+      ready.yes = true;
+      await connector.keyStoreChanged();
+      expect(written.filter((s) => s.token)).toHaveLength(1);
+    });
+  });
+
   it("does nothing until a panel uses it", async () => {
     const { connector, fake } = await setup({ secrets: SIGNED_IN });
     expect(connector.view().status).toBe("off");
