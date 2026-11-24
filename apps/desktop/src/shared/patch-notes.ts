@@ -28,6 +28,30 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.24.160",
+    date: "2026-11-24",
+    title: "Sturdier saved sign-ins",
+    notes: [
+      "Your saved sign-ins and keys open the same way as before.",
+    ],
+    prs: [
+      { number: 940, title: "Saved sign-ins use the async safeStorage calls" },
+    ],
+    tags: ["accounts", "cloud-copy", "discord", "publishing"],
+  },
+  {
+    version: "0.24.159",
+    date: "2026-11-24",
+    title: "Tabs drop where you drag them",
+    notes: [
+      "Dragging a tab to the right now drops it where you let go, also with animations on.",
+    ],
+    prs: [
+      { number: 939, title: "Fix tab drag to the right dropping nothing with animations on" },
+    ],
+    tags: ["pdf-viewer", "ui-kit"],
+  },
+  {
     version: "0.24.158",
     date: "2026-11-24",
     title: "Safer cloud copy files",
