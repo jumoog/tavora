@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.35",
+    date: "2026-11-25",
+    title: "Cards you can pin",
+    notes: [
+      "Modules can show a card on hover that holds buttons and links, and you can pin it.",
+      "Tab takes you into the card, and Escape closes it.",
+      "The UI Playground shows it on a new page.",
+    ],
+    prs: [
+      { number: 995, title: "Kit HoverCard: a card you can move into, click in and pin" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.34",
     date: "2026-11-25",
     title: "A tree for modules",
