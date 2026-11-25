@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.27",
+    date: "2026-11-25",
+    title: "Lists you can search",
+    notes: [
+      "Modules can show a list with a search field on top that stays open, for picking what to add.",
+      "Type to search, use ↑ ↓ to move and Enter to take one.",
+      "The UI Playground shows it.",
+    ],
+    prs: [
+      { number: 990, title: "Listbox: an always-open list to pick from, with search on top" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.26",
     date: "2026-11-25",
     title: "Small fixes to pages, backups and files",
