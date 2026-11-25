@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.33",
+    date: "2026-11-25",
+    title: "Toolbars with arrow keys",
+    notes: [
+      "Modules can put their tools in one row that you move along with the arrow keys.",
+      "The UI Playground shows how.",
+    ],
+    prs: [
+      { number: 991, title: "Kit Toolbar: one Tab stop, arrow keys along it" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.32",
     date: "2026-11-25",
     title: "Tooltips fade out",
