@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.19",
+    date: "2026-11-25",
+    title: "One card, two places",
+    notes: [
+      "Modules can show the same item card in their panel's tooltip and in Tavora's.",
+      "Modules can build their own cards from the item card's parts.",
+      "The UI Playground shows both.",
+    ],
+    prs: [
+      { number: 983, title: "Item card parts and ItemTooltip: one card, described once, in the panel or Tavora's tooltip" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.18",
     date: "2026-11-25",
     title: "Publish says more up front",
