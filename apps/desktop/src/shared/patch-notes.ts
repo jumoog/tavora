@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.32",
+    date: "2026-11-25",
+    title: "Tooltips fade out",
+    notes: [
+      "Tooltips fade out when they close, instead of vanishing.",
+    ],
+    prs: [
+      { number: 989, title: "Tooltip: fade out, align, toggle for touch, keepOnPress, when, name or describe" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.31",
     date: "2026-11-25",
     title: "Chips in the Hardware style",
