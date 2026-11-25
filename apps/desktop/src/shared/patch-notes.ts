@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.24",
+    date: "2026-11-25",
+    title: "Plainer buttons and headings",
+    notes: [
+      "Dialog buttons like Save, Publish and Allow have no icon any more; Delete, Copy, Add and Download keep theirs.",
+      "Buttons that open a page or site end in an arrow, and buttons that ask for more first end in \"…\".",
+      "Plainer headings and welcome texts.",
+    ],
+    prs: [
+      { number: 992, title: "Buttons and headings follow the new rules" },
+    ],
+    tags: ["calculator", "catalog", "clock-counter", "cloud-copy", "games", "hotkeys", "icons", "notes", "overlays", "pdf-viewer", "privacy", "publishing", "settings", "ui-kit", "website", "workspace"],
+  },
+  {
     version: "0.25.23",
     date: "2026-11-25",
     title: "Copy and share",
