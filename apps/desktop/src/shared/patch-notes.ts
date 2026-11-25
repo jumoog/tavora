@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.43",
+    date: "2026-11-25",
+    title: "Calendar keeps its height",
+    notes: [
+      "A calendar always shows 6 weeks, so it no longer grows and shrinks between months. The days of the months around it are shown in grey, and you can pick them too.",
+    ],
+    prs: [
+      { number: 1010, title: "Calendar: always 6 weeks, neighbour days dimmed" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.42",
     date: "2026-11-25",
     title: "Cloud copy and Trash fixes",
