@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.3.45",
+    "date": "2026-11-25",
+    "notes": [
+      "Restore after a delete in another panel keeps the board's name and pictures."
+    ]
+  },
+  {
     "version": "0.3.44",
     "date": "2026-11-25",
     "notes": [
