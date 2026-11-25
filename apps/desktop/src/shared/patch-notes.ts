@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.42",
+    date: "2026-11-25",
+    title: "Cloud copy and Trash fixes",
+    notes: [
+      "Switching accounts while your cloud copy uploads no longer touches the other account's copy.",
+      "While a cloud copy you picked is still waiting, Tavora asks you to choose which data to keep before you turn the copy on again.",
+      "A workspace that couldn't be deleted from Trash comes back with its panels and layout when you restore it.",
+    ],
+    prs: [
+      { number: 1011, title: "Audit fixes from #994: leaked keys, upload memory, cloud copy, Trash, Whiteboard" },
+    ],
+    tags: ["accounts", "catalog", "cloud-copy", "publishing", "service", "settings", "whiteboard", "workspace"],
+  },
+  {
     version: "0.25.41",
     date: "2026-11-25",
     title: "Search in pick lists",
