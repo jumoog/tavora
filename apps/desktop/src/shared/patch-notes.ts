@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.41",
+    date: "2026-11-25",
+    title: "Search in pick lists",
+    notes: [
+      "The search at the top of a pick list is now a field of its own.",
+    ],
+    prs: [
+      { number: 1009, title: "Picker: search as its own field, groups example on one baseline" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.40",
     date: "2026-11-25",
     title: "Buttons don't end in …",
