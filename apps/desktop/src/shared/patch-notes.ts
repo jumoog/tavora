@@ -28,6 +28,32 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.23",
+    date: "2026-11-25",
+    title: "Copy and share",
+    notes: [
+      "Copy in the Calculator now puts the result on your clipboard.",
+      "Modules can copy text for you, and share a result as text or a picture.",
+    ],
+    prs: [
+      { number: 993, title: "Kit: copyText, ShareMenu and renderToImage; Tavora clipboard.writeText (SDK 0.4.14)" },
+    ],
+    tags: ["calculator", "clock-counter", "modules", "notes", "pdf-viewer", "privacy", "publishing", "sdk", "system-monitor", "todos", "ui-kit", "website", "whiteboard", "workspace"],
+  },
+  {
+    version: "0.25.22",
+    date: "2026-11-25",
+    title: "A calendar for modules",
+    notes: [
+      "Modules can show a month to pick a day from, with marks such as solved or missed.",
+      "The UI Playground has a new Dates page to try it.",
+    ],
+    prs: [
+      { number: 987, title: "Kit Calendar and CalendarLegend, Dates page in the UI Playground" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.21",
     date: "2026-11-25",
     title: "Links and list rows",

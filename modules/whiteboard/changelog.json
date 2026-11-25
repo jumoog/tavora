@@ -1,9 +1,23 @@
 [
   {
-    "version": "0.3.45",
+    "version": "0.3.47",
     "date": "2026-11-25",
     "notes": [
       "Restore after a delete in another panel keeps the board's name and pictures."
+    ]
+  },
+  {
+    "version": "0.3.46",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.3.45",
+    "date": "2026-11-25",
+    "notes": [
+      "A new calendar in the shared controls."
     ]
   },
   {

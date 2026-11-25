@@ -23,7 +23,7 @@ export const PAGES = [
   { id: "writing", group: "foundations", keywords: "texts words copy tone german english translation you du plain short friendly", examples: ["FewWords", "Descriptions", "PlainWords", "YouDu", "Names"] },
   // Actions
   { id: "buttons", group: "actions", keywords: "primary secondary ghost outline destructive danger remove link icon loading progress install split group menu toggle tile tiles add card square text link inline entity name", examples: ["Variants", "Sizes", "WithIcons", "TextLinks", "ProgressButtons", "ActionTiles", "IconOnly", "ToggleButtons", "SplitButtons", "WideButtons"] },
-  { id: "menus", group: "actions", keywords: "dropdown menu context right-click submenu actions icon description row async wait busy pending promise", examples: ["DescribedMenu", "Dropdown", "RightClick", "WaitingMenu"] },
+  { id: "menus", group: "actions", keywords: "dropdown menu context right-click submenu actions icon description row async wait busy pending promise share copy clipboard picture image save png", examples: ["DescribedMenu", "Dropdown", "RightClick", "WaitingMenu", "Share"] },
   { id: "tooltips", group: "actions", keywords: "tooltip hover help readable keyboard shortcut arrow values rows divider disabled reason why off switched switch checkbox input select menu item card skin frame game effect stat icon unit portrait level pips spell column heading tag rarity badge corner meta width wide shared pin pinned workspace parts compose own", examples: ["FromTitle", "OnDisabled", "Rich", "Values", "Parts", "Shared", "ItemCards", "CardParts", "UnitCards", "DisabledReasons"] },
   { id: "popovers", group: "actions", keywords: "popover floating panel form anchor close", examples: ["WithField"] },
   { id: "dialogs", group: "actions", keywords: "dialog modal confirm delete rename name prompt busy footer scroll dismiss escape discard unsaved", examples: ["NameDialogs", "ConfirmDialogs", "FooterButtons", "AskBeforeClosing", "LongDialog"] },
@@ -34,6 +34,7 @@ export const PAGES = [
   { id: "pick", group: "inputs", keywords: "radio segmented icon tooltip select empty choice none clear picker dropdown combobox autocomplete search pictures free text suggestions format groups badges filters", examples: ["RadioGroup", "Segmented", "SegmentedSliding", "SegmentedIcons", "SegmentedNone", "Select", "SelectDescribed", "SelectEmpty", "SelectPictures", "Combobox", "ComboboxFree", "Picker", "PickerGroups", "DropdownIcons"] },
   { id: "numbers", group: "inputs", keywords: "slider range number field stepper quantity plus minus editable type reset value box", examples: ["Slider", "SliderField", "SliderSpoken", "NumberField"] },
   { id: "colour-stars", group: "inputs", keywords: "color colour picker swatch custom palette stars rating review score", examples: ["Swatches", "CustomColour", "StarsShown", "StarSizes", "StarsPick"] },
+  { id: "dates", group: "inputs", keywords: "date day calendar month week today archive marks picker datum kalender tag monat", examples: ["PickDay", "DayMarks"] },
   { id: "toggles", group: "inputs", keywords: "toggle pressed bold italic underline format group style tiles looks pictures", examples: ["Toggles", "ToggleGroup", "StyleTiles"] },
   // Display
   { id: "status", group: "display", keywords: "badge chip tag status dot kbd shortcut keys", examples: ["Badges", "StatusDot", "Keys"] },

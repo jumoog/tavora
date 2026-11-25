@@ -543,7 +543,7 @@ test("ui playground: lists its pages in a side menu, finds them, shows each exam
   const pageTitle = () => inModule<string>(app, PLAYGROUND, `${q("page-title")}.textContent.trim()`);
 
   // Every page is in the menu, Colours is open first, and the header names its group and title.
-  await expect.poll(menu).toHaveLength(28);
+  await expect.poll(menu).toHaveLength(29);
   expect((await menu()).slice(0, 6)).toEqual(["colours", "text", "spacing", "motion", "writing", "buttons"]);
   expect(await pageTitle()).toBe("Colours");
   await openPage(app, "tabs");
@@ -560,7 +560,7 @@ test("ui playground: lists its pages in a side menu, finds them, shows each exam
   await expect.poll(menu).toEqual(["pick"]);
   await inModule(app, PLAYGROUND, `${q("page-search")}.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))`);
   await ready(app, PLAYGROUND, "page-pick");
-  await expect.poll(menu).toHaveLength(28);
+  await expect.poll(menu).toHaveLength(29);
 
   // Show code shows the example's own file, and hides it again.
   const box = `document.querySelector('[data-testid="example-Combobox"]')`;
@@ -574,11 +574,19 @@ test("ui playground: lists its pages in a side menu, finds them, shows each exam
   expect(await inModule(app, PLAYGROUND, `getComputedStyle(${numbers}).userSelect`)).toBe("none");
   expect(await inModule(app, PLAYGROUND, `getComputedStyle(${numbers}).borderRightWidth`)).toBe("1px");
   expect(await inModule(app, PLAYGROUND, `getComputedStyle(${numbers}).textAlign`)).toBe("right");
-  // Copy puts the plain source on the clipboard, without the numbers.
-  await inModule(app, PLAYGROUND, `(() => { window.__copied = ""; Object.defineProperty(navigator, "clipboard", { value: { writeText: async (text) => { window.__copied = text; } }, configurable: true }); })()`);
+  // Copy puts the plain source on the PC's clipboard (through Tavora's clipboard.writeText, so after a real press), without the numbers.
+  // Windows keeps line breaks on the clipboard as CRLF; the page shows LF.
+  const clipboardText = async () => (await app.evaluate(({ clipboard }) => clipboard.readText())).replace(/\r\n/g, "\n");
+  await app.evaluate(({ clipboard }) => clipboard.clear());
+  await app.evaluate(({ webContents }, moduleId) => {
+    const target = webContents.getAllWebContents().find((contents) => contents.getURL().startsWith(`tavora-module://${moduleId}/`));
+    if (!target) throw new Error("no panel");
+    target.sendInputEvent({ type: "keyDown", keyCode: "F24" });
+    target.sendInputEvent({ type: "keyUp", keyCode: "F24" });
+  }, PLAYGROUND);
   await inModule(app, PLAYGROUND, `${box}.querySelector('[data-testid="copy-code"]').click()`);
-  await expect.poll(() => inModule<string>(app, PLAYGROUND, `window.__copied`)).toBe(await inModule<string>(app, PLAYGROUND, `${box}.querySelector('[data-testid="example-code"]').textContent`));
-  expect(await inModule<string>(app, PLAYGROUND, `window.__copied`)).toContain("<ComboboxInput");
+  await expect.poll(clipboardText).toBe(await inModule<string>(app, PLAYGROUND, `${box}.querySelector('[data-testid="example-code"]').textContent`));
+  expect(await clipboardText()).toContain("<ComboboxInput");
   // The code shown is the example's whole file: no prop of the playground's in it.
   expect(await inModule<string>(app, PLAYGROUND, `${box}.querySelector('[data-testid="example-code"]').textContent`)).not.toContain("defineProps");
   expect(await inModule(app, PLAYGROUND, `${box}.querySelector('[data-testid="show-code"]').getAttribute("aria-expanded")`)).toBe("true");
