@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.37",
+    date: "2026-11-25",
+    title: "Clearer menus",
+    notes: [
+      "In Liquid Glass, the row you point at in a menu is easy to see.",
+      "Menu rows have corners that follow the menu's own.",
+    ],
+    prs: [
+      { number: 1007, title: "UI kit: elevation, layer and game-motion tokens" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard", "workspace"],
+  },
+  {
     version: "0.25.36",
     date: "2026-11-25",
     title: "Boards you move through with the keys",
