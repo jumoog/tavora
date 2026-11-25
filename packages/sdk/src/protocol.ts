@@ -1209,6 +1209,11 @@ export interface Methods {
    * the user can't open themselves and tells the module nothing. Tavora 0.23.77 and newer.
    */
   "overlay.openPage": { params: undefined; result: null };
+  /**
+   * Puts plain text on the system clipboard (at most `LIMITS.maxClipboardTextBytes` as UTF-8, never empty). Only right
+   * after a click or key press, one copy per press; there is no call to read the clipboard. Tavora 0.25.23+.
+   */
+  "clipboard.writeText": { params: { text: string }; result: null };
   /** The hotkeys the user set for this module in the current workspace. Tavora 0.19.26 and newer. */
   "hotkeys.list": { params: undefined; result: HotkeyBinding[] };
   /**
@@ -1224,7 +1229,6 @@ export type MethodName = keyof Methods;
 
 /** Methods reserved for later milestones, and the capability each needs. */
 export const RESERVED_METHODS: Readonly<Record<string, Capability>> = {
-  "clipboard.writeText": "clipboard",
   "clipboard.readText": "clipboard",
   "sharedData.publish": "sharedData",
   "sharedData.read": "sharedData",
@@ -1371,6 +1375,8 @@ export const LIMITS = {
   maxBlobsBytes: 500 * 1024 * 1024,
   /** A PNG a module puts on the clipboard. */
   maxClipboardImageBytes: 20 * 1024 * 1024,
+  /** Text a module puts on the clipboard, as UTF-8. */
+  maxClipboardTextBytes: 1024 * 1024,
   /** The body of one network.fetch answer, before any base64. A longer answer fails with QUOTA_EXCEEDED. */
   maxNetworkResponseBytes: 5 * 1024 * 1024,
   /** How long one network.fetch may take, redirects included. */
@@ -1481,6 +1487,14 @@ export function checkOverlaySources(value: unknown, limits: { maxOverlaySources:
     sources.push(source);
   }
   return accept(sources);
+}
+
+/** clipboard.writeText's text: a string that isn't empty, at most LIMITS.maxClipboardTextBytes as UTF-8 (QUOTA_EXCEEDED past it). */
+export function checkClipboardText(value: unknown, max: number = LIMITS.maxClipboardTextBytes): ParamCheck<string> {
+  if (typeof value !== "string" || value === "") return refuse("params.text must be text that isn't empty");
+  // A UTF-8 byte is at most one per UTF-16 unit times three; count exactly only when it could be over.
+  if (value.length * 3 > max && new TextEncoder().encode(value).byteLength > max) return refuse(`params.text can be at most ${max} bytes`, "QUOTA_EXCEEDED");
+  return accept(value);
 }
 
 /** hotkeys.set's label: 1 to LIMITS.maxHotkeyLabel characters on one line, trimmed. */
@@ -2390,6 +2404,7 @@ export const METHOD_INFO: Readonly<Record<CallName, MethodInfo>> = {
   "blobs.put": call("0.12.0"),
   "blobs.app.put": later("0.23.101"),
   "clipboard.writeImage": call("0.14.1", null, true),
+  "clipboard.writeText": later("0.25.23", null, true),
   "files.pickReadOnly": call("0.21.13", null, true),
   "files.forget": call("0.21.13"),
   "files.check": later("0.23.6"),
