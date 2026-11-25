@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.38",
+    date: "2026-11-25",
+    title: "Numbers, facts and bars",
+    notes: [
+      "Modules can show numbers as tiles, label and value lists, and bar charts that work with the keyboard.",
+      "A trend in a tooltip now shows a small arrow, not only a colour.",
+      "The UI Playground has a new Stats & Charts page.",
+    ],
+    prs: [
+      { number: 996, title: "Kit: StatTile/StatStrip, FactList and BarChart, Stats & Charts page in the UI Playground" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.37",
     date: "2026-11-25",
     title: "Clearer menus",
