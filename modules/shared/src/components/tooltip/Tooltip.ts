@@ -1,5 +1,5 @@
 import { Comment, defineComponent, Fragment, h, Teleport, nextTick, onMounted, onUnmounted, ref, watch, type PropType, type VNode } from 'vue';
-import { pointAnchor, tooltipPlacement, TOOLTIP_MAX_WIDTH, type TooltipPoint, type TooltipRect, type TooltipSide } from './geometry';
+import { pointAnchor, tooltipPlacement, TOOLTIP_MAX_WIDTH, type TooltipAlign, type TooltipPoint, type TooltipRect, type TooltipSide } from './geometry';
 import { uiText } from '../ui/text';
 import { isMac } from '../../lib/platform';
 import './tooltip.css';
@@ -13,9 +13,11 @@ const KEY_CAPS: Record<string, string> = { Escape: 'Esc', ArrowUp: '↑', ArrowD
  */
 export function shortcutKeys(shortcut: string): string[] {
   // Alternatives are split where a new one starts with a modifier, so a plain "Ctrl + Mouse wheel" stays whole.
-  const first = shortcut.replace(/\s*\+\s*/g, '+').trim().split(/\s+(?=(?:Control|Ctrl|Meta|Alt|Shift)\+)/)[0] ?? '';
+  const first = shortcut.replace(/\s*\+\s*/g, '+').trim().split(/\s+(?=(?:Control|Ctrl|Meta|Mod|mod|Alt|Shift)\+)/)[0] ?? '';
   return first.split(/\+(?!$)/).filter(Boolean).map(key => {
     if (key === 'Control' || key === 'Ctrl') return uiText.value.ctrl;
+    // "mod": Ctrl, or Cmd on a Mac, for a shortcut written once for both.
+    if (key.toLowerCase() === 'mod') return isMac ? 'Cmd' : uiText.value.ctrl;
     if (key === 'Meta') return isMac ? 'Cmd' : 'Win';
     return KEY_CAPS[key] ?? (key.length === 1 ? key.toUpperCase() : key);
   });
@@ -42,6 +44,11 @@ function drawn(nodes: VNode[] | undefined): nodes is VNode[] {
 export const TOOLTIP_WARM_MS = 400;
 let openTooltips = 0;
 let lastClosed = -Infinity;
+/** How long a closing tooltip fades out (tooltip.css, tavora-tooltip-out). */
+export const TOOLTIP_CLOSE_MS = 100;
+/** Tooltips fading out now: the next one that opens ends them at once, so going along a row swaps without a fade. */
+const fading = new Set<() => void>();
+
 /** Whether a tooltip is open now or was a moment ago: the next one then comes without waiting or fading in. */
 export function tooltipsWarm(): boolean {
   return openTooltips > 0 || performance.now() - lastClosed < TOOLTIP_WARM_MS;
@@ -62,6 +69,8 @@ export default defineComponent({
     at: Object as PropType<TooltipPoint>,
     /** Where the card goes when there is room. */
     side: { type: String as PropType<TooltipSide>, default: 'bottom' },
+    /** Lines the card up with the element's start or end instead of its middle, for a hint on a whole row or field. */
+    align: { type: String as PropType<TooltipAlign>, default: 'center' },
     title: { type: String, default: '' },
     description: String,
     /** A keyboard shortcut beside the title, such as "Ctrl+D". */
@@ -97,6 +106,10 @@ export default defineComponent({
     const ready = ref(false);
     /** Shown while another was open: it appears at once instead of fading in. */
     const instant = ref(false);
+    /** Closing: still drawn for a moment, fading out (tooltip.css), then gone. */
+    const closing = ref(false);
+    let closeTimer: ReturnType<typeof setTimeout> | undefined;
+    const finishClose = () => { clearTimeout(closeTimer); fading.delete(finishClose); closing.value = false; ready.value = false; };
     let counted = false;
     let generation = 0;
     function track(open: boolean) {
@@ -107,27 +120,37 @@ export default defineComponent({
     }
     // Synchronous, so a tooltip that closes as the next one opens is already counted as closed.
     watch(() => props.open, (open) => {
-      if (open) instant.value = tooltipsWarm();
+      if (open) {
+        instant.value = tooltipsWarm();
+        finishClose();
+        // Another tooltip still fading out goes at once: one card at a time, and a row of them swaps without a fade.
+        for (const end of [...fading]) end();
+      } else if (ready.value) {
+        closing.value = true;
+        fading.add(finishClose);
+        closeTimer = setTimeout(finishClose, TOOLTIP_CLOSE_MS);
+      }
       track(open);
     }, { immediate: true, flush: 'sync' });
     const anchor = () => props.anchor ?? pointAnchor(props.at ?? { x: 0, y: 0 });
     async function place() {
       const version = ++generation;
-      if (!props.open) { ready.value = false; return; }
+      // A closing card keeps its place while it fades out.
+      if (!props.open) { if (!closing.value) ready.value = false; return; }
       const viewport = { width: innerWidth, height: innerHeight }, side = props.side, max = tooltipMaxWidth(props.width);
-      position.value = tooltipPlacement(anchor(), 0, 0, viewport, side, max, props.bare);
+      position.value = tooltipPlacement(anchor(), 0, 0, viewport, side, max, props.bare, props.align);
       // Measure, place, and measure again if a side placement made the card narrower and so taller.
       for (let pass = 0; pass < 2; pass++) {
         await nextTick();
         if (version !== generation || !card.value) return;
         const measured = card.value.getBoundingClientRect();
-        const placed = tooltipPlacement(anchor(), measured.width, measured.height, viewport, side, max, props.bare);
+        const placed = tooltipPlacement(anchor(), measured.width, measured.height, viewport, side, max, props.bare, props.align);
         position.value = placed;
         if (placed.width >= measured.width) break;
       }
       ready.value = true;
     }
-    watch(() => [props.open, props.anchor, props.at?.x, props.at?.y, props.side, props.title, props.description, props.shortcut, props.badge, props.meta, props.divider, props.width], place, { immediate: true });
+    watch(() => [props.open, props.anchor, props.at?.x, props.at?.y, props.side, props.align, props.title, props.description, props.shortcut, props.badge, props.meta, props.divider, props.width], place, { immediate: true });
     const dismiss = () => emit('dismiss');
     const key = (event: KeyboardEvent) => { if (event.key === 'Escape') dismiss(); };
     // Only an open tooltip listens to the window: a list of closed ones adds nothing to every scroll and key.
@@ -145,6 +168,7 @@ export default defineComponent({
     onUnmounted(() => {
       generation++;
       track(false);
+      finishClose();
       listen(false);
     });
     /** The title line's own parts: badges after the title, meta text at the right. Null when it is the title alone. */
@@ -175,8 +199,10 @@ export default defineComponent({
       const above = Boolean(props.title || drawn(slots.title?.()) || props.description);
       return [props.divider && drawn(content) && above ? h('hr', { class: 'tavora-tooltip-divider', 'aria-hidden': 'true' }) : null, content];
     }
-    return () => h(Teleport, { to: 'body' }, props.open ? [h('section', {
-      id: props.id, ref: card, role: 'tooltip', 'data-slot': 'tooltip', 'data-side': position.value.side, 'data-tone': props.tone, 'data-ready': ready.value ? 'true' : undefined, 'data-instant': instant.value ? 'true' : undefined,
+    return () => h(Teleport, { to: 'body' }, props.open || closing.value ? [h('section', {
+      // A closing card is only a picture fading out: no longer the tooltip for anyone (id, role, a screen reader).
+      ...(props.open ? { id: props.id, role: 'tooltip', 'data-slot': 'tooltip' } : { 'data-slot': 'tooltip-closing', 'aria-hidden': 'true' }), ref: card, 'data-side': position.value.side, 'data-tone': props.tone, // A closing card is no longer ready: its fade-out then wins over the fade-in (tooltip.css).
+      'data-ready': ready.value && !closing.value ? 'true' : undefined, 'data-instant': instant.value ? 'true' : undefined, 'data-closing': !props.open && closing.value ? 'true' : undefined,
       'data-bare': props.bare ? 'true' : undefined,
       class: props.compact ? 'tavora-tooltip compact' : 'tavora-tooltip',
       style: { left: position.value.left + 'px', top: position.value.top + 'px', maxWidth: position.value.width + 'px', '--tavora-tooltip-arrow': position.value.arrow + 'px', visibility: ready.value ? 'visible' : 'hidden' },
