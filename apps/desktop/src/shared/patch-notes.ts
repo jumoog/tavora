@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.31",
+    date: "2026-11-25",
+    title: "Chips in the Hardware style",
+    notes: [
+      "Coloured chips get the same coloured edge as badges in the Hardware style.",
+    ],
+    prs: [
+      { number: 1001, title: "Hardware style: coloured chips get Badge's coloured edge" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.30",
     date: "2026-11-25",
     title: "Newer settings and interrupted drags in the built-in modules",
