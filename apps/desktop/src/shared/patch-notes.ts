@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.40",
+    date: "2026-11-25",
+    title: "Buttons don't end in …",
+    notes: [
+      "Buttons and menu entries that open a dialog or a file picker, like Rename, Add folder and Restore, no longer end in \"…\".",
+    ],
+    prs: [
+      { number: 1006, title: "Buttons and menu entries don't end in …" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "privacy", "publishing", "ui-kit", "website", "whiteboard"],
+  },
+  {
     version: "0.25.39",
     date: "2026-11-25",
     title: "Buttons that say how it went",

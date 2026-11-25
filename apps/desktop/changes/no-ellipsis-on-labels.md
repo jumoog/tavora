@@ -1,3 +1,0 @@
-# Buttons don't end in …
-
-- Buttons and menu entries that open a dialog or a file picker, like Rename, Add folder and Restore, no longer end in "…".
