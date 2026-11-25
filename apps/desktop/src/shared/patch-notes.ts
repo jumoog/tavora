@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.21",
+    date: "2026-11-25",
+    title: "Links and list rows",
+    notes: [
+      "Modules get two new controls: a text link for names in text or lists, and a list row you click as a whole.",
+      "The UI Playground shows both.",
+    ],
+    prs: [
+      { number: 986, title: "UI kit: TextLink and ListRow" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.20",
     date: "2026-11-25",
     title: "More table options for modules",
