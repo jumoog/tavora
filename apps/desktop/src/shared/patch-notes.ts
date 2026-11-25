@@ -28,6 +28,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.26",
+    date: "2026-11-25",
+    title: "Small fixes to pages, backups and files",
+    notes: [
+      "A page you import loads even when the first address of its site doesn't answer.",
+      "Tavora no longer deletes other programs' .tmp files from your pictures folder.",
+      "Two backups on the same day can't spoil each other any more.",
+      "A saved document still reaches your other panels when its list can't be updated right away.",
+      "A new project called con, nul or another name Windows keeps gets a folder name that works.",
+    ],
+    prs: [
+      { number: 997, title: "Hunt leftovers 11-25, main and API: page import addresses, backups, blobs, body memory" },
+    ],
+    tags: ["cloud-copy", "privacy", "service", "website"],
+  },
+  {
     version: "0.25.25",
     date: "2026-11-25",
     title: "Chips and tags",
