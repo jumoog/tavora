@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.39",
+    date: "2026-11-25",
+    title: "Buttons that say how it went",
+    notes: [
+      "A Copy button now says Copied with a check, and Save says Saved.",
+      "A button that takes a moment shows a spinner and can't be pressed twice.",
+      "When it doesn't work, the button goes back and a message says why.",
+      "The UI Playground shows it.",
+    ],
+    prs: [
+      { number: 1004, title: "Button action: Copy → Copied, busy with a spinner, failed with a toast" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.38",
     date: "2026-11-25",
     title: "Numbers, facts and bars",
