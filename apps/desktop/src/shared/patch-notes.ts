@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.11",
+    date: "2026-11-25",
+    title: "Richer tooltips for modules",
+    notes: [
+      "Module tooltips can show a badge and a short note beside their title.",
+      "Numbers in a tooltip line up with their units, also in several columns under headings.",
+      "The UI Playground shows how to put one together.",
+    ],
+    prs: [
+      { number: 975, title: "Tooltip parts: badge and meta beside the title, divider, units and columns in rows, width" },
+    ],
+    tags: ["ui-kit"],
+  },
+  {
     version: "0.25.10",
     date: "2026-11-25",
     title: "Sharper tiles",
