@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.25",
+    date: "2026-11-25",
+    title: "Chips and tags",
+    notes: [
+      "Modules can show tags you remove with a ×, or switch on and off as filters.",
+      "A new tag field: type, pick a suggestion or paste a list.",
+      "The UI Playground shows both.",
+    ],
+    prs: [
+      { number: 988, title: "Chip and TagInput: removable and toggle chips, a tag field with suggestions" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.24",
     date: "2026-11-25",
     title: "Plainer buttons and headings",
