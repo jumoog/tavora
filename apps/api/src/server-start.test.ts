@@ -1,5 +1,5 @@
 import { mkdtempSync, readFileSync } from "node:fs";
-import { createServer, type Server } from "node:http";
+import http, { createServer, type Server } from "node:http";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -7,6 +7,7 @@ import { serve } from "@hono/node-server";
 import { publishReadMs, ZIP_LIMITS } from "@tavora/pack";
 import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { BackgroundWork } from "./background-work.ts";
 import { CatalogStore } from "./catalog.ts";
 import { backfillAtStart, guarded, HEADERS_TIMEOUT_MS, setServerTimeouts, shutDownOnSignals } from "./server-start.ts";
 
@@ -191,6 +192,60 @@ describe("timers and shutdown (bug hunt)", () => {
     await exited;
     expect(closed).toEqual(["accounts", "catalog"]);
     expect(exitCode).toBe(0);
+  });
+
+  it("doesn't wait out the keep-alive of a connection whose request finished during the stop (hunt 2026-11-25 E4)", async () => {
+    let finish!: () => void;
+    const server = createServer((_request, response) => {
+      finish = () => response.end("done");
+    });
+    server.keepAliveTimeout = 4000;
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as net.AddressInfo).port;
+    const handlers = new Map<string, () => void>();
+    const exited = new Promise<number>((resolve) =>
+      shutDownOnSignals({ servers: [server], close: [], graceMs: 10_000, on: (signal, run) => void handlers.set(signal, run), exit: resolve, log: { log: () => {}, error: () => {} } }),
+    );
+    // A client that keeps its connection open for the next request, as browsers and the app do.
+    const agent = new http.Agent({ keepAlive: true });
+    const running = new Promise<string>((resolve, reject) =>
+      http.get({ host: "127.0.0.1", port, agent }, (response) => {
+        let text = "";
+        response.on("data", (chunk) => (text += chunk));
+        response.on("end", () => resolve(text));
+      }).on("error", reject),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    handlers.get("SIGTERM")!();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    finish();
+    expect(await running).toBe("done");
+    const started = Date.now();
+    expect(await exited).toBe(0);
+    expect(Date.now() - started).toBeLessThan(2000);
+    agent.destroy();
+  });
+
+  it("waits for mail still going out before it closes the stores, within the grace time (review of #976)", async () => {
+    const server = createServer((_request, response) => response.end("done"));
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const handlers = new Map<string, () => void>();
+    const closed: string[] = [];
+    const background = new BackgroundWork();
+    let sendMail!: () => void;
+    background.add(new Promise<void>((resolve) => (sendMail = resolve)));
+    let exited = false;
+    const exit = new Promise<number>((resolve) =>
+      shutDownOnSignals({ servers: [server], pending: () => background.settled(), close: [() => closed.push("accounts")], graceMs: 5000, on: (signal, run) => void handlers.set(signal, run), exit: (code) => ((exited = true), resolve(code)), log: { log: () => {}, error: () => {} } }),
+    );
+    handlers.get("SIGTERM")!();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    // The server is closed, the mail still goes: the stores stay open for it.
+    expect(closed).toEqual([]);
+    expect(exited).toBe(false);
+    sendMail();
+    expect(await exit).toBe(0);
+    expect(closed).toEqual(["accounts"]);
   });
 
   it("gives up waiting after the grace period, still closing the stores", async () => {

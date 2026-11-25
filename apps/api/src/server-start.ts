@@ -83,6 +83,7 @@ export const SHUTDOWN_GRACE_MS = 20_000;
  */
 export function shutDownOnSignals({
   servers,
+  pending = () => Promise.resolve(),
   close,
   graceMs = SHUTDOWN_GRACE_MS,
   on = (signal, run) => void process.on(signal, run),
@@ -90,6 +91,8 @@ export function shutDownOnSignals({
   log = console,
 }: {
   servers: Server[];
+  /** Work that goes on after its answer went out (BackgroundWork.settled): waited for within the grace time too. */
+  pending?: () => Promise<unknown>;
   close: (() => void)[];
   graceMs?: number;
   on?: (signal: "SIGTERM" | "SIGINT", run: () => void) => void;
@@ -105,20 +108,26 @@ export function shutDownOnSignals({
       (server) =>
         new Promise<void>((resolve) => {
           server.close(() => resolve());
-          // Kept-alive connections that wait for their next request would hold close() up.
+          // Kept-alive connections that wait for their next request would hold close() up: now, and each one whose
+          // request finishes during the stop, so none waits out its keep-alive (hunt 2026-11-25 E4).
           server.closeIdleConnections();
         }),
     );
+    const idle = setInterval(() => {
+      for (const server of servers) server.closeIdleConnections();
+    }, 250);
     let timer: NodeJS.Timeout | undefined;
     const late = new Promise<void>((resolve) => {
       timer = setTimeout(() => {
-        log.error(`[tavora-api] Requests still running after ${Math.round(graceMs / 1000)} s; stopping anyway.`);
+        log.error(`[tavora-api] Requests or mails still running after ${Math.round(graceMs / 1000)} s; stopping anyway.`);
         for (const server of servers) server.closeAllConnections();
         resolve();
       }, graceMs);
     });
-    void Promise.race([Promise.all(closed), late]).then(() => {
+    // The requests first, then what they left running (a mail), both within the same grace time.
+    void Promise.race([Promise.all(closed).then(() => pending()), late]).then(() => {
       clearTimeout(timer);
+      clearInterval(idle);
       for (const done of close) {
         try {
           done();

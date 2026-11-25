@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AccountStore, CODE_TTL_MS, normalizeEmail, SESSION_IDLE_MS } from "./account-store.ts";
 import type { AccountOptions } from "./accounts.ts";
+import { BackgroundWork } from "./background-work.ts";
 import { createApp } from "./app.ts";
 import { buildDataset, writeDatabase } from "./dataset.ts";
 import { BREVO_URL, createBrevoMailer, createTestInbox, createTestInboxApp, MailLimitError, maskEmail, type Mailer } from "./mail.ts";
@@ -337,6 +338,48 @@ describe("signed in", () => {
     expect((await (await call("GET", "", undefined, changed.token)).json()) as unknown).toMatchObject({ account: { email: "new@example.com" }, devices: [{ current: true, os: "windows" }] });
     expect((await call("GET", "", undefined, token)).status).toBe(401);
     expect((await call("GET", "", undefined, laptop)).status).toBe(401);
+  });
+
+  it("answers the change with the new sign-in before the old address's notice went out (hunt 2026-11-25 E1)", async () => {
+    for (const fail of [false, true]) {
+      const inbox = createTestInbox();
+      let release: () => void = () => undefined;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const mailer: Mailer = {
+        send: async (mail) => {
+          // The notice to the old address waits as for a slow mail service, then goes or fails.
+          if (mail.subject === "The email of your Tavora account was changed") {
+            await held;
+            if (fail) throw new Error("Mail service down.");
+          }
+          return inbox.send(mail);
+        },
+      };
+      const background = new BackgroundWork();
+      const { call, clock, store } = setup({ mailer, accounts: { background } });
+      await call("POST", "/code", { email: `old${fail}@example.com` });
+      const verified = await call("POST", "/verify", { email: `old${fail}@example.com`, code: codeTo(inbox, `old${fail}@example.com`), os: "windows", create: true });
+      const { token } = (await verified.json()) as { token: string };
+      clock.now += 15 * 60_000;
+      await call("POST", "/email/code", { email: `new${fail}@example.com`, confirmCurrent: true }, token);
+      const [newCode, currentCode] = [codeTo(inbox, `new${fail}@example.com`), codeTo(inbox, `old${fail}@example.com`)];
+      const day = new Date(clock.now).toISOString().slice(0, 10);
+      const before = store.mailsSent(day);
+      const changed = await Promise.race([
+        call("POST", "/email", { email: `new${fail}@example.com`, code: newCode, currentCode }, token),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 200)),
+      ]);
+      expect(changed?.status).toBe(200);
+      const renewed = ((await changed!.json()) as { token: string }).token;
+      expect((await call("GET", "", undefined, renewed)).status).toBe(200);
+      // Counted while it goes, and given back when it fails; the clean stop waits for it.
+      expect(store.mailsSent(day)).toBe(before + 1);
+      expect(background.size).toBe(1);
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(store.mailsSent(day)).toBe(fail ? before : before + 1);
+      if (!fail) expect(inbox.mails()[0]).toMatchObject({ to: "oldfalse@example.com", subject: "The email of your Tavora account was changed" });
+    }
   });
 
   it("refuses an app that proves only the new address, before any mail goes out", async () => {
@@ -858,6 +901,22 @@ describe("the day's emails", () => {
     // The refusal counted nothing: one more sign-in code still fits.
     expect((await call("POST", "/code", { email: "me@example.com" })).status).toBe(202);
     expect((await call("POST", "/code", { email: "me@example.com" })).status).toBe(429);
+  });
+
+  it("spends no day share on a code the address's own limit refuses (hunt 2026-11-25 E3)", async () => {
+    const { call, oldAccount, store } = setup({ accounts: { codeDayRateLimiter: createRateLimiter({ limit: 5, windowMs: 24 * 60 * 60_000 }) } });
+    // A suspended account, so its delete code goes out too.
+    oldAccount("gone@example.com");
+    store.suspend(store.accountByEmail("gone@example.com")!.id, "spam", null, Date.parse("2026-10-16T12:00:00Z"));
+    // "Send code" pressed 5 times: 3 go, the address's limit refuses 2.
+    const asked: number[] = [];
+    for (let i = 0; i < 5; i++) asked.push((await call("POST", "/code", { email: "me@example.com" })).status);
+    expect(asked).toEqual([202, 202, 202, 429, 429]);
+    expect((await call("POST", "/delete/suspended/code", { email: "me@example.com" })).status).toBe(429);
+    // Only the 3 that went counted: 2 of the 5 are left.
+    expect((await call("POST", "/code", { email: "you@example.com" })).status).toBe(202);
+    expect((await call("POST", "/delete/suspended/code", { email: "gone@example.com" })).status).toBe(202);
+    expect((await call("POST", "/code", { email: "them@example.com" })).status).toBe(429);
   });
 
   it("says the same when the provider refuses because its allowance is used up", async () => {
