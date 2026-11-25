@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.34",
+    date: "2026-11-25",
+    title: "A tree for modules",
+    notes: [
+      "Modules get a tree: entries inside entries, with branches that open and close, and the arrow keys to move around.",
+      "The UI Playground shows it on a new Tree page.",
+    ],
+    prs: [
+      { number: 998, title: "UI kit: TreeView" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.33",
     date: "2026-11-25",
     title: "Toolbars with arrow keys",
