@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.15",
+    date: "2026-11-25",
+    title: "Email change keeps you signed in",
+    notes: [
+      "Changing or removing your email or Discord login no longer signs this PC out by mistake.",
+    ],
+    prs: [
+      { number: 976, title: "Fix the email-change sign-out race and API findings of the 11-25 hunt" },
+    ],
+    tags: ["accounts", "catalog", "publishing", "service"],
+  },
+  {
     version: "0.25.14",
     date: "2026-11-25",
     title: "Steadier pictures and overlays",
