@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.16",
+    date: "2026-11-25",
+    title: "Tooltips in the UI Playground",
+    notes: [
+      "The chart's bars show their values when you Tab to them.",
+      "A new example shows a big card in Tavora's tooltip, and you can pin it.",
+    ],
+    prs: [
+      { number: 980, title: "useTooltip(): one kit tooltip for many targets, in the panel or Tavora's shared tooltip" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.15",
     date: "2026-11-25",
     title: "Email change keeps you signed in",
