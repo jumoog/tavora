@@ -82,6 +82,13 @@ export default defineComponent({
     divider: Boolean,
     /** How wide the card may get: `sm` (280 px), `md`, `lg` or pixels. It never gets wider than the window. */
     width: { type: [String, Number] as PropType<TooltipWidth>, default: 'sm' },
+    /**
+     * For the kit's ItemTooltip: the card brings its own surface and width (an item card), so the tooltip draws no
+     * padding, background or edge, and never squeezes it beside the element.
+     */
+    bare: Boolean,
+    /** The arrow pointing at the element. ItemTooltip turns it off where it can't take the card's look (a skin, a unit). */
+    arrow: { type: Boolean, default: true },
   },
   emits: ['dismiss'],
   setup(props, { emit, slots }) {
@@ -108,13 +115,13 @@ export default defineComponent({
       const version = ++generation;
       if (!props.open) { ready.value = false; return; }
       const viewport = { width: innerWidth, height: innerHeight }, side = props.side, max = tooltipMaxWidth(props.width);
-      position.value = tooltipPlacement(anchor(), 0, 0, viewport, side, max);
+      position.value = tooltipPlacement(anchor(), 0, 0, viewport, side, max, props.bare);
       // Measure, place, and measure again if a side placement made the card narrower and so taller.
       for (let pass = 0; pass < 2; pass++) {
         await nextTick();
         if (version !== generation || !card.value) return;
         const measured = card.value.getBoundingClientRect();
-        const placed = tooltipPlacement(anchor(), measured.width, measured.height, viewport, side, max);
+        const placed = tooltipPlacement(anchor(), measured.width, measured.height, viewport, side, max, props.bare);
         position.value = placed;
         if (placed.width >= measured.width) break;
       }
@@ -170,8 +177,9 @@ export default defineComponent({
     }
     return () => h(Teleport, { to: 'body' }, props.open ? [h('section', {
       id: props.id, ref: card, role: 'tooltip', 'data-slot': 'tooltip', 'data-side': position.value.side, 'data-tone': props.tone, 'data-ready': ready.value ? 'true' : undefined, 'data-instant': instant.value ? 'true' : undefined,
+      'data-bare': props.bare ? 'true' : undefined,
       class: props.compact ? 'tavora-tooltip compact' : 'tavora-tooltip',
       style: { left: position.value.left + 'px', top: position.value.top + 'px', maxWidth: position.value.width + 'px', '--tavora-tooltip-arrow': position.value.arrow + 'px', visibility: ready.value ? 'visible' : 'hidden' },
-    }, [...head(), ...body(), h('span', { class: 'tavora-tooltip-arrow', 'aria-hidden': 'true' })])] : []);
+    }, [...head(), ...body(), props.arrow ? h('span', { class: 'tavora-tooltip-arrow', 'aria-hidden': 'true' }) : null])] : []);
   },
 });
