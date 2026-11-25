@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.17",
+    date: "2026-11-25",
+    title: "Steadier tiles and dialogs",
+    notes: [
+      "A new game workspace's module tiles no longer flicker while you work.",
+      "Share icons says so when a later batch fails, and Esc no longer closes it mid-share.",
+      "Adding another PC sends one answer, even if you press Esc right after Add.",
+      "Reporting a review no longer closes the question you opened on another one.",
+    ],
+    prs: [
+      { number: 981, title: "Fix renderer bug hunt findings (11-25): start tiles, share icons, pairing, review report" },
+    ],
+    tags: ["catalog", "cloud-copy", "icons", "workspace"],
+  },
+  {
     version: "0.25.16",
     date: "2026-11-25",
     title: "Tooltips in the UI Playground",
