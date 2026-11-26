@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.56",
+    date: "2026-11-26",
+    title: "Clearer id step when publishing",
+    notes: [
+      "The id step names the module's id and why it can't be used.",
+      "A prefix you already hold is ready to use at once, without Check.",
+      "Publish looks off while something is left to fix, and says what when you point at it.",
+    ],
+    prs: [
+      { number: 1026, title: "Publish: clearer id step, held prefix ready at once, Publish says why it is off" },
+    ],
+    tags: ["publishing", "website"],
+  },
+  {
     version: "0.25.55",
     date: "2026-11-26",
     title: "Full patch notes",
