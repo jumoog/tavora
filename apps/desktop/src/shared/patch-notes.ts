@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.57",
+    date: "2026-11-26",
+    title: "Tidier fields and lists",
+    notes: [
+      "Theme pictures show again in Settings > Appearance.",
+      "Titles in Notes and To-Dos, and the browser's address, show an edge when you point at them.",
+      "Choices in dialogs are rows you can click anywhere on.",
+    ],
+    prs: [
+      { number: 1027, title: "Kit: bare fields, picture in a Select, Badge numbers, preview align, RadioField" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "publishing", "rail", "settings", "system-monitor", "todos", "ui-kit", "whiteboard", "workspace"],
+  },
+  {
     version: "0.25.56",
     date: "2026-11-26",
     title: "Clearer id step when publishing",
