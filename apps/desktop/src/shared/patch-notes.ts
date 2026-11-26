@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.51",
+    date: "2026-11-26",
+    title: "Rows that show a card",
+    notes: [
+      "Rows and tiles in modules can show a card when you point at them or reach them with Tab.",
+    ],
+    prs: [
+      { number: 1019, title: "Kit HoverRow and StatTile hoverable: rows and tiles that show a card but aren't buttons" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.50",
     date: "2026-11-26",
     title: "Toolbars that match",
