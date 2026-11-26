@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.58",
+    date: "2026-11-26",
+    title: "Easier ticks",
+    notes: [
+      "To-Dos: click anywhere in the square around the circle to tick a to-do, and a faint tick shows when you hover it.",
+      "To-Dos: Keep finished to-dos has its switch on the right.",
+    ],
+    prs: [
+      { number: 1028, title: "SwitchField at the end of the row; bigger tick area in To-Dos" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.57",
     date: "2026-11-26",
     title: "Tidier fields and lists",
