@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.55",
+    date: "2026-11-26",
+    title: "Full patch notes",
+    notes: [
+      "Save to project now works when your module already lists 100 versions: the oldest one goes.",
+    ],
+    prs: [
+      { number: 1025, title: "Keep module patch notes within their limit; steady the Notes quit test" },
+    ],
+    tags: ["modules", "publishing", "website"],
+  },
+  {
     version: "0.25.54",
     date: "2026-11-26",
     title: "Small fixes in the app",
