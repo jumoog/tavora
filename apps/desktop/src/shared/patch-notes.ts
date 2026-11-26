@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.61",
+    date: "2026-11-26",
+    title: "Tall cards and drop lines",
+    notes: [
+      "A card taller than its panel is no longer cut off. Scroll it with the mouse wheel.",
+      "With reduced motion, the line showing where a dragged row will land is clearer.",
+    ],
+    prs: [
+      { number: 1031, title: "Kit: bare ZoomPane, scrolling tall cards, one drop line, flush Table" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.60",
     date: "2026-11-26",
     title: "Icons on the System Monitor cards",
