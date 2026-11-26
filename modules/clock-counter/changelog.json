@@ -653,12 +653,5 @@
       "Counters you linked stand together in a frame, and say what they add to and where they count from.",
       "Show a whole group of linked counters in one overlay, with a line you write yourself like {Deaths} Death – {Sit-ups} Situps."
     ]
-  },
-  {
-    "version": "0.1.1",
-    "date": "2026-10-31",
-    "notes": [
-      "Text fields and dropdowns look calmer in Dark mode."
-    ]
   }
 ]

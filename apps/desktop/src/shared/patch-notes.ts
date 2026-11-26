@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.62",
+    date: "2026-11-27",
+    title: "Tab reaches a field at the start of a toolbar",
+    notes: [
+      "A select, switch or search at the start of a tool row now gets a Tab stop.",
+    ],
+    prs: [
+      { number: 1033, title: "Kit Toolbar: Tab reaches a field before the first tool" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.61",
     date: "2026-11-26",
     title: "Tall cards and drop lines",
