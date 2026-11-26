@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.46",
+    date: "2026-11-26",
+    title: "Tabs with more room",
+    notes: [
+      "Tabs in the new looks have more space above and below their text, also in Settings > Developer.",
+    ],
+    prs: [
+      { number: 1015, title: "Pill tabs: room above and below the text" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.45",
     date: "2026-11-26",
     title: "Controls that line up",
