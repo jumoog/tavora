@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.59",
+    date: "2026-11-26",
+    title: "Cleaner search lists",
+    notes: [
+      "Search (Ctrl+K) shows what you typed in bold.",
+      "In Add a game, a game's module count sits at the end of its row.",
+      "A game you add by its own name sits under Not on the list.",
+    ],
+    prs: [
+      { number: 1029, title: "Kit: palette parts for big search lists; search and Add a game move onto them" },
+    ],
+    tags: ["calculator", "clock-counter", "games", "notes", "onboarding", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.58",
     date: "2026-11-26",
     title: "Easier ticks",
