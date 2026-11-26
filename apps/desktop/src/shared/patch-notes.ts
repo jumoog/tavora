@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.54",
+    date: "2026-11-26",
+    title: "Small fixes in the app",
+    notes: [
+      "On a narrow window, Community modules in the module list no longer leaves an empty line under its name.",
+    ],
+    prs: [
+      { number: 1024, title: "Kit: icons on ChoiceCard, a bare Button, and the rail on it" },
+    ],
+    tags: ["accounts", "calculator", "clock-counter", "games", "modules", "notes", "overlays", "pdf-viewer", "rail", "settings", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.53",
     date: "2026-11-26",
     title: "Tidier Notes and To-Dos",
