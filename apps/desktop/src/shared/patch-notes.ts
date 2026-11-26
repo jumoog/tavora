@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.45",
+    date: "2026-11-26",
+    title: "Controls that line up",
+    notes: [
+      "Buttons, fields, pickers, toggles and list rows share three sizes, so a row of them lines up.",
+      "On/off buttons look the same everywhere, with or without words, and say why when they're off.",
+      "Lists you pick from, and lists down the side of a page, have slightly tighter rows.",
+    ],
+    prs: [
+      { number: 1013, title: "Kit: one size scale, Toggle looks and sizes, same names, fill" },
+    ],
+    tags: ["calculator", "clock-counter", "cloud-copy", "games", "icons", "notes", "pdf-viewer", "privacy", "publishing", "system-monitor", "todos", "ui-kit", "whiteboard", "workspace"],
+  },
+  {
     version: "0.25.44",
     date: "2026-11-26",
     title: "Same look for everything that's off",
