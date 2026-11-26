@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.53",
+    date: "2026-11-26",
+    title: "Tidier Notes and To-Dos",
+    notes: [
+      "Search, checkboxes, the description field and buttons match the rest of Tavora.",
+    ],
+    prs: [
+      { number: 1023, title: "Notes and To-Dos: move hand-built controls onto the kit" },
+    ],
+    tags: ["notes", "todos"],
+  },
+  {
     version: "0.25.52",
     date: "2026-11-26",
     title: "Same controls in more places",
