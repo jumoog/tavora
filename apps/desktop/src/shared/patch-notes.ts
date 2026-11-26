@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.52",
+    date: "2026-11-26",
+    title: "Same controls in more places",
+    notes: [
+      "The side rail, links, list rows, tick rows and cards in the app now use Tavora's shared controls, so they look and behave the same everywhere.",
+      "Picking an icon for a game in its menu now shows the current choice with the shared highlight instead of a check mark.",
+    ],
+    prs: [
+      { number: 1022, title: "App renderer on the kit: rail, links, rows, tick rows, cards" },
+    ],
+    tags: ["accounts", "catalog", "games", "icons", "modules", "onboarding", "overlays", "privacy", "publishing", "rail", "settings", "workspace"],
+  },
+  {
     version: "0.25.51",
     date: "2026-11-26",
     title: "Rows that show a card",
