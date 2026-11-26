@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.1.100",
+    "date": "2026-11-26",
+    "notes": [
+      "New examples: Tool strip and Floating toolbar, on the Buttons page."
+    ]
+  },
+  {
     "version": "0.1.99",
     "date": "2026-11-26",
     "notes": [
@@ -707,13 +714,6 @@
     "date": "2026-10-31",
     "notes": [
       "Text fields and dropdowns look calmer in Dark mode."
-    ]
-  },
-  {
-    "version": "0.1.0",
-    "date": "2026-10-18",
-    "notes": [
-      "Patch notes for this module start with this version."
     ]
   }
 ]
