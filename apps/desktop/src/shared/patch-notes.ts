@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.44",
+    date: "2026-11-26",
+    title: "Same look for everything that's off",
+    notes: [
+      "Buttons, fields, menus and calendar days that are off all fade the same way.",
+      "Empty charts and fact lists say there's no data yet instead of staying blank.",
+      "The Share button is spaced like other menu buttons.",
+    ],
+    prs: [
+      { number: 1012, title: "Kit audit quick fixes: one disabled look, empty charts, overlay classes, ShareMenu" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.43",
     date: "2026-11-25",
     title: "Calendar keeps its height",
