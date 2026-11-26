@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.60",
+    date: "2026-11-26",
+    title: "Icons on the System Monitor cards",
+    notes: [
+      "System Monitor: the CPU, graphics and memory cards got a small icon in the corner.",
+    ],
+    prs: [
+      { number: 1030, title: "StatTile for live readings; System Monitor cards on it" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.59",
     date: "2026-11-26",
     title: "Cleaner search lists",
