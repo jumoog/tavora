@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.47",
+    date: "2026-11-26",
+    title: "Notes on publisher keys",
+    notes: [
+      "Add a short note to each publisher key in Settings > Developer > Publishing, so you know what it is for.",
+      "Tavora's own key is labelled Tavora official.",
+      "Rename a publish token any time.",
+      "The token form now says what to type and what you get.",
+    ],
+    prs: [
+      { number: 1017, title: "Publisher keys: a note on each key, renamable tokens, a clearer token form" },
+    ],
+    tags: ["accounts", "publishing", "service", "website"],
+  },
+  {
     version: "0.25.46",
     date: "2026-11-26",
     title: "Fixes and new module controls",
