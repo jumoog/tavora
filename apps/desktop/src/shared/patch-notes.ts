@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.49",
+    date: "2026-11-26",
+    title: "Cards and checkbox rows in the shared controls",
+    notes: [
+      "The UI Playground has a new Cards page and a checkbox row.",
+    ],
+    prs: [
+      { number: 1020, title: "Kit: Card, ChoiceCard, CheckCard and CheckboxField" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.48",
     date: "2026-11-26",
     title: "Dialogs in four widths",
