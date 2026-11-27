@@ -650,12 +650,5 @@
       "Press the gear on a frame to change that clock, counter or group right over the Overlay page.",
       "In the overlay, the name and the value now share one font and sit on one line."
     ]
-  },
-  {
-    "version": "0.1.5",
-    "date": "2026-11-01",
-    "notes": [
-      "In a linked group's line, counters now have short names without spaces: {counter2}, {bossKills}, {sitUps}. Tap a counter below the field to add it. Lines you wrote with full names keep working."
-    ]
   }
 ]

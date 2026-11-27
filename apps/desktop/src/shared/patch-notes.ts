@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.67",
+    date: "2026-11-27",
+    title: "Long names in pickers",
+    notes: [
+      "A choice too long for its button now shows whole when you point at it.",
+    ],
+    prs: [
+      { number: 1040, title: "Kit: Picker shows a cut-off choice in its tooltip and takes disabled-reason" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.66",
     date: "2026-11-27",
     title: "Narrow settings dialogs",
