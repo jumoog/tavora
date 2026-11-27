@@ -7,8 +7,12 @@
 //
 // With `shared: sdk.ui.tooltip` the card (a TooltipContent) shows in Tavora's shared tooltip instead, above the
 // workspace, so a big card is never cut off at the panel's edge; there is then no <Tooltip> in the panel.
+//
+// `pin: true` lets a press pin a card open, in the panel as in the shared tooltip: it then takes the pointer, shows a
+// close X, and stays until the X, Escape (both give the focus back to its target), a press elsewhere or a second press
+// on its target. On touch, which has no hover, a long press shows a target's card.
 import { getCurrentScope, onScopeDispose, reactive, shallowRef, type VNode } from 'vue';
-import { TOOLTIP_WARM_MS, tooltipDelay } from './Tooltip';
+import { TOOLTIP_WARM_MS, tooltipDelay, type TooltipDismissReason } from './Tooltip';
 import type { TooltipAlign, TooltipRect, TooltipSide } from './geometry';
 
 /** What the helper needs of a shared card (the SDK's TooltipContent has it): its title, and a subtitle if any. */
@@ -30,6 +34,12 @@ export interface UseTooltipOptions {
   side?: TooltipSide;
   /** Where the card lines up along its target: centred (the default), or with its start or end. */
   align?: TooltipAlign;
+  /**
+   * A press on a target that isn't a control (a name in a table, a picture, a slot) pins its card open: it takes the
+   * pointer (select its text, follow a link), shows a close X and stays until you close it. Hovering other targets leaves
+   * it be. On buttons, links and menu rows a press only does what they do, unless the target says `pin`. Off by default.
+   */
+  pin?: boolean;
 }
 
 export interface UseSharedTooltipOptions<T extends SharedCard = SharedCard> extends UseTooltipOptions {
@@ -38,11 +48,6 @@ export interface UseSharedTooltipOptions<T extends SharedCard = SharedCard> exte
    * connected (`() => sdk.value?.ui.tooltip`); until then no card shows.
    */
   shared: SharedTooltip<T> | (() => SharedTooltip<T> | null | undefined);
-  /**
-   * A click on a target that isn't a control (a name in a table, a picture) pins its card, so you can read it while
-   * you do something else. On buttons, links and menu rows a click only does what they do. Off by default.
-   */
-  pin?: boolean;
   /**
    * When Tavora can't show the card (outside Tavora, an older one, the panel not connected yet), show it in the panel
    * instead: bind `tip.props` to an ItemTooltip as well. Off by default.
@@ -67,6 +72,11 @@ export interface TooltipTargetOptions {
   toggle?: boolean;
   /** A press leaves the card open, as for a copy button whose card turns into "Copied". */
   keepOnPress?: boolean;
+  /**
+   * With the helper's `pin`: a press pins this target's card even though it is a button, for a target whose only job
+   * on a press is its card (a slot on a board). Off: a press on a target that isn't a control pins.
+   */
+  pin?: boolean;
   /** Shows the card only when this says so when it's about to show, such as `isTruncated` for a name cut short. */
   when?: (element: Element) => boolean;
   /**
@@ -96,7 +106,14 @@ export interface UseTooltip<T> {
   /** Bind on each target: `v-bind="tip.on(card)"`. */
   on(card: TooltipCard<T>, options?: TooltipTargetOptions): Record<string, unknown>;
   /** Bind on the panel's one tooltip: `<Tooltip v-bind="tip.props">`. (With `shared`, only for its `fallback`.) */
-  readonly props: { open: boolean; anchor: TooltipRect; side: TooltipSide; align: TooltipAlign; id: string; onDismiss: () => void };
+  readonly props: { open: boolean; anchor: TooltipRect; side: TooltipSide; align: TooltipAlign; id: string; pinned: boolean; onDismiss: (reason?: TooltipDismissReason) => void };
+  /** Whether the card shown now is pinned open in the panel. */
+  readonly pinned: boolean;
+  /**
+   * The target whose card is pinned, in the panel or in Tavora's shared tooltip (until it closes there), to mark it
+   * (a slot drawn as chosen). Null when none is.
+   */
+  readonly pinnedTarget: Element | null;
   /** The card shown now (or the last one): fill the tooltip from it. */
   readonly content: T | null;
   /** Shows a card for an element at once, as from the keyboard: for an element you don't bind `on` to. */
@@ -106,6 +123,8 @@ export interface UseTooltip<T> {
 }
 
 const DELAY_MS = 180;
+/** How long a finger rests on a target before its card shows (touch has no hover), and how far it may move meanwhile. */
+const LONG_PRESS_MS = 450, LONG_PRESS_SLOP = 10;
 export const CONTROLS = 'button, a[href], input, select, textarea, [role=button], [role=link], [role=option], [role=menuitem], [role=tab], [role=switch], [role=checkbox], [role=radio]';
 let instances = 0;
 
@@ -133,13 +152,16 @@ export function useTooltip<T>(options: UseTooltipOptions & Partial<UseSharedTool
   if (typeof document !== 'undefined') watchInput(document);
   const given = options.shared;
   const sharedTooltip = (): SharedTooltip<SharedCard> | null => (typeof given === 'function' ? given() : given) ?? null;
-  // One value for where the card is: none, waiting for the hover delay, or showing (here or in Tavora's tooltip).
-  const state = reactive({ status: 'idle' as 'idle' | 'waiting' | 'open', side: (options.side ?? 'bottom') as TooltipSide, align: (options.align ?? 'center') as TooltipAlign, anchor: { left: 0, top: 0, right: 0, bottom: 0 } as TooltipRect });
+  // One value for where the card is: none, waiting for the hover delay, showing (here or in Tavora's tooltip), or
+  // pinned open in the panel by a press.
+  const state = reactive({ status: 'idle' as 'idle' | 'waiting' | 'open' | 'pinned', side: (options.side ?? 'bottom') as TooltipSide, align: (options.align ?? 'center') as TooltipAlign, anchor: { left: 0, top: 0, right: 0, bottom: 0 } as TooltipRect });
   // The card as the module gave it (a function is asked again on each read): not made reactive.
   const shown = shallowRef<TooltipCard<T>>(null);
   let current: Element | null = null;
   /** The shared card's id while it shows, and the tooltip it went to. */
   let sharedCard: { id: string; tooltip: SharedTooltip<SharedCard> } | null = null;
+  /** A card pinned in Tavora's shared tooltip: it stays there after the hover ends, until it closes there. */
+  const pinnedShared = shallowRef<{ id: string; element: Element } | null>(null);
   /** The card shows in the panel (always without `shared`; with it, as its fallback). */
   const inPanel = shallowRef(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -157,12 +179,25 @@ export function useTooltip<T>(options: UseTooltipOptions & Partial<UseSharedTool
     if (ids.length) element.setAttribute(relation, ids.join(' '));
     else element.removeAttribute(relation);
   }
-  // A press anywhere but on the target closes a card a press opened.
-  const outside = (event: PointerEvent) => { if (pressed && current && !(event.target instanceof Node && current.contains(event.target))) hide(); };
+  // A press anywhere but on the target (or, for a pinned card, the card itself) closes a card a press opened.
+  const outside = (event: PointerEvent) => {
+    if (!pressed || !current || !(event.target instanceof Node)) return;
+    if (current.contains(event.target)) return;
+    // The card is teleported out of the panel's tree: it is known by its id.
+    if (state.status === 'pinned' && event.target instanceof Element && event.target.closest('[data-slot=tooltip]')?.id === id) return;
+    hide();
+  };
   function listenOutside(on: boolean) {
     if (typeof document === 'undefined') return;
     if (on) document.addEventListener('pointerdown', outside, true);
     else document.removeEventListener('pointerdown', outside, true);
+  }
+
+  /** A card a press opened (a toggle, a long press, a pin) stays until the next press elsewhere. */
+  function holdOpen() {
+    if (pressed) return;
+    pressed = true;
+    listenOutside(true);
   }
 
   /** Back to no card, without telling Tavora (it closed the card itself, or never showed it). */
@@ -174,10 +209,21 @@ export function useTooltip<T>(options: UseTooltipOptions & Partial<UseSharedTool
     state.status = 'idle';
   }
 
+  /** The target the focus is being given back to: its focus doesn't open the card that just closed. */
+  let returning: Element | null = null;
+  /** A pinned card closed by its X or Escape gives the focus back to its target, where the keyboard left off. */
+  function dismiss(reason?: TooltipDismissReason) {
+    const back = state.status === 'pinned' && (reason === 'escape' || reason === 'close') ? current : null;
+    hide();
+    if (!(back instanceof HTMLElement) || !back.isConnected || !(back.tabIndex >= 0 || back.matches(CONTROLS))) return;
+    returning = back;
+    try { back.focus({ preventScroll: true }); } finally { returning = null; }
+  }
+
   function hide() {
     clearTimeout(timer);
     timer = undefined;
-    if (state.status === 'open') lastHidden = performance.now();
+    if (state.status === 'open' || state.status === 'pinned') lastHidden = performance.now();
     if (current && inPanel.value) describe(current, false);
     inPanel.value = false;
     if (pressed) listenOutside(false);
@@ -191,20 +237,33 @@ export function useTooltip<T>(options: UseTooltipOptions & Partial<UseSharedTool
     const side = target.side;
     const tooltip = sharedTooltip();
     if (!tooltip) return options.fallback ? showInPanel(element, side, target.as, target.align) : hide();
-    if (!unsubscribe) unsubscribe = tooltip.onClose(({ id: closed }) => { if (closed === sharedCard?.id) forget(); });
-    const pinnable = Boolean(options.pin) && !element.closest(CONTROLS);
+    if (!unsubscribe) unsubscribe = tooltip.onClose(({ id: closed }) => {
+      if (closed === pinnedShared.value?.id) pinnedShared.value = null;
+      if (closed === sharedCard?.id) forget();
+    });
+    const pinnable = Boolean(options.pin) && pinsOn(element, target);
     // A card that can be pinned keeps one id per card, so pinning it twice doesn't stack two copies.
     const cardId = pinnable ? `${id}-${`${card.title}-${card.subtitle ?? ''}`.replace(/[^\w-]+/g, '_').slice(0, 100)}` : `${id}-${++serial}`;
     sharedCard = { id: cardId, tooltip };
     state.status = 'open';
     // Tavora couldn't show it: show it in the panel (`fallback`), or forget it so the next hover tries again.
+    if (pinned && pinnable) pinnedShared.value = { id: cardId, element };
     tooltip.show({ id: cardId, anchor: element, content: card, pinnable, ...(pinned && pinnable ? { pinned: true } : {}) })
       .catch(() => {
+        if (pinnedShared.value?.id === cardId) pinnedShared.value = null;
         if (sharedCard?.id !== cardId) return;
         sharedCard = null;
-        if (options.fallback && current === element && element.isConnected) showInPanel(element, side, target.as, target.align);
-        else forget();
+        if (options.fallback && current === element && element.isConnected) {
+          showInPanel(element, side, target.as, target.align);
+          if (pinned && pinnable) pinInPanel();
+        } else forget();
       });
+  }
+
+  /** The card in the panel stays open, pinned: until its X, Escape, a press elsewhere or on its target again. */
+  function pinInPanel() {
+    state.status = 'pinned';
+    holdOpen();
   }
 
   function open(element: Element, target: TooltipTargetOptions, pinned: boolean) {
@@ -215,7 +274,11 @@ export function useTooltip<T>(options: UseTooltipOptions & Partial<UseSharedTool
     if (!element.isConnected || card === null || (target.when && !target.when(element))) return hide();
     if (given) return showShared(element, card as unknown as SharedCard, target, pinned);
     showInPanel(element, side, target.as, target.align);
+    if (pinned && options.pin && pinsOn(element, target)) pinInPanel();
   }
+
+  /** Whether a press on this target pins its card: one that isn't a control, or one that says `pin`. */
+  const pinsOn = (element: Element, target: TooltipTargetOptions) => Boolean(target.pin) || !element.closest(CONTROLS);
 
   function showInPanel(element: Element, side: TooltipSide | undefined, as?: 'label' | 'description', align?: TooltipAlign) {
     const { left, top, right, bottom } = element.getBoundingClientRect();
@@ -231,7 +294,7 @@ export function useTooltip<T>(options: UseTooltipOptions & Partial<UseSharedTool
   /** Shows `card` for `element` after `wait` ms (at once for 0). */
   function schedule(element: Element, card: TooltipCard<T>, target: TooltipTargetOptions, wait: number, pinned = false) {
     // Already showing for it, or on the way (unless the keyboard asks for it now).
-    if (element === current && !pinned && (state.status === 'open' || (state.status === 'waiting' && wait > 0))) return;
+    if (element === current && !pinned && (state.status === 'open' || state.status === 'pinned' || (state.status === 'waiting' && wait > 0))) return;
     hide();
     if (resolve(card) === null || (target.when && !target.when(element))) return;
     current = element;
@@ -246,52 +309,113 @@ export function useTooltip<T>(options: UseTooltipOptions & Partial<UseSharedTool
     return performance.now() - lastHidden < TOOLTIP_WARM_MS ? 0 : tooltipDelay(options.delay ?? DELAY_MS);
   }
 
-  if (getCurrentScope()) onScopeDispose(() => { hide(); unsubscribe?.(); });
+  // A finger resting on a target: its card shows after LONG_PRESS_MS, as a press opened it (it stays until the next press
+  // elsewhere), and the click that ends the touch is swallowed, so the target doesn't also do what a tap does.
+  let longPress: { timer: ReturnType<typeof setTimeout>; element: Element; x: number; y: number; pointer: number } | null = null;
+  function cancelLongPress() {
+    if (longPress) clearTimeout(longPress.timer);
+    longPress = null;
+  }
+  function swallowNextClick(element: Element) {
+    if (typeof document === 'undefined') return;
+    const swallow = (event: MouseEvent) => {
+      if (event.target instanceof Node && element.contains(event.target)) { event.preventDefault(); event.stopPropagation(); }
+      done();
+    };
+    const done = () => { clearTimeout(expiry); document.removeEventListener('click', swallow, true); };
+    const expiry = setTimeout(done, 800);
+    document.addEventListener('click', swallow, true);
+  }
+
+  if (getCurrentScope()) onScopeDispose(() => { cancelLongPress(); hide(); unsubscribe?.(); });
 
   return {
     on(card, target = {}) {
       // A card a press opened stays when the pointer or the focus moves on; anything else closes it.
       const leave = (event: Event) => { if (event.currentTarget === current && !pressed) hide(); };
-      // The focus moving on closes even a card a press opened (Tab away from an info button).
-      const blur = (event: Event) => { if (event.currentTarget === current) hide(); };
+      // The focus moving on closes even a card a press opened (Tab away from an info button), but not a pinned one: the
+      // focus may go into it, or the X.
+      const blur = (event: Event) => { if (event.currentTarget === current && state.status !== 'pinned') hide(); };
+      // While a card is pinned, other targets show nothing on hover or focus: the pinned one stays in sight.
+      const free = () => state.status !== 'pinned';
       return {
         ...(target.focusable ? { tabindex: 0 } : {}),
         onPointerenter: (event: PointerEvent) => {
-          // Touch has no hover: a tap is for the target itself.
-          if (event.pointerType !== 'touch') schedule(event.currentTarget as Element, card, target, hoverWait());
+          // Touch has no hover: a tap is for the target itself (a long press shows the card).
+          if (event.pointerType !== 'touch' && free()) schedule(event.currentTarget as Element, card, target, hoverWait());
         },
         onPointerleave: leave,
-        onFocus: (event: FocusEvent) => { if (keyboardFocus(event.currentTarget as Element)) schedule(event.currentTarget as Element, card, target, 0); },
+        onFocus: (event: FocusEvent) => { if (free() && event.currentTarget !== returning && keyboardFocus(event.currentTarget as Element)) schedule(event.currentTarget as Element, card, target, 0); },
         onBlur: blur,
         // A press closes the card (it would cover what the press changed), except on a `toggle` target (the click
-        // decides) or one that keeps it.
-        onPointerdown: (event: PointerEvent) => { if (!target.toggle && !target.keepOnPress) leave(event); },
-        onKeydown: (event: KeyboardEvent) => { if (event.key === 'Escape' && event.currentTarget === current) hide(); },
+        // decides), one that keeps it, or one a press pins (the click decides there too).
+        onPointerdown: (event: PointerEvent) => {
+          const element = event.currentTarget as Element;
+          if (event.pointerType === 'touch' && !target.toggle) {
+            cancelLongPress();
+            const timer = setTimeout(() => {
+              longPress = null;
+              if (!element.isConnected) return;
+              schedule(element, card, target, 0, true);
+              if (current === element && state.status !== 'idle') holdOpen();
+              swallowNextClick(element);
+            }, LONG_PRESS_MS);
+            longPress = { timer, element, x: event.clientX, y: event.clientY, pointer: event.pointerId };
+          }
+          const pins = Boolean(options.pin) && pinsOn(element, target);
+          if (!target.toggle && !target.keepOnPress && !pins && state.status !== 'pinned') leave(event);
+        },
+        onPointermove: (event: PointerEvent) => {
+          if (longPress && event.pointerId === longPress.pointer && Math.hypot(event.clientX - longPress.x, event.clientY - longPress.y) > LONG_PRESS_SLOP) cancelLongPress();
+        },
+        onPointerup: cancelLongPress,
+        onPointercancel: cancelLongPress,
+        onKeydown: (event: KeyboardEvent) => {
+          const element = event.currentTarget as Element;
+          if (event.key === 'Escape' && element === current) return dismiss('escape');
+          // A target that isn't a control has no click for Enter: Enter pins (or unpins) its card from the keyboard.
+          if (event.key === 'Enter' && options.pin && !element.closest(CONTROLS) && pinsOn(element, target)) {
+            event.preventDefault();
+            if (element === current && state.status === 'pinned') return hide();
+            schedule(element, card, target, 0, true);
+          }
+        },
         ...(target.toggle ? {
           onClick: (event: MouseEvent) => {
             const element = event.currentTarget as Element;
             if (element === current && state.status === 'open') {
               if (pressed) return hide();
               // Opened by hovering: the press keeps it, as if the press had opened it.
-              pressed = true;
-              listenOutside(true);
+              holdOpen();
               return;
             }
             schedule(element, card, target, 0, true);
-            if (current === element) { pressed = true; listenOutside(true); }
+            if (current === element) holdOpen();
           },
-        } : given && options.pin ? {
+        } : options.pin ? {
           onClick: (event: MouseEvent) => {
             const element = event.currentTarget as Element;
-            if (!element.closest(CONTROLS)) schedule(element, card, target, 0, true);
+            if (!pinsOn(element, target)) return;
+            // A second press on the pinned card's own target closes it; on another target, that one's card is pinned.
+            if (element === current && state.status === 'pinned') return hide();
+            schedule(element, card, target, 0, true);
           },
         } : {}),
         // The target going away (a list that changed) takes its card with it.
-        onVnodeBeforeUnmount: (vnode: VNode) => { if (vnode.el && vnode.el === current) hide(); },
+        onVnodeBeforeUnmount: (vnode: VNode) => { if (vnode.el && vnode.el === current) hide(); if (vnode.el && vnode.el === longPress?.element) cancelLongPress(); },
       };
     },
     get props() {
-      return { open: state.status === 'open' && inPanel.value, anchor: state.anchor, side: state.side, align: state.align, id, onDismiss: hide };
+      const shown = state.status === 'open' || state.status === 'pinned';
+      return { open: shown && inPanel.value, anchor: state.anchor, side: state.side, align: state.align, id, pinned: state.status === 'pinned' && inPanel.value, onDismiss: dismiss };
+    },
+    get pinned() {
+      return state.status === 'pinned';
+    },
+    get pinnedTarget() {
+      if (state.status === 'pinned') return current;
+      const shared = pinnedShared.value;
+      return shared?.element.isConnected ? shared.element : null;
     },
     get content() {
       return resolve(shown.value);
