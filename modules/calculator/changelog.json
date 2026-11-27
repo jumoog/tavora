@@ -645,14 +645,5 @@
       "A toolbar on top: switch between the Basic keypad and Plus, and show or hide your history.",
       "The keypad no longer gets cut off when the panel is wide but not wide enough for the history beside it."
     ]
-  },
-  {
-    "version": "0.1.1",
-    "date": "2026-10-22",
-    "notes": [
-      "New keys: √, x², ± and ans for your last result, with the Windows shortcuts @, q and F9.",
-      "Copy puts the result on your clipboard as a plain number, also with Ctrl+C.",
-      "Big numbers show their thousands, like 1,234,567."
-    ]
   }
 ]

@@ -648,12 +648,5 @@
     "notes": [
       "Checkboxes, toggles and options animate when you pick them, and folding sections open smoothly."
     ]
-  },
-  {
-    "version": "0.1.8",
-    "date": "2026-11-01",
-    "notes": [
-      "Settings in a dialog have an icon and a Close button in the corner."
-    ]
   }
 ]

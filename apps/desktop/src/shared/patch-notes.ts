@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.68",
+    date: "2026-11-27",
+    title: "Why a menu entry is off",
+    notes: [
+      "A switched-off entry in a module's menu can now say why: point at it or move to it with the arrow keys.",
+    ],
+    prs: [
+      { number: 1043, title: "SDK 0.4.16: a reason for switched-off entries in Tavora's menus (ui.showMenu disabledReason)" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "privacy", "publishing", "sdk", "system-monitor", "todos", "ui-kit", "website", "whiteboard"],
+  },
+  {
     version: "0.25.67",
     date: "2026-11-27",
     title: "Long names in pickers",
