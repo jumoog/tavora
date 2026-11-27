@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.64",
+    date: "2026-11-27",
+    title: "Tidier overlay layout",
+    notes: [
+      "In the overlay layout settings, \"Mixed\" is now small grey text instead of a badge next to the controls.",
+    ],
+    prs: [
+      { number: 1036, title: "Keep badges out of control rows" },
+    ],
+    tags: ["overlays"],
+  },
+  {
     version: "0.25.63",
     date: "2026-11-27",
     title: "Toolbar menus open next to their button",
