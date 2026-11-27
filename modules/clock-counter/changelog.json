@@ -648,12 +648,5 @@
       "Over game is gone from the settings. Add clocks and counters to your game on the Overlay page.",
       "Drag a row to put it in a new place, or press Alt and the up or down arrow on it."
     ]
-  },
-  {
-    "version": "0.1.15",
-    "date": "2026-11-02",
-    "notes": [
-      "Main buttons and badges can follow a theme's deeper button colour."
-    ]
   }
 ]

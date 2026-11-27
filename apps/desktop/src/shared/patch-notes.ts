@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.74",
+    date: "2026-11-28",
+    title: "Long choices stay on one line",
+    notes: [
+      "A long choice in a list field now stays on one line and ends in …, so a row of fields keeps one height.",
+      "Hover or focus the field to read the whole choice.",
+    ],
+    prs: [
+      { number: 1049, title: "Kit: a long Select value stays on one line; `wrap` gives it two" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.73",
     date: "2026-11-27",
     title: "Clearer menus and tiles",
