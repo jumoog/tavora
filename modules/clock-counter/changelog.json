@@ -648,12 +648,5 @@
     "notes": [
       "Main buttons and badges can follow a theme's deeper button colour."
     ]
-  },
-  {
-    "version": "0.1.14",
-    "date": "2026-11-02",
-    "notes": [
-      "Small update to the shared look; nothing changes for you here."
-    ]
   }
 ]

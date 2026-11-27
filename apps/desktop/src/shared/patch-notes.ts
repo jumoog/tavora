@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.73",
+    date: "2026-11-27",
+    title: "Clearer menus and tiles",
+    notes: [
+      "In Hardware and Liquid Glass, the sidebar's Overlays button no longer gets a solid block when its page is open.",
+      "A switched-off Delete or Clear in a menu is no longer red.",
+      "Whiteboard's menus show in full why Clear, Copy and Save are off, and Clear lost its extra tooltip.",
+    ],
+    prs: [
+      { number: 1047, title: "Kit: bare pressed tiles keep their look, off red rows aren't red, module check allows colour fades" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "website", "whiteboard"],
+  },
+  {
     version: "0.25.72",
     date: "2026-11-27",
     title: "Formatting in item cards",
