@@ -648,12 +648,5 @@
     "notes": [
       "Switches and tabs slide to what you pick."
     ]
-  },
-  {
-    "version": "0.1.11",
-    "date": "2026-11-02",
-    "notes": [
-      "A counter counts up or down to its new number."
-    ]
   }
 ]

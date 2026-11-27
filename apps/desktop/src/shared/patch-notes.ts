@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.70",
+    date: "2026-11-27",
+    title: "Menu reasons in the row",
+    notes: [
+      "A switched-off menu entry now shows why right in its row, where its shortcut would be.",
+    ],
+    prs: [
+      { number: 1046, title: "Kit: a menu row shows why it is off in the row, not in a tooltip" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "privacy", "sdk", "system-monitor", "todos", "ui-kit", "website", "whiteboard"],
+  },
+  {
     version: "0.25.69",
     date: "2026-11-27",
     title: "Tooltips you can pin",
