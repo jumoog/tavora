@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.65",
+    date: "2026-11-27",
+    title: "Clearer in-game texts",
+    notes: [
+      "Settings say plainly whether something shows in your game, and when you see it.",
+      "Settings > Overlays & Streaming calls its game part In game.",
+    ],
+    prs: [
+      { number: 1037, title: "Say plainly whether something shows in your game" },
+    ],
+    tags: ["clock-counter"],
+  },
+  {
     version: "0.25.64",
     date: "2026-11-27",
     title: "Tidier overlay layout",
