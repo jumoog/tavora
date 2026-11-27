@@ -28,6 +28,20 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.69",
+    date: "2026-11-27",
+    title: "Tooltips you can pin",
+    notes: [
+      "Item cards inside a panel now look the same as Tavora's own tooltip, Path of Exile items too.",
+      "A card pinned inside a panel has a close button, and Esc takes you back to where you were.",
+      "On a touch screen, press and hold something to see its tooltip.",
+    ],
+    prs: [
+      { number: 1045, title: "Kit: tooltip leftovers (PoE look, pin in the panel, freestanding parts, tokens)" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.68",
     date: "2026-11-27",
     title: "Why a menu entry is off",
