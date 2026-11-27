@@ -1407,6 +1407,8 @@ export const LIMITS = {
   maxMenuLabel: 80,
   /** Characters of the hint on the right of a menu item, such as a shortcut. */
   maxMenuHint: 30,
+  /** Characters of why a menu item is off (its `disabledReason`). */
+  maxMenuReason: 120,
   /** What one overlay shows (overlay.publish), as JSON. */
   maxOverlayStateBytes: 16 * 1024,
   /** Overlays one module may have in one workspace; publishing more fails with QUOTA_EXCEEDED. */
@@ -1672,12 +1674,15 @@ export interface CheckedMenu {
 const MENU_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 /** A CSS colour without anything that could load or run: hex, a colour function of numbers, or transparent. */
 const MENU_COLOR = /^(?:#[0-9a-f]{3,8}|(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([0-9.%\s,/+-]{1,60}\)|transparent)$/i;
+/** What a reason may not hold: control characters, line and paragraph breaks, zero-width marks and the marks that reorder text. */
+const MENU_NOT_PLAIN = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/;
 /** Largest offset or size accepted for a menu's `at`, in CSS pixels. */
 const MAX_MENU_COORDINATE = 100_000;
 
 /**
  * ui.showMenu's params, rebuilt from known fields only: text stays text, colours are plain CSS colour values, at most
- * LIMITS.maxMenuEntries entries (submenus included), labels up to LIMITS.maxMenuLabel and hints up to LIMITS.maxMenuHint.
+ * LIMITS.maxMenuEntries entries (submenus included), labels up to LIMITS.maxMenuLabel, hints up to LIMITS.maxMenuHint
+ * and reasons up to LIMITS.maxMenuReason, on one line. A reason only goes with `disabled: true`.
  */
 export function checkMenu(params: unknown): ParamCheck<CheckedMenu> {
   return refusing(() => {
@@ -1688,6 +1693,9 @@ export function checkMenu(params: unknown): ParamCheck<CheckedMenu> {
     };
     const text = (value: unknown, max: number, name: string): string =>
       typeof value !== "string" || value.trim() === "" || value.length > max ? invalid(`${name} must be text of 1 to ${max} characters`) : value;
+    /** Text on one line, without line breaks, control characters or invisible marks that hide or reorder it. */
+    const oneLine = (value: unknown, max: number, name: string): string =>
+      typeof value === "string" && MENU_NOT_PLAIN.test(value) ? invalid(`${name} must be one line of plain text`) : text(value, max, name);
     const flag = (value: unknown, name: string): boolean | undefined => (value === undefined || typeof value === "boolean" ? value : invalid(`${name} must be true or false`));
     const color = (value: unknown, name: string): string | undefined =>
       value === undefined || (typeof value === "string" && MENU_COLOR.test(value)) ? value : invalid(`${name} must be a CSS colour such as #e5675a or oklch(0.7 0.17 150)`);
@@ -1717,13 +1725,15 @@ export function checkMenu(params: unknown): ParamCheck<CheckedMenu> {
             only(entry, ["type", "label"], where);
             return { type: "heading", label: text(entry.label, LIMITS.maxMenuLabel, `${where}.label`) };
           case "item": {
-            only(entry, ["type", "id", "label", "hint", "color", "checked", "radio", "disabled", "danger"], where);
+            only(entry, ["type", "id", "label", "hint", "color", "checked", "radio", "disabled", "disabledReason", "danger"], where);
             if (typeof entry.id !== "string" || !MENU_ID.test(entry.id)) invalid(`${where}.id must be 1 to 64 letters, digits, ".", "_", ":" or "-"`);
             const id = entry.id as string;
             if (ids.has(id)) invalid(`${where}.id "${id}" is used twice`);
             ids.add(id);
             const disabled = flag(entry.disabled, `${where}.disabled`);
             if (enabled && !disabled) choices.add(id);
+            const disabledReason = entry.disabledReason === undefined ? undefined : oneLine(entry.disabledReason, LIMITS.maxMenuReason, `${where}.disabledReason`);
+            if (disabledReason !== undefined && !disabled) invalid(`${where}.disabledReason goes with disabled: true`);
             return defined<MenuEntry>({
               type: "item",
               id,
@@ -1733,6 +1743,7 @@ export function checkMenu(params: unknown): ParamCheck<CheckedMenu> {
               checked: flag(entry.checked, `${where}.checked`),
               radio: flag(entry.radio, `${where}.radio`),
               disabled,
+              disabledReason,
               danger: flag(entry.danger, `${where}.danger`),
             });
           }
@@ -2073,6 +2084,14 @@ export type MenuEntry =
       /** The mark is a dot: one choice of several. */
       radio?: boolean;
       disabled?: boolean;
+      /**
+       * Why it is off, with `disabled: true`: a short sentence on one line, at most 120 characters ("Already used by
+       * another line."). The entry stays reachable by the pointer and the arrow keys, shows the reason in a tooltip beside
+       * it and to screen readers, and can't be picked. Without it a disabled entry is skipped. Needs
+       * `sdk.supports("ui.showMenu.disabledReason")`: on an older Tavora the SDK shows it as the `hint` when the entry has
+       * none (cut to 30 characters), and leaves it out otherwise.
+       */
+      disabledReason?: string;
       /** Red, for something that deletes or cannot be undone. */
       danger?: boolean;
     }
@@ -2338,6 +2357,12 @@ export const ITEM_CARD_COLUMNS_TAVORA = "0.24.148";
  */
 export const ITEM_CARD_ART_TAGS_TAVORA = "0.24.149";
 /**
+ * The first Tavora that takes `disabledReason` on a menu item (`ui.showMenu`): the one place that number is written. Set
+ * it to the version the pull request merges as, right before merging. Too low, and the SDK sends an older Tavora a key
+ * it refuses, and with it the whole menu.
+ */
+export const MENU_DISABLED_REASON_TAVORA = "0.25.68";
+/**
  * The first Tavora that tells a panel whether it is over the game (`panel.isOverGame` and the `panel.overGame` event):
  * the one place that number is written. Set it to the version the pull request merges as, right before merging, then
  * run `pnpm --filter @tavora/docs protocol`. Too low, and a module asks an older Tavora, which answers UNKNOWN_METHOD.
@@ -2507,7 +2532,7 @@ const SDK_CALLS = { "panel.openDialog": "panel.setDialog", "panel.closeDialog": 
  * Params of an existing call that only a newer Tavora knows. An older one rejects the unknown key (INVALID_PARAMS) for the
  * whole call, so the SDK leaves the key out there. They never raise `MIN_TAVORA`.
  */
-export const FIELD_SINCE = { "ui.tooltip.pinnable": "0.23.91", "ui.tooltip.skin": ITEM_CARD_TAVORA, "ui.tooltip.per": ITEM_CARD_PER_TAVORA, "ui.tooltip.boxBorder": ITEM_CARD_BOX_BORDER_TAVORA, "ui.tooltip.propertyIcon": ITEM_CARD_ICON_TAVORA, "ui.tooltip.anchorBox": TOOLTIP_ANCHOR_BOX_TAVORA, "ui.tooltip.unit": UNIT_CARD_TAVORA, "ui.tooltip.columns": ITEM_CARD_COLUMNS_TAVORA, "ui.tooltip.artTags": ITEM_CARD_ART_TAGS_TAVORA } as const;
+export const FIELD_SINCE = { "ui.tooltip.pinnable": "0.23.91", "ui.tooltip.skin": ITEM_CARD_TAVORA, "ui.tooltip.per": ITEM_CARD_PER_TAVORA, "ui.tooltip.boxBorder": ITEM_CARD_BOX_BORDER_TAVORA, "ui.tooltip.propertyIcon": ITEM_CARD_ICON_TAVORA, "ui.tooltip.anchorBox": TOOLTIP_ANCHOR_BOX_TAVORA, "ui.tooltip.unit": UNIT_CARD_TAVORA, "ui.tooltip.columns": ITEM_CARD_COLUMNS_TAVORA, "ui.tooltip.artTags": ITEM_CARD_ART_TAGS_TAVORA, "ui.showMenu.disabledReason": MENU_DISABLED_REASON_TAVORA } as const;
 
 /** A protocol call, a param only newer Tavoras know (`ui.tooltip.pinnable`), or one of the SDK calls named differently on the wire (`panel.openDialog`). */
 export type SupportedCall = CallName | keyof typeof SDK_CALLS | keyof typeof FIELD_SINCE;
