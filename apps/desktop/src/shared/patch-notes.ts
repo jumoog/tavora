@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.66",
+    date: "2026-11-27",
+    title: "Narrow settings dialogs",
+    notes: [
+      "A setting's name stays readable: its control moves under it when there's no room beside it.",
+    ],
+    prs: [
+      { number: 1039, title: "Kit: a narrow settings row puts its control under the name" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.65",
     date: "2026-11-27",
     title: "Clearer in-game texts",

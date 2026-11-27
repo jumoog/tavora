@@ -650,13 +650,5 @@
     "notes": [
       "In a linked group's line, counters now have short names without spaces: {counter2}, {bossKills}, {sitUps}. Tap a counter below the field to add it. Lines you wrote with full names keep working."
     ]
-  },
-  {
-    "version": "0.1.4",
-    "date": "2026-11-01",
-    "notes": [
-      "Show Clock & Counter over your game from the panel's menu. Your clocks and counters stay in view, and you count or start and stop them while you hold the game layer key.",
-      "Add works over your game too, and a button that can't work there now tells you what to do."
-    ]
   }
 ]
