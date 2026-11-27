@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.72",
+    date: "2026-11-27",
+    title: "Formatting in item cards",
+    notes: [
+      "Cards from modules can show bold and italic text, lists, tags and a footer line.",
+    ],
+    prs: [
+      { number: 1048, title: "SDK 0.4.17: formatting in the shared tooltip (bold, italic, blocks, footer)" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "privacy", "publishing", "sdk", "system-monitor", "todos", "ui-kit", "website", "whiteboard"],
+  },
+  {
     version: "0.25.71",
     date: "2026-11-27",
     title: "Amount bars",
