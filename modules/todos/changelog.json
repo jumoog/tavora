@@ -643,12 +643,5 @@
       "Live view settings open in a big window: pick a font and size, bold, text color, outline and background color.",
       "Choose what sits between groups in the live view (nothing, a line or the group name) and whether finished to-dos show, ticked and struck through."
     ]
-  },
-  {
-    "version": "0.1.0",
-    "date": "2026-10-18",
-    "notes": [
-      "Patch notes for this module start with this version."
-    ]
   }
 ]

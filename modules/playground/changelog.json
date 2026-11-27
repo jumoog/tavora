@@ -640,12 +640,5 @@
     "notes": [
       "New page: Overlay text, the box every overlay text uses, with scrolling, shrinking and cutting off, and its settings."
     ]
-  },
-  {
-    "version": "0.1.24",
-    "date": "2026-11-03",
-    "notes": [
-      "New specimen: rows you drag to reorder."
-    ]
   }
 ]

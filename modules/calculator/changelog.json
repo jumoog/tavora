@@ -647,13 +647,5 @@
       "Copy puts the result on your clipboard as a plain number, also with Ctrl+C.",
       "Big numbers show their thousands, like 1,234,567."
     ]
-  },
-  {
-    "version": "0.1.0",
-    "date": "2026-10-22",
-    "notes": [
-      "A quick calculator for each game, with your keyboard too.",
-      "Your last 10 results stay, so you can pick them up again."
-    ]
   }
 ]
