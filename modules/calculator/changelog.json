@@ -644,13 +644,5 @@
       "The keys keep a size you can press, in small panels too; a short panel scrolls instead.",
       "The history keeps room for your results below or beside the keypad."
     ]
-  },
-  {
-    "version": "0.1.2",
-    "date": "2026-10-22",
-    "notes": [
-      "A toolbar on top: switch between the Basic keypad and Plus, and show or hide your history.",
-      "The keypad no longer gets cut off when the panel is wide but not wide enough for the history beside it."
-    ]
   }
 ]
