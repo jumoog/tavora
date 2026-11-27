@@ -28,6 +28,18 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.71",
+    date: "2026-11-27",
+    title: "Amount bars",
+    notes: [
+      "Screen readers now read the rating bars and System Monitor's drive bars as amounts, not as something still loading.",
+    ],
+    prs: [
+      { number: 1044, title: "Kit: Meter for amounts; rating bars and drive bars use it" },
+    ],
+    tags: ["calculator", "catalog", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.70",
     date: "2026-11-27",
     title: "Menu reasons in the row",
