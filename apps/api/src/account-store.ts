@@ -34,8 +34,12 @@ export const CODE_OTHER_TRIES = 3;
  * before and still changes or deletes from inside the account, and strangers can mail the address at most 10 times a
  * day plus one an hour. An owner on a network they never signed in from shares that group with strangers, so the hour
  * is what keeps strangers on a few networks from locking them out for a day: they wait an hour at most, unless
- * strangers take every hour from yet another network (and each such code reaches the owner's inbox, where the owner
- * can type it in from their own network, CODE_OTHER_TRIES). The 3 codes an address may
+ * strangers take every hour from yet another network. Each such code reaches the owner's inbox and works from the
+ * owner's network too, but only until strangers spend its CODE_OTHER_TRIES from yet another network (audit run 3), so
+ * strangers with about 25 networks a day can keep an owner off a new network as long as they keep at it. Counting
+ * others' tries per network would end that and let them guess a code 3 times per network instead; the owner still
+ * signs in from a network they used before, with Discord or on a PC that is signed in (security.md, Known limits).
+ * The 3 codes an address may
  * draw from the emails kept for accounts on a busy day (accounts.ts accountShareRateLimiter) are counted per group too
  * (codeGroup), so strangers can't use up those of the networks the owner signed in from either.
  */
