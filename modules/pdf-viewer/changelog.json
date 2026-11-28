@@ -637,12 +637,5 @@
     "notes": [
       "Checkboxes, toggles and options animate when you pick them, and folding sections open smoothly."
     ]
-  },
-  {
-    "version": "0.1.4",
-    "date": "2026-11-01",
-    "notes": [
-      "Rename and Remove ask with an icon and a Close button in the corner."
-    ]
   }
 ]

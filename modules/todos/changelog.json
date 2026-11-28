@@ -641,12 +641,5 @@
     "notes": [
       "Small update to the shared look; nothing changes for you here."
     ]
-  },
-  {
-    "version": "0.2.9",
-    "date": "2026-11-02",
-    "notes": [
-      "Lists, dialogs and settings pages move smoothly, and a to-do folds away the same way."
-    ]
   }
 ]

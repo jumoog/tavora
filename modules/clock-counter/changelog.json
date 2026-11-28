@@ -645,12 +645,5 @@
       "In game and On stream say where it shows; Arrange in Overlays opens Tavora's Overlay page.",
       "There is no Done button any more: changes save as you make them, and Delete is the last row of the first page."
     ]
-  },
-  {
-    "version": "0.1.17",
-    "date": "2026-11-02",
-    "notes": [
-      "Screen readers read each message once."
-    ]
   }
 ]

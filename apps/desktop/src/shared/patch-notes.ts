@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.76",
+    date: "2026-11-28",
+    title: "New frame for Path of Exile 2 item cards",
+    notes: [
+      "Path of Exile 2 item cards get corner pieces in the rarity colour and a diamond on each divider.",
+      "Tabs that go on to a second row no longer run over what's below them.",
+    ],
+    prs: [
+      { number: 1051, title: "Kit: corner brackets on PoE item cards, wrapped tabs grow their list" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.75",
     date: "2026-11-28",
     title: "Round ends",

@@ -635,12 +635,5 @@
     "notes": [
       "See which apps use your memory: the new button on the Memory card lists them with their RAM and CPU."
     ]
-  },
-  {
-    "version": "0.1.1",
-    "date": "2026-10-25",
-    "notes": [
-      "Your NVIDIA graphics card now shows its temperature and power use."
-    ]
   }
 ]

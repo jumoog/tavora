@@ -644,12 +644,5 @@
     "notes": [
       "Menus and tooltips open out of the spot they belong to, and buttons dip a little when you press them."
     ]
-  },
-  {
-    "version": "0.6.2",
-    "date": "2026-10-31",
-    "notes": [
-      "Text fields and dropdowns look calmer in Dark mode."
-    ]
   }
 ]

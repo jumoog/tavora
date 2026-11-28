@@ -637,12 +637,5 @@
     "notes": [
       "Dropdowns where you pick a value show an up-and-down arrow."
     ]
-  },
-  {
-    "version": "0.1.10",
-    "date": "2026-11-01",
-    "notes": [
-      "Settings now open as a dialog over the whole workspace, not inside the small panel."
-    ]
   }
 ]
