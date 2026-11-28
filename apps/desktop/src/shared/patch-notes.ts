@@ -28,6 +28,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.26.1",
+    date: "2026-11-28",
+    title: "Overlays in game",
+    notes: [
+      "Hide from capture now hides the whole panel when you use it in game, not only its live view.",
+      "Overlays keep updating while Tavora is minimized.",
+      "With only overlays in the layer, the game lets go of the mouse when you open it, so you can click Use, Arrange and Close.",
+      "The right panel keeps running for an overlay, also in modules with several panels.",
+      "OBS sources keep updating while their workspace isn't open in Tavora.",
+      "A module's keys work in game while its overlay is there, whatever Tavora shows.",
+      "Overlays come back on top after a quick alt-tab, and no longer flash at full strength when they load.",
+    ],
+    prs: [
+      { number: 1056, title: "Overlays: capture hiding for panels, overlay panels keep running, layer focus" },
+    ],
+    tags: ["overlays", "privacy", "website", "workspace"],
+  },
+  {
     version: "0.26.0",
     date: "2026-11-28",
     title: "Tidier controls and new item cards",
