@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.75",
+    date: "2026-11-28",
+    title: "Round ends",
+    notes: [
+      "With the corners set fully round (Settings > Appearance), buttons, toggles, tags and fields give their text a bit more room at the ends, and an icon sits evenly in the curve.",
+      "Pills that are always round have a bit more room at their ends too: the Welcome page's quick-start buttons, a workspace's Running label and the small counts on the sidebar and maps.",
+    ],
+    prs: [
+      { number: 1050, title: "Kit: pill padding for round ends" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "rail", "system-monitor", "todos", "ui-kit", "whiteboard", "workspace"],
+  },
+  {
     version: "0.25.74",
     date: "2026-11-28",
     title: "Long choices stay on one line",
