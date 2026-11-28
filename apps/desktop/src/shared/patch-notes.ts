@@ -28,6 +28,21 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.26.2",
+    date: "2026-11-28",
+    title: "Safer files and updates",
+    notes: [
+      "Panels get files only through Tavora's own file dialogs. Pictures in Notes and Whiteboard come in that way too.",
+      "Settings > About tells you when Tavora can't confirm you're up to date.",
+      "Game overlays keep going when a call to Windows fails once.",
+      "On a local page in the Browser, such as your router's, ads and embeds can't reach your network.",
+    ],
+    prs: [
+      { number: 1057, title: "Security and stability fixes before 1.0 (audit package A)" },
+    ],
+    tags: ["catalog", "notes", "overlays", "privacy", "security", "updates", "website", "whiteboard"],
+  },
+  {
     version: "0.26.1",
     date: "2026-11-28",
     title: "Overlays in game",
