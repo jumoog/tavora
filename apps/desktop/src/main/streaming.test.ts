@@ -45,7 +45,7 @@ async function setup({ held = [] as string[] } = {}) {
   };
   const heard: HotkeyBinding[] = [];
   const panel: HotkeyListener = { moduleId: MODULE.manifest.id, usedAt: 1, hotkeyPressed: (binding) => heard.push(binding) };
-  const world = { workspaceId: "poe2" as string | null, panels: [panel], clipboard: "", opened: [] as string[], settings: { streamOverlays: false, overlayPort: 47820 }, granted: true, asked: 0, answer: true, module: MODULE as GrantedModule | undefined };
+  const world = { workspaceId: "poe2" as string | null, panels: [panel], clipboard: "", opened: [] as string[], settings: { streamOverlays: false, overlayPort: 47820 }, granted: true, asked: 0, answer: true, module: MODULE as GrantedModule | undefined, streamChanges: 0 };
   const streaming = await Streaming.create({
     userData: dir,
     settings: () => world.settings,
@@ -77,6 +77,7 @@ async function setup({ held = [] as string[] } = {}) {
     shell: { openSetting: (setting) => void world.opened.push(setting), focus: () => {} },
     language: () => "en",
     changed: () => {},
+    streamsChanged: () => void world.streamChanges++,
   });
   return { streaming, registered, heard, world, hotkeys: streaming.hotkeysFor(MODULE, "poe2"), overlay: streaming.overlayFor(MODULE, "poe2") };
 }
@@ -206,6 +207,57 @@ describe("which hotkeys work", () => {
     expect(registered.has("F9")).toBe(false);
   });
 
+  it("also a workspace's not shown, while its module's item is on screen and a panel of that workspace runs for it", async () => {
+    const { streaming, registered, world, hotkeys } = await setup();
+    const asked = hotkeys.set("start-pause", "item-1", "Boss timer");
+    streaming.answer(streaming.request()!.id, "set", "F9");
+    await asked;
+    let onScreen = true;
+    streaming.useOverlayKeys({ showing: () => true, wants: () => false, has: () => false, pressed: () => {}, general: () => false, moduleShowing: (module) => onScreen && module.workspaceId === "poe2" });
+    const own: HotkeyBinding[] = [];
+    const other: HotkeyBinding[] = [];
+    const ownPanel: HotkeyListener = { moduleId: MODULE.manifest.id, usedAt: 1, workspaceId: "poe2", hotkeyPressed: (binding) => own.push(binding) };
+    const otherPanel: HotkeyListener = { moduleId: MODULE.manifest.id, usedAt: 5, workspaceId: "elden", hotkeyPressed: (binding) => other.push(binding) };
+    world.panels = [ownPanel, otherPanel];
+    // Home is shown in Tavora, the overlay is on the game.
+    world.workspaceId = null;
+    streaming.sync();
+    expect(registered.has("F9")).toBe(true);
+    registered.get("F9")!();
+    // To the panel of its own workspace, though another of the module was used later.
+    expect(own).toEqual([{ action: "start-pause", target: "item-1" }]);
+    expect(other).toEqual([]);
+    onScreen = false;
+    streaming.sync();
+    expect(registered.has("F9")).toBe(false);
+    // Nothing of its workspace runs: no key.
+    onScreen = true;
+    world.panels = [otherPanel];
+    streaming.sync();
+    expect(registered.has("F9")).toBe(false);
+  });
+
+  it("let the workspace shown keep a key that an overlay's module of another workspace has too", async () => {
+    const { streaming, registered, world, hotkeys } = await setup();
+    const asked = hotkeys.set("start-pause", "item-1", "Boss timer");
+    streaming.answer(streaming.request()!.id, "set", "F9");
+    await asked;
+    world.workspaceId = "elden";
+    const elden = streaming.hotkeysFor(MODULE, "elden");
+    const askedThere = elden.set("reset", "item-2", "Deaths");
+    streaming.answer(streaming.request()!.id, "set", "F9");
+    expect(await askedThere).toBe("set");
+    streaming.useOverlayKeys({ showing: () => true, wants: () => false, has: () => false, pressed: () => {}, general: () => false, moduleShowing: (module) => module.workspaceId === "poe2" });
+    const heard: string[] = [];
+    world.panels = [
+      { moduleId: MODULE.manifest.id, usedAt: 1, workspaceId: "poe2", hotkeyPressed: (binding) => void heard.push(`poe2 ${binding.action}`) },
+      { moduleId: MODULE.manifest.id, usedAt: 1, workspaceId: "elden", hotkeyPressed: (binding) => void heard.push(`elden ${binding.action}`) },
+    ];
+    streaming.sync();
+    registered.get("F9")!();
+    expect(heard).toEqual(["elden reset"]);
+  });
+
   it("go with their workspace", async () => {
     const { streaming, hotkeys } = await setup();
     const asked = hotkeys.set("start-pause", "item-1", "Boss timer");
@@ -278,7 +330,7 @@ describe("publishing without the connector", () => {
   it("keeps state for a key that has a game overlay", async () => {
     const { streaming, overlay, world } = await setup();
     world.granted = false;
-    streaming.useOverlayKeys({ showing: () => false, wants: () => false, has: (subject) => subject.key === "item-2", pressed: () => {}, general: () => false });
+    streaming.useOverlayKeys({ showing: () => false, wants: () => false, has: (subject) => subject.key === "item-2", pressed: () => {}, general: () => false , moduleShowing: () => false });
     overlay.publish("item-2", { value: 2 });
     expect(stored(streaming, "item-2")?.state).toEqual({ value: 2 });
   });
@@ -294,7 +346,7 @@ describe("publishing without the connector", () => {
   it("removes what was published for a game overlay, with or without the connector", async () => {
     const { streaming, overlay, world } = await setup();
     world.granted = false;
-    streaming.useOverlayKeys({ showing: () => false, wants: () => false, has: () => true, pressed: () => {}, general: () => false });
+    streaming.useOverlayKeys({ showing: () => false, wants: () => false, has: () => true, pressed: () => {}, general: () => false , moduleShowing: () => false });
     overlay.publish("item-1", { value: 4 });
     expect(stored(streaming, "item-1")?.state).toEqual({ value: 4 });
     overlay.remove("item-1");
@@ -327,7 +379,7 @@ describe("keys of game overlays", () => {
     const heard: string[] = [];
     let front: string | null = null;
     // As the service decides: the keys work while something shows; the layer key over any game in front, a toggle key over its own.
-    made.streaming.useOverlayKeys({ showing: () => front !== null, wants: (record) => record.workspaceId === "$all" || record.workspaceId === front, has: () => false, pressed: (record) => void heard.push(`${record.action}:${record.target}`), general: (binding) => binding.workspaceId === "$all" });
+    made.streaming.useOverlayKeys({ showing: () => front !== null, wants: (record) => record.workspaceId === "$all" || record.workspaceId === front, has: () => false, pressed: (record) => void heard.push(`${record.action}:${record.target}`), general: (binding) => binding.workspaceId === "$all" , moduleShowing: () => false });
     return { ...made, heard, front: (id: string | null) => (front = id) };
   }
 
@@ -395,7 +447,7 @@ describe("keys of game overlays", () => {
 
   it("lets a general overlay's key collide with the keys of every game", async () => {
     const made = await setup();
-    made.streaming.useOverlayKeys({ showing: () => false, wants: () => false, has: () => false, pressed: () => {}, general: (binding) => binding.workspaceId === "personal" || binding.workspaceId === "$all" });
+    made.streaming.useOverlayKeys({ showing: () => false, wants: () => false, has: () => false, pressed: () => {}, general: (binding) => binding.workspaceId === "personal" || binding.workspaceId === "$all" , moduleShowing: () => false });
     const wide = { ...toggle, workspaceId: "personal" };
     const asked = made.streaming.askOverlayKey(wide, "Clock", words);
     made.streaming.answer(made.streaming.request()!.id, "set", "F6");
@@ -514,6 +566,32 @@ describe("open Stream overlay pages", () => {
   /** Well under the 15 s ping that used to be the only thing ending a stream. */
   const ended = (stream: { ended: Promise<void> }) =>
     Promise.race([stream.ended, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("the stream stayed open")), 1_000))]);
+
+  it("count as streamed while open and a while after they closed, so the panel feeding them keeps running", async () => {
+    const { streaming, port, token, world } = await running();
+    const item = { owner: MODULE.owner, moduleId: MODULE.manifest.id, workspaceId: "poe2", key: "item-1" };
+    try {
+      expect(streaming.streamedSubjects()).toEqual([]);
+      const first = await open(port, token);
+      expect(streaming.streamedSubjects()).toEqual([item]);
+      expect(world.streamChanges).toBe(1);
+      // A second source of the same link changes nothing.
+      const second = await open(port, token);
+      expect(world.streamChanges).toBe(1);
+      world.granted = false;
+      streaming.recheckStreams();
+      await ended(first);
+      await ended(second);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      // OBS refreshing a source opens it again right away: it still counts.
+      expect(streaming.streamedSubjects()).toEqual([item]);
+      expect(world.streamChanges).toBe(1);
+    } finally {
+      await streaming.shutdown();
+    }
+    expect(streaming.streamedSubjects()).toEqual([]);
+    expect(world.streamChanges).toBe(2);
+  });
 
   it("end at once when the module loses the connector, and the link is gone for a new page", async () => {
     const { streaming, port, token, world } = await running();
