@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { LIMITS, MIN_TAVORA, TAB_OVERFLOW_TAVORA, TAB_OVERFLOWS, tabOverflowOf, TavoraError } from "./index.js";
-import { METHOD_INFO, versionAtLeast } from "./protocol.js";
+import { LEADERBOARD_SUBMIT_MAX_BYTES, leaderboardSubmitBody, METHOD_INFO, versionAtLeast } from "./protocol.js";
 import { ADD_DIALOG_MS, createMemoryHost, GESTURE_MS, LATEST_TAVORA } from "./testing.js";
 
 const failure = (promise: Promise<unknown>) => promise.then(() => undefined, (error: unknown) => error);
@@ -545,6 +545,17 @@ describe("scripted answers", () => {
     expect(await sdk.storage.get("anything")).toBe("scripted");
   });
 
+  // Bug hunt leftovers (2026-11-25), D L3.
+  it("refuses an export of nothing, and an empty picture or file, as Tavora does", async () => {
+    const { sdk, host } = createMemoryHost({ limits: { maxClipboardImageBytes: 8 } });
+    expect(await failure(sdk.files.exportJson(undefined as never))).toMatchObject({ code: "INVALID_PARAMS" });
+    expect(await failure(sdk.pictures.save(new Blob([], { type: "image/png" })))).toMatchObject({ code: "INVALID_PARAMS" });
+    expect(await failure(sdk.clipboard.writeImage(new Blob([], { type: "image/png" })))).toMatchObject({ code: "INVALID_PARAMS" });
+    expect(await failure(sdk.pictures.save(new Blob(["123456789"], { type: "image/png" })))).toMatchObject({ code: "QUOTA_EXCEEDED" });
+    expect(await failure(sdk.blobs.put(new Blob([], { type: "image/png" })))).toMatchObject({ code: "INVALID_PARAMS" });
+    expect(host.saved).toEqual([]);
+  });
+
   it("answers the file, picture and blob calls like the host does, and records what was saved", async () => {
     const { sdk, host } = createMemoryHost();
     expect(await sdk.files.saveJson({ a: 1 }, "Build")).toEqual({ fileName: "Build.json" });
@@ -645,6 +656,27 @@ describe("leaderboards", () => {
     expect(await sdk.leaderboards.hide()).toMatchObject({ shown: false });
   });
 
+  // Bug hunt leftovers (2026-11-25): the body Tavora sends depends on the board's kind, so the limit does too.
+  it("refuses a submit past 30 KB by the board's kind, as Tavora does before it asks the service", async () => {
+    const size = (results: unknown[]) => new TextEncoder().encode(JSON.stringify(leaderboardSubmitBody({ kind: "score" }, results))).length;
+    const results = Array.from({ length: 100 }, (_, index) => ({ id: `r${index}`, outcome: "won" as const, at: 1, day: "2026-10-28" }));
+    // As big as a plain score board's submit may be.
+    results[99]!.id += "x".repeat(LEADERBOARD_SUBMIT_MAX_BYTES - size(results));
+    expect(size(results)).toBe(LEADERBOARD_SUBMIT_MAX_BYTES);
+    const boards = [
+      { id: "plain", name: "Plain", kind: "score" },
+      { id: "low", name: "Low", kind: "average", order: "low", minGames: 5 },
+    ];
+    const { sdk, host } = createMemoryHost({ leaderboards: boards, limits: { maxLeaderboardResults: 1000 } });
+    await sdk.leaderboards.show();
+    expect(await sdk.leaderboards.submit("plain", results)).toMatchObject({ accepted: expect.any(Array) });
+    // Its declaration (order, minGames) is longer, so the same results are too big for it.
+    expect(await failure(sdk.leaderboards.submit("low", results))).toMatchObject({ code: "INVALID_PARAMS" });
+    // Checked before the sign-in, like the params.
+    host.leaderboards.setStatus({ signedIn: false });
+    expect(await failure(sdk.leaderboards.submit("low", results))).toMatchObject({ code: "INVALID_PARAMS" });
+  });
+
   it("takes scripted answers for top, mine and submit", async () => {
     const { sdk, host } = createMemoryHost();
     expect(await sdk.leaderboards.top("daily")).toEqual({ rows: [] });
@@ -694,6 +726,42 @@ describe("menus, tooltips and Discord pictures", () => {
     host.answer("ui.showMenu", () => "a");
     expect(await failure(sdk.ui.showMenu({ at, items: [item(), item()] }))).toMatchObject({ code: "INVALID_PARAMS" });
     expect(await sdk.ui.showMenu({ at, items: Array.from({ length: 100 }, (_, index) => item("x".repeat(80), `a${index}`)) })).toBe("a");
+  });
+
+  it("takes why an item is off: one line of up to 120 characters, only on a switched-off item", async () => {
+    const { sdk, host } = createMemoryHost();
+    const at = { x: 0, y: 0 };
+    const off = (disabledReason: unknown) => ({ ...item(), disabled: true, disabledReason }) as never;
+    for (const bad of ["x".repeat(121), "  ", "", "two\nlines", "tab\there", "\u2028", "a\u202eb", "zero\u200bwidth", 5]) {
+      expect(await failure(sdk.ui.showMenu({ at, items: [off(bad)] }))).toMatchObject({ code: "INVALID_PARAMS" });
+    }
+    expect(await failure(sdk.ui.showMenu({ at, items: [{ ...item(), disabledReason: "In use" }] }))).toMatchObject({ code: "INVALID_PARAMS" });
+    expect(await failure(sdk.ui.showMenu({ at, items: [{ ...item(), disabled: false, disabledReason: "In use" }] }))).toMatchObject({ code: "INVALID_PARAMS" });
+    const items = [off("x".repeat(120)), { ...item("B", "b"), radio: true, checked: false, disabled: true, disabledReason: "Already used by another line." }];
+    await sdk.ui.showMenu({ at, items });
+    expect(host.calls["ui.showMenu"]?.at(-1)).toEqual({ at, items });
+  });
+
+  it("makes the reason the hint on a Tavora without reasons, and leaves it out where there is a hint", async () => {
+    const { sdk, host } = createMemoryHost({ version: "0.25.67" });
+    expect(sdk.supports("ui.showMenu.disabledReason")).toBe(false);
+    const at = { x: 0, y: 0 };
+    await sdk.ui.showMenu({
+      at,
+      items: [
+        { ...item(), disabled: true, disabledReason: "In use" },
+        { ...item("B", "b"), disabled: true, hint: "Ctrl+B", disabledReason: "In use" },
+        { type: "submenu", label: "More", items: [{ ...item("C", "c"), disabled: true, disabledReason: "This one is already used by another line, so pick another." }] },
+      ],
+    });
+    expect(host.calls["ui.showMenu"]).toEqual([{
+      at,
+      items: [
+        { ...item(), disabled: true, hint: "In use" },
+        { ...item("B", "b"), disabled: true, hint: "Ctrl+B" },
+        { type: "submenu", label: "More", items: [{ ...item("C", "c"), disabled: true, hint: "This one is already used by a…" }] },
+      ],
+    }]);
   });
 
   it("refuses a tooltip or skin Tavora refuses", async () => {

@@ -245,6 +245,11 @@ export const LOOK_MS = 400;
  * game, Windows raises it over them until the next look puts them on top again, so that look comes sooner.
  */
 export const STACKED_LOOK_MS = 100;
+/**
+ * Looks in a row that may throw before game overlays stop for the session: a one-off Windows or koffi error is passed
+ * over (what shows stays until the next look), one that keeps coming isn't. About 2 s at LOOK_MS.
+ */
+export const FAILED_LOOKS_ALLOWED = 5;
 
 /** The hotkey binding of the layer key, and of one item's toggle key (an item has one key, whichever setups it is in). */
 export const layerBinding = () => ({ owner: LAYER_OWNER, moduleId: LAYER_OWNER, workspaceId: ALL_GAMES, action: OVERLAY_LAYER_ACTION, target: "layer" });
@@ -267,6 +272,8 @@ export class GameOverlays {
   /** The quicker look while overlays are stacked above the game (STACKED_LOOK_MS). */
   private stackedTimer: ReturnType<typeof setInterval> | undefined;
   private probe: ForegroundProbe | null = null;
+  /** Looks that threw since the last one that worked (FAILED_LOOKS_ALLOWED). */
+  private failedLooks = 0;
   /** What the service watches: hidden for now, failed, the game in front or left (game-layer.ts `watchStep`, run by `see`). */
   private watch: Watch = WATCH_START;
   /** The in-game layer (game-layer.ts `layerStep`). */
@@ -748,6 +755,14 @@ export class GameOverlays {
     return this.placedOfKey(record)?.item.mode === "toggle";
   }
 
+  /** Whether an item of this module from this workspace is in a setup whose keys work now (its module's own keys work then too). */
+  moduleShowing(module: Pick<HotkeyRecord, "owner" | "moduleId" | "workspaceId">): boolean {
+    if (!this.showing()) return false;
+    const setups = this.keySetups();
+    const same = (item: { owner: string; moduleId: string; workspaceId: string }) => item.owner === module.owner && item.moduleId === module.moduleId && item.workspaceId === module.workspaceId;
+    return [...placedOverlays(this.store, setups).values()].some(({ item }) => same(item)) || [...placedPanels(this.store, setups).values()].some(({ item }) => same(item));
+  }
+
   /** Whether a key works outside one game (the layer key, and the toggle key of an item in Everywhere or All games): it collides with any workspace's keys. */
   general(record: Pick<HotkeyRecord, "owner" | "moduleId" | "workspaceId" | "action" | "target">): boolean {
     if (record.action === OVERLAY_LAYER_ACTION) return true;
@@ -863,16 +878,30 @@ export class GameOverlays {
     let foreground: Foreground | null = null;
     let failed = this.watch.failed;
     if (!failed) {
-      try {
-        this.probe ??= this.options.platform.probe();
-        foreground = this.probe.look();
-      } catch (error) {
-        // Windows' functions could not be loaded; looking again won't help, so it is said once and not tried again.
+      const stop = (error: unknown) => {
+        // Said once, and not tried again.
         console.warn(`[tavora] game overlays stopped: ${error instanceof Error ? error.message : String(error)}`);
         failed = true;
         clearInterval(this.timer);
         this.timer = undefined;
         this.lookQuickly(false);
+      };
+      try {
+        this.probe ??= this.options.platform.probe();
+      } catch (error) {
+        // Windows' functions could not be loaded; looking again won't help.
+        stop(error);
+      }
+      if (this.probe && !failed) {
+        try {
+          foreground = this.probe.look();
+          this.failedLooks = 0;
+        } catch (error) {
+          // One call that failed passes; the next look tries again, and only failures that keep coming stop overlays.
+          this.failedLooks += 1;
+          if (this.failedLooks >= FAILED_LOOKS_ALLOWED) stop(error);
+          else return;
+        }
       }
     }
     if (failed) {
@@ -958,6 +987,7 @@ export class GameOverlays {
       hasLive: (panel) => this.liveStateOf(panel) !== undefined,
       card: (mode) => layerCardContent(this.options.language(), mode, this.options.streaming.keyOf(layerBinding())?.accelerator ?? null),
       awayHandle: handle,
+      frontHandle: Number(frontOf(this.watch)?.window ?? 0) || 0,
       make: {
         overlay: (overlay, id) => this.makeOverlay(overlay, id),
         panel: (panel, id) => this.makePanel(panel, id),

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // NameDialog asks for a name: it selects the text on open, counts against a limit, and locks while `busy`.
-import { Pencil, Save } from "@lucide/vue";
+import { Pencil } from "@lucide/vue";
 import { NameDialog } from "@tavora/official-ui";
 import { Button } from "@tavora/official-ui/components/ui/button";
 import { ref } from "vue";
@@ -25,7 +25,7 @@ function saveSlowly() {
 
 <template>
   <div class="flex flex-wrap items-center gap-2">
-    <Button variant="secondary" @click="renaming = true">Rename…</Button>
+    <Button variant="secondary" @click="renaming = true">Rename</Button>
     <Button variant="secondary" @click="renamingSlowly = true">Rename with a slow save…</Button>
     <Button variant="secondary" @click="pickedSave = ''; fromSave = true">New from a save…</Button>
   </div>
@@ -33,7 +33,6 @@ function saveSlowly() {
     v-model:open="renaming"
     title="Rename note"
     :icon="Pencil"
-    :confirm-icon="Save"
     description="The new name shows in the list and the panel tab."
     label="Name"
     :value="name"

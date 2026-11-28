@@ -2,8 +2,9 @@
 // The bar above a selected picture: on its own line at a chosen width, or at the left or right with
 // the text flowing around it at the size it has; larger view; remove. Dragging a corner resizes it freely.
 import { Maximize2, Trash2 } from "@lucide/vue";
-import { cn } from "@tavora/official-ui";
 import { Button } from "@tavora/official-ui/components/ui/button";
+import { Toggle } from "@tavora/official-ui/components/ui/toggle";
+import { Toolbar } from "@tavora/official-ui/components/ui/toolbar";
 import { computed } from "vue";
 import { t } from "./i18n";
 import type { ImageMode } from "./ImageNode";
@@ -25,28 +26,28 @@ const style = computed(() => ({ left: `${Math.max(8, Math.min(props.left, window
 </script>
 
 <template>
-  <div
-    class="bg-popover text-popover-foreground fixed z-50 flex items-center gap-0.5 rounded-md border p-1 text-xs shadow-lg"
+  <Toolbar
+    variant="floating"
+    class="fixed z-(--layer-floating) text-xs"
     :style="style"
-    role="toolbar"
-    :aria-label="t('image.bar')"
+    :label="t('image.bar')"
     data-image-bar
     data-testid="image-bar"
     @pointerdown.prevent
   >
-    <Button
+    <Toggle
       v-for="choice in choices"
       :key="choice.id"
       variant="ghost"
       size="sm"
-      :class="cn('h-7 flex-none px-2 text-xs', choice.active && 'bg-accent text-foreground')"
-      :aria-pressed="choice.active"
+      class="px-2 text-xs"
+      :model-value="choice.active"
       :title="choice.hint || undefined"
       :data-testid="`image-${choice.id}`"
-      @click="emit('set', choice.patch)"
+      @update:model-value="emit('set', choice.patch)"
     >
       {{ choice.label }}
-    </Button>
+    </Toggle>
     <span class="bg-border mx-1 h-4 w-px flex-none" aria-hidden="true" />
     <Button variant="ghost" size="icon-sm" class="flex-none" data-testid="image-open" :aria-label="t('image.openLarger')" :title="t('image.openLarger')" @click="emit('open')">
       <Maximize2 />
@@ -54,5 +55,5 @@ const style = computed(() => ({ left: `${Math.max(8, Math.min(props.left, window
     <Button variant="danger" size="icon-sm" class="flex-none" data-testid="image-remove" :aria-label="t('image.remove')" :title="t('image.remove')" @click="emit('remove')">
       <Trash2 />
     </Button>
-  </div>
+  </Toolbar>
 </template>

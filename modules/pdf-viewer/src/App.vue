@@ -3,7 +3,7 @@
 // into the module's file store and listed in one document that every panel of the workspace shares. Which files a
 // panel has open, and which one it shows, is that panel's own state. A file picked in Tavora's open dialog stays linked
 // to its original: when the tab is shown, a bar offers to reload it after it changed, or to remove it once it's gone.
-import { FilePlus2, FolderOpen, Pencil, Save, Trash2, Upload } from "@lucide/vue";
+import { FilePlus2, FolderOpen, Pencil, Trash2, Upload } from "@lucide/vue";
 import { connectModule, ConfirmDialog, errorMessage, NameDialog } from "@tavora/official-ui";
 import { Button } from "@tavora/official-ui/components/ui/button";
 import { EmptyState } from "@tavora/official-ui/components/ui/empty-state";
@@ -84,7 +84,7 @@ onMounted(async () => {
       return;
     }
     const saved = parseTabState(await connected.panel.getState<unknown>());
-    tabState.value = keepExisting(saved, (id) => opened.find(id) !== undefined);
+    tabState.value = keepExisting(saved, (id) => opened.find(id) !== undefined, opened.keeps);
     // Asking about an id nobody linked tells whether this Tavora has the call at all; an older one doesn't know it.
     canLink.value = await connected.files.check("0".repeat(32)).then(
       () => true,
@@ -113,7 +113,7 @@ onBeforeUnmount(() => {
 watch(files, () => {
   if (!store.value) return;
   const renamed = new Map(files.value.flatMap((file) => (file.previous ? [[file.previous, file.id] as const] : [])));
-  const next = keepExisting(followRenamed(tabState.value, renamed), (id) => byId.value.has(id));
+  const next = keepExisting(followRenamed(tabState.value, renamed), (id) => byId.value.has(id), store.value.keeps);
   if (next !== tabState.value) tabState.value = next;
 });
 
@@ -365,7 +365,7 @@ async function remove() {
 </script>
 
 <template>
-  <Notice v-if="!store && error" variant="error" class="m-4" data-testid="status">{{ t("connectError") }}</Notice>
+  <Notice v-if="!store && error" variant="destructive" class="m-4" data-testid="status">{{ t("connectError") }}</Notice>
   <div v-else-if="!store" class="flex flex-col gap-2 p-4" data-testid="status">
     <Progress :model-value="starting" :aria-label="t('loading')" />
     <p class="text-muted-foreground text-sm">{{ t("loading") }}</p>
@@ -438,7 +438,7 @@ async function remove() {
 
     <input ref="picker" type="file" multiple class="hidden" :accept="ACCEPT_ATTRIBUTE" :aria-label="t('pick.label')" data-testid="file-input" @change="onPicked" />
 
-    <NameDialog v-if="renaming" :icon="Pencil" :confirm-icon="Save" :title="t('rename.title')" :label="t('rename.label')" :confirm="t('rename.save')" :cancel="t('cancel')" :value="renaming.name" @submit="rename(renaming.id, $event)" @cancel="renaming = null" />
+    <NameDialog v-if="renaming" :icon="Pencil" :title="t('rename.title')" :label="t('rename.label')" :confirm="t('rename.save')" :cancel="t('cancel')" :value="renaming.name" @submit="rename(renaming.id, $event)" @cancel="renaming = null" />
     <ConfirmDialog v-if="removing" :icon="Trash2" :confirm-icon="Trash2" :title="t('remove.title', { name: removing.name })" :description="t('remove.description')" :confirm="t('remove.confirm')" :cancel="t('cancel')" :busy="busy" @confirm="remove" @cancel="removing = null" />
     <Toaster />
   </div>

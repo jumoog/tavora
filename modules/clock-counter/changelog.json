@@ -1,5 +1,362 @@
 [
   {
+    "version": "0.1.108",
+    "date": "2026-11-28",
+    "notes": [
+      "Dialogs: the message sits under the title row, never beside the icon."
+    ]
+  },
+  {
+    "version": "0.1.107",
+    "date": "2026-11-28",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.106",
+    "date": "2026-11-28",
+    "notes": [
+      "Round buttons, toggles, tags and fields give their text a bit more room at the ends."
+    ]
+  },
+  {
+    "version": "0.1.105",
+    "date": "2026-11-28",
+    "notes": [
+      "A long choice in a list field stays on one line; hover it to read it all."
+    ]
+  },
+  {
+    "version": "0.1.104",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.103",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.102",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.101",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.100",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.99",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.98",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.97",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.96",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.95",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.94",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.93",
+    "date": "2026-11-27",
+    "notes": [
+      "The In game settings say plainly whether you see it in your game, and when."
+    ]
+  },
+  {
+    "version": "0.1.92",
+    "date": "2026-11-27",
+    "notes": [
+      "Menus now open next to their toolbar button."
+    ]
+  },
+  {
+    "version": "0.1.91",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.90",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.89",
+    "date": "2026-11-26",
+    "notes": [
+      "With reduced motion, the line where a dragged row will land is clearer."
+    ]
+  },
+  {
+    "version": "0.1.88",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.87",
+    "date": "2026-11-26",
+    "notes": [
+      "Small look and feel updates."
+    ]
+  },
+  {
+    "version": "0.1.86",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.85",
+    "date": "2026-11-26",
+    "notes": [
+      "Small look and feel updates."
+    ]
+  },
+  {
+    "version": "0.1.84",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.83",
+    "date": "2026-11-26",
+    "notes": [
+      "New hover rows in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.82",
+    "date": "2026-11-26",
+    "notes": [
+      "The toolbar at the top is one Tab stop, and the arrow keys move along it."
+    ]
+  },
+  {
+    "version": "0.1.81",
+    "date": "2026-11-26",
+    "notes": [
+      "The shared controls gained cards and checkbox rows."
+    ]
+  },
+  {
+    "version": "0.1.80",
+    "date": "2026-11-26",
+    "notes": [
+      "Dialogs come in four set widths, so they line up everywhere."
+    ]
+  },
+  {
+    "version": "0.1.79",
+    "date": "2026-11-26",
+    "notes": [
+      "Tabs have more room above and below the text."
+    ]
+  },
+  {
+    "version": "0.1.78",
+    "date": "2026-11-26",
+    "notes": [
+      "Buttons, fields and lists line up at the same heights, and on/off buttons look the same everywhere."
+    ]
+  },
+  {
+    "version": "0.1.77",
+    "date": "2026-11-25",
+    "notes": [
+      "Disabled controls all fade the same way, and empty charts say there's no data yet."
+    ]
+  },
+  {
+    "version": "0.1.76",
+    "date": "2026-11-25",
+    "notes": [
+      "Small fixes in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.75",
+    "date": "2026-11-25",
+    "notes": [
+      "Lists you pick from with a search show it as a field of its own."
+    ]
+  },
+  {
+    "version": "0.1.74",
+    "date": "2026-11-25",
+    "notes": [
+      "Settings and the hotkey buttons no longer end in …."
+    ]
+  },
+  {
+    "version": "0.1.73",
+    "date": "2026-11-25",
+    "notes": [
+      "Buttons in the shared controls can say how it went: Copied, Saved, or a spinner while they work."
+    ]
+  },
+  {
+    "version": "0.1.72",
+    "date": "2026-11-25",
+    "notes": [
+      "New stat tiles, fact lists and bar charts in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.71",
+    "date": "2026-11-25",
+    "notes": [
+      "Menus: rows follow the menu's rounded corners, and in Liquid Glass the row you point at is easy to see."
+    ]
+  },
+  {
+    "version": "0.1.70",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.69",
+    "date": "2026-11-25",
+    "notes": [
+      "New hover card in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.68",
+    "date": "2026-11-25",
+    "notes": [
+      "New tree view in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.67",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.66",
+    "date": "2026-11-25",
+    "notes": [
+      "Tooltips fade out when they close."
+    ]
+  },
+  {
+    "version": "0.1.65",
+    "date": "2026-11-25",
+    "notes": [
+      "Coloured chips get a coloured edge in the Hardware style."
+    ]
+  },
+  {
+    "version": "0.1.64",
+    "date": "2026-11-25",
+    "notes": [
+      "The text box settings keep a choice a newer version added, instead of resetting it."
+    ]
+  },
+  {
+    "version": "0.1.63",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.62",
+    "date": "2026-11-25",
+    "notes": [
+      "The shared list with search shows its no-match note in a frame."
+    ]
+  },
+  {
+    "version": "0.1.61",
+    "date": "2026-11-25",
+    "notes": [
+      "Small fixes in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.60",
+    "date": "2026-11-25",
+    "notes": [
+      "A new list with search in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.59",
+    "date": "2026-11-25",
+    "notes": [
+      "New chips and a tag field in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.58",
+    "date": "2026-11-25",
+    "notes": [
+      "Set and Change next to a hotkey end in … now, since they ask for the key first."
+    ]
+  },
+  {
     "version": "0.1.57",
     "date": "2026-11-25",
     "notes": [
@@ -283,152 +640,6 @@
     "date": "2026-11-02",
     "notes": [
       "Settings ask Tavora for the usual dialog size through the shared settings parts; nothing looks different."
-    ]
-  },
-  {
-    "version": "0.1.18",
-    "date": "2026-11-02",
-    "notes": [
-      "Settings use Tavora's settings layout: what the panel shows, what the overlay shows and the stream link, each in its own place.",
-      "Write what the overlay says yourself, with {time} or {count}, and see it change as you type.",
-      "The words and the number of the overlay get their own colour and size.",
-      "In game and On stream say where it shows; Arrange in Overlays opens Tavora's Overlay page.",
-      "There is no Done button any more: changes save as you make them, and Delete is the last row of the first page."
-    ]
-  },
-  {
-    "version": "0.1.17",
-    "date": "2026-11-02",
-    "notes": [
-      "Screen readers read each message once."
-    ]
-  },
-  {
-    "version": "0.1.16",
-    "date": "2026-11-02",
-    "notes": [
-      "Settings are tidier: pages on the left and one footer with Delete and Done.",
-      "The settings window is named after the clock or counter.",
-      "Over game is gone from the settings. Add clocks and counters to your game on the Overlay page.",
-      "Drag a row to put it in a new place, or press Alt and the up or down arrow on it."
-    ]
-  },
-  {
-    "version": "0.1.15",
-    "date": "2026-11-02",
-    "notes": [
-      "Main buttons and badges can follow a theme's deeper button colour."
-    ]
-  },
-  {
-    "version": "0.1.14",
-    "date": "2026-11-02",
-    "notes": [
-      "Small update to the shared look; nothing changes for you here."
-    ]
-  },
-  {
-    "version": "0.1.13",
-    "date": "2026-11-02",
-    "notes": [
-      "Lists, dialogs and settings pages move smoothly."
-    ]
-  },
-  {
-    "version": "0.1.12",
-    "date": "2026-11-02",
-    "notes": [
-      "Switches and tabs slide to what you pick."
-    ]
-  },
-  {
-    "version": "0.1.11",
-    "date": "2026-11-02",
-    "notes": [
-      "A counter counts up or down to its new number."
-    ]
-  },
-  {
-    "version": "0.1.10",
-    "date": "2026-11-02",
-    "notes": [
-      "Buttons have a little depth and feel pressed when you click them."
-    ]
-  },
-  {
-    "version": "0.1.9",
-    "date": "2026-11-02",
-    "notes": [
-      "Checkboxes, toggles and options animate when you pick them, and folding sections open smoothly."
-    ]
-  },
-  {
-    "version": "0.1.8",
-    "date": "2026-11-01",
-    "notes": [
-      "Settings in a dialog have an icon and a Close button in the corner."
-    ]
-  },
-  {
-    "version": "0.1.7",
-    "date": "2026-11-01",
-    "notes": [
-      "Menus and tooltips open out of the spot they belong to, and buttons dip a little when you press them."
-    ]
-  },
-  {
-    "version": "0.1.6",
-    "date": "2026-11-01",
-    "notes": [
-      "Add each clock, counter or linked group to your game from the Overlay page, one by one, and place them where you like. A new frame fits its content.",
-      "Press the gear on a frame to change that clock, counter or group right over the Overlay page.",
-      "In the overlay, the name and the value now share one font and sit on one line."
-    ]
-  },
-  {
-    "version": "0.1.5",
-    "date": "2026-11-01",
-    "notes": [
-      "In a linked group's line, counters now have short names without spaces: {counter2}, {bossKills}, {sitUps}. Tap a counter below the field to add it. Lines you wrote with full names keep working."
-    ]
-  },
-  {
-    "version": "0.1.4",
-    "date": "2026-11-01",
-    "notes": [
-      "Show Clock & Counter over your game from the panel's menu. Your clocks and counters stay in view, and you count or start and stop them while you hold the game layer key.",
-      "Add works over your game too, and a button that can't work there now tells you what to do."
-    ]
-  },
-  {
-    "version": "0.1.3",
-    "date": "2026-11-01",
-    "notes": [
-      "A clock or counter's settings now open as a big dialog over the whole workspace, not inside the small panel."
-    ]
-  },
-  {
-    "version": "0.1.2",
-    "date": "2026-11-01",
-    "notes": [
-      "Every clock and counter is a single row now, so more of them fit in a panel. Settings open in a dialog in the middle, behind the gear.",
-      "Counters you linked stand together in a frame, and say what they add to and where they count from.",
-      "Show a whole group of linked counters in one overlay, with a line you write yourself like {Deaths} Death – {Sit-ups} Situps."
-    ]
-  },
-  {
-    "version": "0.1.1",
-    "date": "2026-10-31",
-    "notes": [
-      "Text fields and dropdowns look calmer in Dark mode."
-    ]
-  },
-  {
-    "version": "0.1.0",
-    "date": "2026-10-21",
-    "notes": [
-      "Countdowns, stopwatches and counters for each game.",
-      "Show any of them in OBS, and control them with hotkeys."
     ]
   }
 ]

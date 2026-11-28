@@ -16,6 +16,11 @@ import { cn } from "../../../lib/utils"
 import DialogCloseX from "./DialogCloseX.vue"
 import { useDialogDismissal, withoutDismissListener, type DismissEmits, type DismissOptions } from "./dismissal"
 import { provideDialogInstant } from "./instant"
+import { dialogSizeClass, type DialogSize } from "./size"
+import { leaveToolbar } from "../toolbar/context"
+
+// What it holds is not part of a Toolbar around its trigger.
+leaveToolbar()
 
 defineOptions({
   inheritAttrs: false,
@@ -24,14 +29,17 @@ defineOptions({
 const props = withDefaults(defineProps<DialogContentProps & DismissOptions & {
   class?: HTMLAttributes["class"]
   instant?: boolean
+  /** How wide: sm 360, md 420 (the default), lg 560, xl 760. */
+  size?: DialogSize
 }>(), {
+  size: "md",
   instant: false,
   dismissible: true,
   busy: false,
 })
 const emits = defineEmits<DialogContentEmits & DismissEmits>()
 
-const delegatedProps = reactiveOmit(props, "class", "instant", "dismissible", "busy")
+const delegatedProps = reactiveOmit(props, "class", "instant", "dismissible", "busy", "size")
 const instant = provideDialogInstant(() => props.instant)
 // On top of the page while open: page keys such as Ctrl+Z stand down and the page around it is inert (layers.ts).
 const attrs = useAttrs()
@@ -55,13 +63,14 @@ function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }
   <DialogPortal>
     <DialogOverlay
       :data-instant="instant ? '' : undefined"
-      class="tavora-dialog-overlay fixed inset-0 z-50 grid place-items-center overflow-y-auto overscroll-contain bg-black/80"
+      class="tavora-dialog-overlay fixed inset-0 z-(--layer-floating) grid place-items-center overflow-y-auto overscroll-contain bg-black/80"
     >
       <DialogContent
         :data-instant="instant ? '' : undefined"
         :class="
           cn(
-            'tavora-dialog relative z-50 grid w-full max-w-lg my-8 gap-4 border border-border bg-background p-6 shadow-lg sm:rounded-lg md:w-full',
+            'tavora-dialog relative z-(--layer-floating) grid w-full my-8 gap-4 border border-border bg-background p-6 shadow-elevation-3 sm:rounded-lg md:w-full',
+            dialogSizeClass[props.size],
             props.class,
           )
         "
@@ -72,7 +81,7 @@ function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }
         <LayerAnchor />
         <slot />
 
-        <DialogCloseX class="absolute top-4 right-4 p-0.5 transition-colors rounded-md hover:bg-secondary disabled:pointer-events-none disabled:opacity-50">
+        <DialogCloseX class="absolute top-4 right-4 p-0.5 transition-colors rounded-md hover:bg-secondary disabled:pointer-events-none disabled:opacity-(--disabled-opacity)">
           <X class="w-4 h-4" />
         </DialogCloseX>
       </DialogContent>

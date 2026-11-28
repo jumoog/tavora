@@ -16,6 +16,11 @@ import DialogCloseX from "./DialogCloseX.vue"
 import DialogOverlay from "./DialogOverlay.vue"
 import { useDialogDismissal, withoutDismissListener, type DismissEmits, type DismissOptions } from "./dismissal"
 import { provideDialogInstant } from "./instant"
+import { dialogAnchorClass, dialogSizeClass, type DialogAnchor, type DialogSize } from "./size"
+import { leaveToolbar } from "../toolbar/context"
+
+// What it holds is not part of a Toolbar around its trigger.
+leaveToolbar()
 
 defineOptions({
   inheritAttrs: false,
@@ -25,7 +30,13 @@ const props = withDefaults(defineProps<DialogContentProps & DismissOptions & {
   class?: HTMLAttributes["class"]
   showCloseButton?: boolean
   instant?: boolean
+  /** How wide: sm 360, md 420 (the default), lg 560, xl 760. */
+  size?: DialogSize
+  /** `top` sits near the top of the window: for a dialog whose height changes. */
+  anchor?: DialogAnchor
 }>(), {
+  size: "md",
+  anchor: "center",
   showCloseButton: true,
   instant: false,
   dismissible: true,
@@ -33,7 +44,7 @@ const props = withDefaults(defineProps<DialogContentProps & DismissOptions & {
 })
 const emits = defineEmits<DialogContentEmits & DismissEmits>()
 
-const delegatedProps = reactiveOmit(props, "class", "showCloseButton", "instant", "dismissible", "busy")
+const delegatedProps = reactiveOmit(props, "class", "showCloseButton", "instant", "dismissible", "busy", "size", "anchor")
 
 // Opened by a key (or closed with Escape), or `instant` for a dialog that never animates: no rise, no fade (instant.ts).
 const instant = provideDialogInstant(() => props.instant)
@@ -42,7 +53,7 @@ const root = injectDialogRootContext()
 const attrs = useAttrs()
 const layer = useLayer("dialog", root.open, { name: () => attrs["data-testid"] as string | undefined, kept: () => !!props.forceMount })
 
-// A DialogHeader with a title draws the close X itself (centred against the title); without one the X sits in the corner.
+// A DialogHeader with a title draws the close X itself (at the top of the title row); without one the X sits in the corner.
 const headerClose = ref(false)
 provide(dialogChromeKey, { showClose: toRef(props, "showCloseButton"), headerClose })
 
@@ -130,7 +141,9 @@ useEventListener(window, "resize", place)
       @pointer-down-outside="dismissal.onPointerDownOutside"
       :class="
         cn(
-          'tavora-dialog bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[min(420px,calc(100%-2rem))] max-h-[calc(100%-2rem)] overflow-y-auto overscroll-contain translate-x-[-50%] translate-y-[-50%] gap-6 rounded-lg border p-6 shadow-lg',
+          'tavora-dialog bg-background fixed top-[50%] left-[50%] z-(--layer-floating) grid w-full max-h-[calc(100%-2rem)] overflow-y-auto overscroll-contain translate-x-[-50%] translate-y-[-50%] gap-6 rounded-lg border p-6 shadow-elevation-3',
+          dialogSizeClass[props.size],
+          dialogAnchorClass[props.anchor],
           props.class,
         )"
     >

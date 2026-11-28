@@ -76,6 +76,8 @@ export function createBoardSaver(options: BoardSaverOptions) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let saving: Promise<void> = Promise.resolve();
   let failures = 0;
+  /** A background the user picked on purpose (even the one shown), saved as it is until it is stored. */
+  let pickedBackground: string | null = null;
   /**
    * Why nothing is saved any more, or null while it saves: the board was deleted elsewhere, the page let go of it for a
    * delete (`resume` takes that back when the delete did not go through), or the saver was disposed.
@@ -126,6 +128,7 @@ export function createBoardSaver(options: BoardSaverOptions) {
     const signature = signatureOf(scene);
     if (signature === queued) return saving;
     queued = signature;
+    const pick = pickedBackground;
     set({ save: "saving" });
     saving = saving
       .then(async () => {
@@ -138,7 +141,8 @@ export function createBoardSaver(options: BoardSaverOptions) {
           elements: JSON.parse(JSON.stringify(scene.elements.filter((element) => !element.isDeleted))) as JsonValue[],
           files: synced.files,
           // Unchanged here: what was stored stays, also a background a newer version added that the board shows as the default.
-          background: scene.background === shownBackground(document.data.background) ? document.data.background : scene.background,
+          // A pick is saved as it is.
+          background: pick === null && scene.background === shownBackground(document.data.background) ? document.data.background : scene.background,
           grid: scene.grid,
         };
         const bytes = JSON.stringify(next).length;
@@ -152,6 +156,7 @@ export function createBoardSaver(options: BoardSaverOptions) {
       .then(
         () => {
           stored = signature;
+          if (pickedBackground === pick) pickedBackground = null;
           // Saved, unless more was drawn meanwhile: that has its own save coming.
           if (queued === signature && !timer) set({ dirty: false, save: "saved" });
         },
@@ -172,6 +177,19 @@ export function createBoardSaver(options: BoardSaverOptions) {
     change(scene: Scene): void {
       latest = scene;
       if (stopped || signatureOf(scene) === queued) return;
+      schedule();
+    },
+    /**
+     * The user picked a background in Excalidraw's palette. It is saved as it is, also when it is the one the board shows for
+     * a background a newer version stored (picking it changes nothing Excalidraw reports, so `change` can't see it).
+     */
+    pickBackground(background: string): void {
+      if (!latest) return;
+      latest = { ...latest, background };
+      pickedBackground = background;
+      // Deleted elsewhere: kept for bringing the board back (copy), nothing is saved.
+      if (stopped) return;
+      queued = "";
       schedule();
     },
     /** Saves what is not stored yet; resolves once it is, or once saving failed (the state says so). */
@@ -201,7 +219,8 @@ export function createBoardSaver(options: BoardSaverOptions) {
         ...base,
         elements: JSON.parse(JSON.stringify(elements)) as JsonValue[],
         files,
-        background: latest.background === shownBackground(base.background) ? base.background : latest.background,
+        // As a save does: a pick stays as it is.
+        background: pickedBackground === null && latest.background === shownBackground(base.background) ? base.background : latest.background,
         grid: latest.grid,
       };
     },
@@ -215,6 +234,8 @@ export function createBoardSaver(options: BoardSaverOptions) {
     resume(): void {
       if (stopped !== "discarded") return;
       stopped = null;
+      // A pick made meanwhile changes nothing the signature sees, so it is saved like any pick.
+      if (pickedBackground !== null) queued = "";
       if (latest && signatureOf(latest) !== queued) schedule();
     },
     onState(fn: (state: SaverState) => void): () => void {

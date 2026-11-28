@@ -1,5 +1,368 @@
 [
   {
+    "version": "0.1.126",
+    "date": "2026-11-28",
+    "notes": [
+      "Dialogs: the message sits under the title row, never beside the icon. Path of Exile 2 cards get a new frame."
+    ]
+  },
+  {
+    "version": "0.1.125",
+    "date": "2026-11-28",
+    "notes": [
+      "Tool strip: the main action is a filled button."
+    ]
+  },
+  {
+    "version": "0.1.124",
+    "date": "2026-11-28",
+    "notes": [
+      "Tabs: a new example with tabs on more than one row."
+    ]
+  },
+  {
+    "version": "0.1.123",
+    "date": "2026-11-28",
+    "notes": [
+      "The Buttons page shows round ends: the same controls at your corners and at 16."
+    ]
+  },
+  {
+    "version": "0.1.122",
+    "date": "2026-11-28",
+    "notes": [
+      "Pick shows a select with a long choice, on one line and on two."
+    ]
+  },
+  {
+    "version": "0.1.121",
+    "date": "2026-11-27",
+    "notes": [
+      "The Buttons page shows a bare tile that stays on.",
+      "The Menus page shows a switched-off Clear without red."
+    ]
+  },
+  {
+    "version": "0.1.120",
+    "date": "2026-11-27",
+    "notes": [
+      "The Tooltips page shows a card with bold, italics and a footer, the same in the panel and in Tavora's tooltip."
+    ]
+  },
+  {
+    "version": "0.1.119",
+    "date": "2026-11-27",
+    "notes": [
+      "Stats & Charts shows the new Meter, a bar for an amount."
+    ]
+  },
+  {
+    "version": "0.1.118",
+    "date": "2026-11-27",
+    "notes": [
+      "Menus › Dropdown shows why a choice is off in its row."
+    ]
+  },
+  {
+    "version": "0.1.117",
+    "date": "2026-11-27",
+    "notes": [
+      "New tooltip examples: your own card from parts, pinning a card, and the Path of Exile look."
+    ]
+  },
+  {
+    "version": "0.1.116",
+    "date": "2026-11-27",
+    "notes": [
+      "Popovers has an example of a list that stays beside a field while you type."
+    ]
+  },
+  {
+    "version": "0.1.115",
+    "date": "2026-11-27",
+    "notes": [
+      "Menus › Dropdown shows a choice that is off and says why."
+    ]
+  },
+  {
+    "version": "0.1.114",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.113",
+    "date": "2026-11-27",
+    "notes": [
+      "Menus › Dropdown shows a submenu entry that holds the chosen choice."
+    ]
+  },
+  {
+    "version": "0.1.112",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.111",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.110",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.109",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.108",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.107",
+    "date": "2026-11-26",
+    "notes": [
+      "New examples: bare zoom pane, tall card, drop line and flush table."
+    ]
+  },
+  {
+    "version": "0.1.106",
+    "date": "2026-11-26",
+    "notes": [
+      "New example: live readings with a graph."
+    ]
+  },
+  {
+    "version": "0.1.105",
+    "date": "2026-11-26",
+    "notes": [
+      "New examples: the big search list and its parts."
+    ]
+  },
+  {
+    "version": "0.1.104",
+    "date": "2026-11-26",
+    "notes": [
+      "New example: a switch at the end of its row."
+    ]
+  },
+  {
+    "version": "0.1.103",
+    "date": "2026-11-26",
+    "notes": [
+      "New examples: edit in place, picture in a field, radio field, badge numbers and a growing preview."
+    ]
+  },
+  {
+    "version": "0.1.102",
+    "date": "2026-11-26",
+    "notes": [
+      "New examples: a bare button and choice cards with icons."
+    ]
+  },
+  {
+    "version": "0.1.101",
+    "date": "2026-11-26",
+    "notes": [
+      "A new tooltip example: rows and tiles that show a card when you point at them."
+    ]
+  },
+  {
+    "version": "0.1.100",
+    "date": "2026-11-26",
+    "notes": [
+      "New examples: Tool strip and Floating toolbar, on the Buttons page."
+    ]
+  },
+  {
+    "version": "0.1.99",
+    "date": "2026-11-26",
+    "notes": [
+      "New Cards page: Card, choice cards and check cards.",
+      "The Checks page has a checkbox field."
+    ]
+  },
+  {
+    "version": "0.1.98",
+    "date": "2026-11-26",
+    "notes": [
+      "Dialogs come in four set widths, so they line up everywhere."
+    ]
+  },
+  {
+    "version": "0.1.97",
+    "date": "2026-11-26",
+    "notes": [
+      "Tabs have more room above and below the text."
+    ]
+  },
+  {
+    "version": "0.1.96",
+    "date": "2026-11-26",
+    "notes": [
+      "New examples: sizes on every control, toggle looks and sizes, a segmented control across the width and an empty panel."
+    ]
+  },
+  {
+    "version": "0.1.95",
+    "date": "2026-11-25",
+    "notes": [
+      "Disabled controls all fade the same way, and empty charts say there's no data yet."
+    ]
+  },
+  {
+    "version": "0.1.94",
+    "date": "2026-11-25",
+    "notes": [
+      "The calendar always shows 6 weeks, so it keeps its height from month to month."
+    ]
+  },
+  {
+    "version": "0.1.93",
+    "date": "2026-11-25",
+    "notes": [
+      "Picker: the search is a field of its own, and \"Picker with groups\" keeps its two texts on one line."
+    ]
+  },
+  {
+    "version": "0.1.92",
+    "date": "2026-11-25",
+    "notes": [
+      "The examples' Rename and New folder no longer end in …."
+    ]
+  },
+  {
+    "version": "0.1.91",
+    "date": "2026-11-25",
+    "notes": [
+      "Buttons that say how it went: Copy says Copied, Save shows a spinner and then Saved, and a failure goes back with a message."
+    ]
+  },
+  {
+    "version": "0.1.90",
+    "date": "2026-11-25",
+    "notes": [
+      "Stats & Charts: stat tiles, facts and bar charts, light and dark.",
+      "A trend in a tooltip now shows a small arrow, not only a colour."
+    ]
+  },
+  {
+    "version": "0.1.89",
+    "date": "2026-11-25",
+    "notes": [
+      "Spacing and Motion: new examples for elevation, layers and game motion.",
+      "Menus: rows follow the menu's rounded corners, and in Liquid Glass the row you point at is easy to see."
+    ]
+  },
+  {
+    "version": "0.1.88",
+    "date": "2026-11-25",
+    "notes": [
+      "Boards & Keys: a board of slots the arrow keys move through, tiles that wrap, and keys for one pane."
+    ]
+  },
+  {
+    "version": "0.1.87",
+    "date": "2026-11-25",
+    "notes": [
+      "Hover cards: a new page with cards you can move into, click in and pin."
+    ]
+  },
+  {
+    "version": "0.1.86",
+    "date": "2026-11-25",
+    "notes": [
+      "Tree: entries inside entries, with branches that open and close."
+    ]
+  },
+  {
+    "version": "0.1.85",
+    "date": "2026-11-25",
+    "notes": [
+      "A new Toolbar specimen: one Tab stop, and the arrow keys move along it."
+    ]
+  },
+  {
+    "version": "0.1.84",
+    "date": "2026-11-25",
+    "notes": [
+      "A new tooltip example: an info button you can tap, a copy button that says Copied, and long names that get their full name."
+    ]
+  },
+  {
+    "version": "0.1.83",
+    "date": "2026-11-25",
+    "notes": [
+      "Coloured chips get a coloured edge in the Hardware style."
+    ]
+  },
+  {
+    "version": "0.1.82",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.81",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.80",
+    "date": "2026-11-25",
+    "notes": [
+      "List with search: a search with no match shows its note in a frame."
+    ]
+  },
+  {
+    "version": "0.1.79",
+    "date": "2026-11-25",
+    "notes": [
+      "Dates: the month arrows are easier to see."
+    ]
+  },
+  {
+    "version": "0.1.78",
+    "date": "2026-11-25",
+    "notes": [
+      "List with search: an always-open list to pick from, with a search on top.",
+      "List without search: a short list that shows which one is chosen."
+    ]
+  },
+  {
+    "version": "0.1.77",
+    "date": "2026-11-25",
+    "notes": [
+      "Chips: tags you can remove or switch on and off, in three sizes.",
+      "Tags: a field that turns what you type or pick into tags."
+    ]
+  },
+  {
+    "version": "0.1.76",
+    "date": "2026-11-25",
+    "notes": [
+      "Button and dialog examples follow the new icon and label rules; a few titles say plainly what they show."
+    ]
+  },
+  {
     "version": "0.1.75",
     "date": "2026-11-25",
     "notes": [
@@ -277,270 +640,6 @@
     "date": "2026-11-12",
     "notes": [
       "New specimen: Game covers, a game's tall cover with late art, its tile when there is none, and a spinner while it is added."
-    ]
-  },
-  {
-    "version": "0.1.36",
-    "date": "2026-11-12",
-    "notes": [
-      "New specimen: Item cards, the tooltip's card in a panel, plain and in a module's skin."
-    ]
-  },
-  {
-    "version": "0.1.35",
-    "date": "2026-11-09",
-    "notes": [
-      "The Select examples show a long choice wrapped between words, and a name that changes shows at once."
-    ]
-  },
-  {
-    "version": "0.1.34",
-    "date": "2026-11-07",
-    "notes": [
-      "The map and zoom examples keep their last view when Tavora closes or sleeps."
-    ]
-  },
-  {
-    "version": "0.1.33",
-    "date": "2026-11-06",
-    "notes": [
-      "New specimen: Why it is off, a reason on a switched-off switch, box, field, select, button and menu row."
-    ]
-  },
-  {
-    "version": "0.1.32",
-    "date": "2026-11-06",
-    "notes": [
-      "New specimens: a line chart with one or two lines over game time or dates, its tooltip, and its empty and one-point states."
-    ]
-  },
-  {
-    "version": "0.1.31",
-    "date": "2026-11-05",
-    "notes": [
-      "The slider with its value now shows an editable box and a Reset button, with specimens for each, narrow and in German."
-    ]
-  },
-  {
-    "version": "0.1.30",
-    "date": "2026-11-05",
-    "notes": [
-      "New specimen: segmented control with icons, icon-only options and one option that is off with a reason."
-    ]
-  },
-  {
-    "version": "0.1.29",
-    "date": "2026-11-04",
-    "notes": [
-      "New specimens: a data grid you can type into like a spreadsheet, and a read-only one with 5,000 rows."
-    ]
-  },
-  {
-    "version": "0.1.28",
-    "date": "2026-11-04",
-    "notes": [
-      "Wide buttons and pickers only dip 1px when pressed."
-    ]
-  },
-  {
-    "version": "0.1.27",
-    "date": "2026-11-03",
-    "notes": [
-      "Under the hood: newer libraries."
-    ]
-  },
-  {
-    "version": "0.1.26",
-    "date": "2026-11-03",
-    "notes": [
-      "The zoom specimens now include one that hides and shows the pane, and maps keep their view when you switch tabs or close a dialog."
-    ]
-  },
-  {
-    "version": "0.1.25",
-    "date": "2026-11-03",
-    "notes": [
-      "New page: Overlay text, the box every overlay text uses, with scrolling, shrinking and cutting off, and its settings."
-    ]
-  },
-  {
-    "version": "0.1.24",
-    "date": "2026-11-03",
-    "notes": [
-      "New specimen: rows you drag to reorder."
-    ]
-  },
-  {
-    "version": "0.1.23",
-    "date": "2026-11-02",
-    "notes": [
-      "Loads a little lighter: the app keeps only the Latin letters of its fonts."
-    ]
-  },
-  {
-    "version": "0.1.22",
-    "date": "2026-11-02",
-    "notes": [
-      "New specimen: a field with a list of suggestions where you can type your own text (Combobox with free text)."
-    ]
-  },
-  {
-    "version": "0.1.21",
-    "date": "2026-11-02",
-    "notes": [
-      "Dialogs you open with the keyboard appear instantly.",
-      "Toasts wait while the panel is hidden or the game is in front, and slide in and out from their edge."
-    ]
-  },
-  {
-    "version": "0.1.20",
-    "date": "2026-11-02",
-    "notes": [
-      "Settings shows a dialog with one page and one with several pages, with the rules for descriptions and units."
-    ]
-  },
-  {
-    "version": "0.1.19",
-    "date": "2026-11-02",
-    "notes": [
-      "New specimens: a settings menu with Overlays, and text with placeholders.",
-      "The settings dialog example uses the same menu and has a Delete row."
-    ]
-  },
-  {
-    "version": "0.1.18",
-    "date": "2026-11-02",
-    "notes": [
-      "The Foundations pages are filled: colours, text, spacing and corners, motion and writing, each with live examples and their code.",
-      "Show disabled sits in the page header for everyone; the Developer tools switch is gone.",
-      "Show code is coloured and has line numbers; Copy still copies the plain code. Examples no longer carry any Show disabled code, so what you see is what you write."
-    ]
-  },
-  {
-    "version": "0.1.17",
-    "date": "2026-11-02",
-    "notes": [
-      "New specimen: Delete with Undo, gone at once and back with Undo.",
-      "Screen readers read each message once."
-    ]
-  },
-  {
-    "version": "0.1.16",
-    "date": "2026-11-02",
-    "notes": [
-      "Pan and zoom and the tile map show the new shared controls: zoom, the % (back to 100 %), the whole map and your own buttons, double-click to zoom in, a canvas that draws itself, a tooltip next to a node, and a view that is remembered."
-    ]
-  },
-  {
-    "version": "0.1.15",
-    "date": "2026-11-02",
-    "notes": [
-      "A side menu with search and one page per kind of control. Every example shows its own code, and the developer helpers sit behind a switch."
-    ]
-  },
-  {
-    "version": "0.1.14",
-    "date": "2026-11-02",
-    "notes": [
-      "Lists open under their field and are at least as wide; the combobox has a clear button; the picture select no longer shows the toggle examples inside its list; the tab row no longer shows a scrollbar."
-    ]
-  },
-  {
-    "version": "0.1.13",
-    "date": "2026-11-02",
-    "notes": [
-      "Main buttons and badges can follow a theme's deeper button colour."
-    ]
-  },
-  {
-    "version": "0.1.12",
-    "date": "2026-11-02",
-    "notes": [
-      "The UI Playground shows loading placeholders and pictures that fade in."
-    ]
-  },
-  {
-    "version": "0.1.11",
-    "date": "2026-11-02",
-    "notes": [
-      "Lists, dialogs and settings pages move smoothly."
-    ]
-  },
-  {
-    "version": "0.1.10",
-    "date": "2026-11-02",
-    "notes": [
-      "Switches and tabs slide to what you pick."
-    ]
-  },
-  {
-    "version": "0.1.9",
-    "date": "2026-11-02",
-    "notes": [
-      "New specimens: a button that shows its own progress, and numbers that count to their new value."
-    ]
-  },
-  {
-    "version": "0.1.8",
-    "date": "2026-11-02",
-    "notes": [
-      "Buttons have a little depth and feel pressed when you click them."
-    ]
-  },
-  {
-    "version": "0.1.7",
-    "date": "2026-11-02",
-    "notes": [
-      "Checkboxes, toggles and options animate when you pick them, and folding sections open smoothly."
-    ]
-  },
-  {
-    "version": "0.1.6",
-    "date": "2026-11-01",
-    "notes": [
-      "Dialogs have an icon box, a short line under the title, a Close button in the corner and footer buttons that carry an icon only when they do something. New specimens show it."
-    ]
-  },
-  {
-    "version": "0.1.5",
-    "date": "2026-11-01",
-    "notes": [
-      "Menus and tooltips open out of the spot they belong to, and buttons dip a little when you press them."
-    ]
-  },
-  {
-    "version": "0.1.4",
-    "date": "2026-11-01",
-    "notes": [
-      "A disabled button with a tooltip still shows it, so you can see why it is off."
-    ]
-  },
-  {
-    "version": "0.1.3",
-    "date": "2026-11-01",
-    "notes": [
-      "Dropdowns where you pick a value show an up-and-down arrow, menus keep the down arrow. Both are side by side in Inputs."
-    ]
-  },
-  {
-    "version": "0.1.2",
-    "date": "2026-10-31",
-    "notes": [
-      "The tile map shows a layer over the map and under the pins, such as a fog of war."
-    ]
-  },
-  {
-    "version": "0.1.1",
-    "date": "2026-10-31",
-    "notes": [
-      "Text fields and dropdowns look calmer in Dark mode."
-    ]
-  },
-  {
-    "version": "0.1.0",
-    "date": "2026-10-18",
-    "notes": [
-      "Patch notes for this module start with this version."
     ]
   }
 ]

@@ -782,7 +782,7 @@ const keysOf = async (page: Page, setup: string) => {
   return (await state(page)).items.map((item) => item.id.split("\n").at(-1));
 };
 
-test("Copy to… lists the other games, copies right away to one without frames, asks before touching one that has some, and says what it left out", async () => {
+test("Copy to lists the other games, copies right away to one without frames, asks before touching one that has some, and says what it left out", async () => {
   const userData = await newUserData();
   await seedCopy(userData);
   const { app, page } = await launch(userData, [MODULES], { seed: false });
@@ -849,7 +849,7 @@ test("Copy to… lists the other games, copies right away to one without frames,
   expect(ids(GAME)).toEqual(["own", "shared", "extra"]);
 });
 
-test("Copy to… is off with a reason while the setup is empty", async () => {
+test("Copy to is off with a reason while the setup is empty", async () => {
   const userData = await newUserData();
   await seedCopy(userData);
   const { app, page } = await launch(userData, [MODULES], { seed: false });
@@ -994,7 +994,7 @@ test("A frame has a right-click menu next to it: arrange, align, lock, a customi
     await layer.mouse.click(...(await centre(frame(first!.id))), { button: "right" });
     await layer.getByTestId("layout-menu-customize").click();
     await expect(customize).toBeVisible();
-    await expect(layer.getByTestId("layout-customize-lock")).toHaveAttribute("aria-checked", "true");
+    await expect(layer.getByTestId("layout-customize-lock").getByRole("checkbox")).toBeChecked();
     await layer.getByTestId("layout-customize-default").click();
     await expect.poll(async () => (await state(page)).toolbar.buttons).toEqual(["settings", "hide", "reset", "reset-size", "remove"]);
     await expect(bar.getByRole("button")).toHaveCount(5);

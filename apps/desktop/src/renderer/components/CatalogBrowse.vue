@@ -18,11 +18,12 @@ import { useActionStatus } from "../action-status";
 import { EmptyState } from "@tavora/official-ui/components/ui/empty-state";
 import { Skeleton } from "@tavora/official-ui/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@tavora/official-ui/components/ui/select";
+import { TextLink } from "@tavora/official-ui/components/ui/text-link";
 import { t } from "../i18n";
 import { formatSize } from "../catalog-size";
 import { PLACEHOLDER_MODULES } from "../catalog-placeholder";
 import { cn } from "@tavora/official-ui/lib/utils";
-import { CircleCheck, Gamepad2, ShieldCheck, WifiOff } from "@lucide/vue";
+import { ChevronRight, CircleCheck, Gamepad2, ShieldCheck, WifiOff } from "@lucide/vue";
 import CatalogIcon from "./CatalogIcon.vue";
 import CatalogModuleDialog from "./CatalogModuleDialog.vue";
 import CatalogRating from "./CatalogRating.vue";
@@ -133,7 +134,7 @@ function settings() {
     <EmptyState v-if="problem" class="mt-8" role="status" :title="t(`catalog.problem.${problem}.title`)" :description="t(`catalog.problem.${problem}.text`)" :data-testid="`catalog-${problem}`">
       <template #icon><WifiOff /></template>
       <template #action>
-        <Button v-if="problem === 'off'" variant="secondary" data-testid="catalog-settings" @click="settings">{{ t("catalog.openSettings") }}</Button>
+        <Button v-if="problem === 'off'" variant="secondary" data-testid="catalog-settings" @click="settings">{{ t("catalog.openSettings") }}<ChevronRight data-icon="end" /></Button>
         <Button v-else variant="secondary" data-testid="catalog-retry" @click="load">{{ t("catalog.retry") }}</Button>
       </template>
     </EmptyState>
@@ -160,9 +161,9 @@ function settings() {
             </button>
             <div class="min-w-0">
               <div class="flex min-w-0 items-baseline gap-2">
-                <button type="button" class="hover:text-primary focus-visible:ring-ring truncate rounded-sm text-left font-medium outline-none focus-visible:ring-2" :title="module.name"
+                <TextLink class="font-medium" :title="module.name"
                   :aria-label="t('catalog.infoLabel', { name: module.name })" data-testid="catalog-name" :data-module="module.id" @click="open(module)"
-                >{{ module.name }}</button>
+                >{{ module.name }}</TextLink>
                 <span class="text-muted-foreground shrink-0 text-xs tabular-nums" :title="isPreview(module) ? t('catalog.previewHint', { version: module.version }) : undefined" :data-testid="`catalog-version-${module.id}`">{{
                   isPreview(module) ? t("catalog.preview") : module.version
                 }}</span>

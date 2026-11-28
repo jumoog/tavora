@@ -18,6 +18,9 @@
 // The `overlay` slot lies over the content without being scaled (pins that keep their size); its `view` and `pane` slot
 // props place things on it. Inside the content or the overlay, a pan never starts on a button or a field, unless it is
 // marked `data-zoom-pane-drag`.
+// With `bare` the pane has no frame and sits flush with what is around it, for a map or tree that fills its panel: the
+// focus ring then sits inside its edge, over the content. While `loading` (the content is not there yet) the zoom
+// controls are hidden, as they are while a saved view is on its way: they would show the % of nothing.
 // With `viewOnly` the pane does all of the above but moves nothing: for a game that draws itself (a canvas, an SVG).
 // The default slot gets the `view` and the `pane` size (also sent as viewChange) and fills the pane, the game draws with
 // them; `world` is the size of what it draws, in its own units at zoom 1, so fitting and the limits know the content.
@@ -26,12 +29,15 @@ import { Maximize, Minus, Plus } from "@lucide/vue"
 import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from "vue"
 import { cn } from "../../../lib/utils"
 import { Button } from "../button"
+import { leaveToolbar } from "../toolbar/context"
 import { Separator } from "../separator"
 import { uiText } from "../text"
 import { zoomPaneKey } from "./context"
 import { createGlide } from "./glide"
 import { areaView, clampPan, clampZoom, containZoom, fitView, percentOf, type Size, stepZoom, type ViewOptions, type ZoomAlign, type ZoomArea, type ZoomBounds, type ZoomFit, zoomAt, type ZoomView } from "./view"
 import { createViewMemory, type SavedView, type ViewMemory } from "./view-memory"
+// Its buttons are parts of it, not stops of a Toolbar around it.
+leaveToolbar()
 
 const props = withDefaults(defineProps<{
   /** Smallest and largest zoom, in the pane's own units: 1 is the content's real size (not 100 %, see `hundred`). */
@@ -65,6 +71,10 @@ const props = withDefaults(defineProps<{
   wholeLabel?: string
   /** What the pane shows, for screen readers. */
   label?: string
+  /** No frame, corners or background of its own, for a map or tree that fills its panel. */
+  bare?: boolean
+  /** What the pane shows is still loading: the zoom controls are hidden until it is there. */
+  loading?: boolean
   class?: HTMLAttributes["class"]
 }>(), {
   minZoom: 0.25,
@@ -531,7 +541,12 @@ defineExpose({ fit, actualSize, zoomIn, zoomOut, moveOrigin, setView, showArea, 
     :aria-label="label"
     tabindex="0"
     :class="cn(
-      'bg-background relative touch-none overflow-hidden rounded-md border outline-none select-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3',
+      'relative touch-none overflow-hidden outline-none select-none',
+      // Bare: the ring is drawn over the content, which would cover an inset shadow on the pane itself. The pane's own
+      // see-through outline is what high-contrast mode colours in, and what a focus check finds on the control.
+      bare
+        ? 'after:pointer-events-none after:absolute after:inset-0 after:z-(--layer-overlay) focus-visible:after:inset-ring-3 focus-visible:after:inset-ring-ring/50 focus-visible:outline-3 focus-visible:-outline-offset-3 focus-visible:outline-transparent focus-visible:outline-solid'
+        : 'bg-background rounded-md border focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3',
       dragging ? 'cursor-grabbing' : 'cursor-grab',
       props.class,
     )"
@@ -544,13 +559,13 @@ defineExpose({ fit, actualSize, zoomIn, zoomOut, moveOrigin, setView, showArea, 
     @dblclick="onDoubleClick"
     @keydown="onKeyDown"
   >
-    <!-- First in the page so Tab reaches the zoom controls before the content, though they are drawn over its corner (z-10). -->
+    <!-- First in the page so Tab reaches the zoom controls before the content, though they are drawn over its corner (--layer-overlay). -->
     <div
       data-slot="zoom-controls"
       role="group"
       :aria-label="uiText.zoomControls"
       data-zoom-pane-ignore
-      class="bg-background/90 absolute z-10 right-2 bottom-2 flex cursor-default items-center gap-0.5 rounded-md border p-0.5 shadow-sm"
+      :class="cn('bg-background/90 absolute z-(--layer-overlay) right-2 bottom-2 flex cursor-default items-center gap-0.5 rounded-md border p-0.5 shadow-elevation-1', (loading || restoring) && 'invisible')"
       @pointerdown.stop
       @dblclick.stop
     >
@@ -583,7 +598,7 @@ defineExpose({ fit, actualSize, zoomIn, zoomOut, moveOrigin, setView, showArea, 
     <Transition enter-from-class="opacity-0" leave-to-class="opacity-0" enter-active-class="transition-opacity" leave-active-class="transition-opacity">
       <p
         v-if="hint"
-        class="bg-popover text-popover-foreground pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 rounded-md border px-2 py-1 text-xs shadow-sm"
+        class="bg-popover text-popover-foreground pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 rounded-md border px-2 py-1 text-xs shadow-elevation-1"
         aria-hidden="true"
       >
         {{ uiText.zoomHint }}

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Trash2 } from "@lucide/vue";
 // The Ratings and reviews section of a catalog module's page (decided 2026-10-21). It shows the
 // summary with its 5 to 1 star bars, the user's own rating, and the newest reviews with the
 // publisher's one reply. Rating needs a sign-in and the module installed, and never your own module;
@@ -13,7 +14,7 @@ import { useOptimistic, useOptimisticKeyed } from "@tavora/official-ui/optimisti
 import { Button } from "@tavora/official-ui/components/ui/button";
 import { useTask } from "@tavora/official-ui/use-task";
 import { CountTo } from "@tavora/official-ui/components/ui/count-to";
-import { Progress } from "@tavora/official-ui/components/ui/progress";
+import { Meter } from "@tavora/official-ui/components/ui/meter";
 import { StarRating } from "@tavora/official-ui/components/ui/star-rating";
 import { Textarea } from "@tavora/official-ui/components/ui/textarea";
 import { formatDate, formatNumber, t } from "../i18n";
@@ -242,7 +243,7 @@ const dateOf = (value: string) => (value && !Number.isNaN(Date.parse(value)) ? f
         <ul class="max-w-80 space-y-1.5">
           <li v-for="row in rows" :key="row.stars" class="grid grid-cols-[3.5rem_minmax(0,1fr)_2.5rem] items-center gap-2 text-xs">
             <span class="text-muted-foreground">{{ t("catalog.rating.stars", { count: row.stars }) }}</span>
-            <Progress :model-value="row.percent" :aria-label="t('catalog.rating.stars', { count: row.stars })" />
+            <Meter :model-value="row.percent" :aria-label="t('catalog.rating.stars', { count: row.stars })" />
             <span class="text-muted-foreground text-right tabular-nums"><CountTo :value="row.percent" :format="(n) => t('catalog.rating.percent', { percent: n })" /></span>
           </li>
         </ul>
@@ -264,7 +265,7 @@ const dateOf = (value: string) => (value && !Number.isNaN(Date.parse(value)) ? f
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <span class="text-muted-foreground min-w-0 flex-1 text-xs">{{ t("catalog.reviews.public") }}</span>
             <span class="text-xs tabular-nums" :class="length > MAX_TEXT ? 'text-destructive' : 'text-muted-foreground'">{{ t("catalog.reviews.length", { count: length }) }}</span>
-            <Button v-if="mine" size="sm" variant="ghost" :disabled="busy || mineWaiting" data-testid="catalog-reviews-delete" @click="remove">{{ t("catalog.reviews.delete") }}</Button>
+            <Button v-if="mine" size="sm" variant="ghost" :disabled="busy || mineWaiting" data-testid="catalog-reviews-delete" @click="remove"><Trash2 />{{ t("catalog.reviews.delete") }}</Button>
             <Button size="sm" :disabled="!changed || length > MAX_TEXT" data-testid="catalog-reviews-post" @click="post">
               {{ mine ? t("catalog.reviews.update") : t("catalog.reviews.post") }}
             </Button>
@@ -314,7 +315,7 @@ const dateOf = (value: string) => (value && !Number.isNaN(Date.parse(value)) ? f
               <Button size="sm" variant="ghost" class="text-muted-foreground" :disabled="busy || replyShown.waiting(review.id)" data-testid="catalog-review-reply-start" @click="startReply(review)">
                 {{ replyShown.value(review.id) ? t("catalog.reviews.replyEdit") : t("catalog.reviews.reply") }}
               </Button>
-              <Button v-if="replyShown.value(review.id)" size="sm" variant="ghost" class="text-muted-foreground" :disabled="busy || replyShown.waiting(review.id)" @click="deleteReply(review)">{{ t("catalog.reviews.replyDelete") }}</Button>
+              <Button v-if="replyShown.value(review.id)" size="sm" variant="ghost" class="text-muted-foreground" :disabled="busy || replyShown.waiting(review.id)" @click="deleteReply(review)"><Trash2 />{{ t("catalog.reviews.replyDelete") }}</Button>
             </template>
             <Button size="sm" variant="ghost" class="text-muted-foreground" :aria-label="t('catalog.reviews.reportLabel', { name: nameOf(review) })" :data-testid="`catalog-review-report-${review.id}`" @click="reportAsk = review.id">
               {{ t("catalog.reviews.report") }}

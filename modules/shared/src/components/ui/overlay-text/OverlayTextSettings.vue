@@ -21,7 +21,6 @@ const props = defineProps<{
 const emit = defineEmits<{ change: [change: Partial<OverlayTextBoxSettings>] }>()
 
 /** Segments that share the control column evenly. */
-const fill = "w-full min-w-0 [&>*]:flex-1 [&>*]:px-0"
 const text = computed(() => uiText.value)
 const NAMES = { grow: "otGrow", fixed: "otFixed", scroll: "otScroll", shrink: "otShrink", cut: "otCut", slow: "otSlow", normal: "otNormal", fast: "otFast" } as const
 const options = <T extends keyof typeof NAMES>(values: readonly T[], testid: string) => values.map((value) => ({ value, label: text.value[NAMES[value]], testid: `${testid}-${value}` }))
@@ -29,24 +28,22 @@ const options = <T extends keyof typeof NAMES>(values: readonly T[], testid: str
 const seconds = computed(() => new Intl.NumberFormat(uiLocale.value, { maximumFractionDigits: 1 }))
 const pauseLabel = (value: number) => (value === 0 ? text.value.otPauseOff : seconds.value.format(value))
 
-const box = computed({ get: () => props.value.box, set: (box) => emit("change", { box }) })
-const tooLong = computed({ get: () => props.value.tooLong, set: (tooLong) => emit("change", { tooLong }) })
-const speed = computed({ get: () => props.value.speed, set: (speed) => emit("change", { speed }) })
+// Through `pick`, not v-model: a value a newer version stored shows as the default here, and picking that option has to be said too.
 const pause = computed({ get: () => String(props.value.pause), set: (pause: string) => emit("change", { pause: Number(pause) }) })
 </script>
 
 <template>
   <SettingsSection :title="title ?? text.otBox" :class="cn(props.class)" data-overlay-text-settings>
     <SettingsRow :label="text.otSize" :hint="value.box === 'grow' ? text.otGrowHint : text.otFixedHint">
-      <SegmentedControl v-model="box" :label="text.otSize" :options="options(OVERLAY_TEXT_BOXES, 'box')" :class="fill" />
+      <SegmentedControl :model-value="value.box" @pick="(box) => emit('change', { box })" :label="text.otSize" :options="options(OVERLAY_TEXT_BOXES, 'box')" fill />
     </SettingsRow>
     <template v-if="value.box === 'fixed'">
       <SettingsRow :label="text.otTooLong" :hint="text.otTooLongHint">
-        <SegmentedControl v-model="tooLong" :label="text.otTooLong" :options="options(OVERLAY_TEXT_TOO_LONG, 'too-long')" :class="fill" />
+        <SegmentedControl :model-value="value.tooLong" @pick="(tooLong) => emit('change', { tooLong })" :label="text.otTooLong" :options="options(OVERLAY_TEXT_TOO_LONG, 'too-long')" fill />
       </SettingsRow>
       <template v-if="value.tooLong === 'scroll'">
         <SettingsRow :label="text.otSpeed" :hint="text.otSpeedHint">
-          <SegmentedControl v-model="speed" :label="text.otSpeed" :options="options(OVERLAY_TEXT_SPEEDS, 'speed')" :class="fill" />
+          <SegmentedControl :model-value="value.speed" @pick="(speed) => emit('change', { speed })" :label="text.otSpeed" :options="options(OVERLAY_TEXT_SPEEDS, 'speed')" fill />
         </SettingsRow>
         <SettingsRow :label="text.otPause" :hint="text.otPauseHint">
           <Select v-model="pause">

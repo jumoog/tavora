@@ -1,5 +1,348 @@
 [
   {
+    "version": "0.2.100",
+    "date": "2026-11-28",
+    "notes": [
+      "Dialogs: the message sits under the title row, never beside the icon."
+    ]
+  },
+  {
+    "version": "0.2.99",
+    "date": "2026-11-28",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.98",
+    "date": "2026-11-28",
+    "notes": [
+      "Round buttons, toggles, tags and fields give their text a bit more room at the ends."
+    ]
+  },
+  {
+    "version": "0.2.97",
+    "date": "2026-11-28",
+    "notes": [
+      "A long choice in a list field stays on one line; hover it to read it all."
+    ]
+  },
+  {
+    "version": "0.2.96",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.95",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.94",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.93",
+    "date": "2026-11-27",
+    "notes": [
+      "A menu entry that's off shows why in its row, not in a tooltip."
+    ]
+  },
+  {
+    "version": "0.2.92",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.91",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.90",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.89",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.88",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.87",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.86",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.85",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.84",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.83",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.82",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.81",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.80",
+    "date": "2026-11-26",
+    "notes": [
+      "Small look and feel updates."
+    ]
+  },
+  {
+    "version": "0.2.79",
+    "date": "2026-11-26",
+    "notes": [
+      "The tick is easier to hit: click anywhere in the space around the circle. Keep finished to-dos has its switch on the right."
+    ]
+  },
+  {
+    "version": "0.2.78",
+    "date": "2026-11-26",
+    "notes": [
+      "A to-do you're editing, names and the add line look like fields when you use them."
+    ]
+  },
+  {
+    "version": "0.2.77",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.76",
+    "date": "2026-11-26",
+    "notes": [
+      "Checkboxes, the description field and buttons look and feel like the rest of Tavora."
+    ]
+  },
+  {
+    "version": "0.2.75",
+    "date": "2026-11-26",
+    "notes": [
+      "New hover rows in the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.74",
+    "date": "2026-11-26",
+    "notes": [
+      "The toolbar at the top is one Tab stop, and the arrow keys move along it."
+    ]
+  },
+  {
+    "version": "0.2.73",
+    "date": "2026-11-26",
+    "notes": [
+      "The shared controls gained cards and checkbox rows."
+    ]
+  },
+  {
+    "version": "0.2.72",
+    "date": "2026-11-26",
+    "notes": [
+      "Dialogs come in four set widths, so they line up everywhere."
+    ]
+  },
+  {
+    "version": "0.2.71",
+    "date": "2026-11-26",
+    "notes": [
+      "Tabs have more room above and below the text."
+    ]
+  },
+  {
+    "version": "0.2.70",
+    "date": "2026-11-26",
+    "notes": [
+      "Buttons, fields and lists line up at the same heights, and on/off buttons look the same everywhere."
+    ]
+  },
+  {
+    "version": "0.2.69",
+    "date": "2026-11-25",
+    "notes": [
+      "Disabled controls all fade the same way, and empty charts say there's no data yet."
+    ]
+  },
+  {
+    "version": "0.2.68",
+    "date": "2026-11-25",
+    "notes": [
+      "Small fixes in the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.67",
+    "date": "2026-11-25",
+    "notes": [
+      "Lists you pick from with a search show it as a field of its own."
+    ]
+  },
+  {
+    "version": "0.2.66",
+    "date": "2026-11-25",
+    "notes": [
+      "Buttons in the shared controls can say how it went: Copied, Saved, or a spinner while they work."
+    ]
+  },
+  {
+    "version": "0.2.65",
+    "date": "2026-11-25",
+    "notes": [
+      "New stat tiles, fact lists and bar charts in the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.64",
+    "date": "2026-11-25",
+    "notes": [
+      "Menus: rows follow the menu's rounded corners, and in Liquid Glass the row you point at is easy to see."
+    ]
+  },
+  {
+    "version": "0.2.63",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.2.62",
+    "date": "2026-11-25",
+    "notes": [
+      "New hover card in the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.61",
+    "date": "2026-11-25",
+    "notes": [
+      "New tree view in the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.60",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.2.59",
+    "date": "2026-11-25",
+    "notes": [
+      "Tooltips fade out when they close."
+    ]
+  },
+  {
+    "version": "0.2.58",
+    "date": "2026-11-25",
+    "notes": [
+      "Coloured chips get a coloured edge in the Hardware style."
+    ]
+  },
+  {
+    "version": "0.2.57",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.2.56",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.2.55",
+    "date": "2026-11-25",
+    "notes": [
+      "The shared list with search shows its no-match note in a frame."
+    ]
+  },
+  {
+    "version": "0.2.54",
+    "date": "2026-11-25",
+    "notes": [
+      "Small fixes in the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.53",
+    "date": "2026-11-25",
+    "notes": [
+      "A new list with search in the shared controls."
+    ]
+  },
+  {
+    "version": "0.2.52",
+    "date": "2026-11-25",
+    "notes": [
+      "New chips and a tag field in the shared controls."
+    ]
+  },
+  {
     "version": "0.2.51",
     "date": "2026-11-25",
     "notes": [
@@ -297,92 +640,6 @@
     "date": "2026-11-02",
     "notes": [
       "Main buttons and badges can follow a theme's deeper button colour."
-    ]
-  },
-  {
-    "version": "0.2.10",
-    "date": "2026-11-02",
-    "notes": [
-      "Small update to the shared look; nothing changes for you here."
-    ]
-  },
-  {
-    "version": "0.2.9",
-    "date": "2026-11-02",
-    "notes": [
-      "Lists, dialogs and settings pages move smoothly, and a to-do folds away the same way."
-    ]
-  },
-  {
-    "version": "0.2.8",
-    "date": "2026-11-02",
-    "notes": [
-      "Switches and tabs slide to what you pick."
-    ]
-  },
-  {
-    "version": "0.2.7",
-    "date": "2026-11-02",
-    "notes": [
-      "The number of to-dos left counts to its new value, and a to-do you drag settles into its place."
-    ]
-  },
-  {
-    "version": "0.2.6",
-    "date": "2026-11-02",
-    "notes": [
-      "Buttons have a little depth and feel pressed when you click them."
-    ]
-  },
-  {
-    "version": "0.2.5",
-    "date": "2026-11-02",
-    "notes": [
-      "Checkboxes, toggles and options animate when you pick them, and folding sections open smoothly."
-    ]
-  },
-  {
-    "version": "0.2.4",
-    "date": "2026-11-01",
-    "notes": [
-      "Delete group asks with a trash icon and a Close button in the corner."
-    ]
-  },
-  {
-    "version": "0.2.3",
-    "date": "2026-11-01",
-    "notes": [
-      "Menus and tooltips open out of the spot they belong to, and buttons dip a little when you press them."
-    ]
-  },
-  {
-    "version": "0.2.2",
-    "date": "2026-11-01",
-    "notes": [
-      "Dropdowns where you pick a value show an up-and-down arrow."
-    ]
-  },
-  {
-    "version": "0.2.1",
-    "date": "2026-10-31",
-    "notes": [
-      "Text fields and dropdowns look calmer in Dark mode."
-    ]
-  },
-  {
-    "version": "0.2.0",
-    "date": "2026-10-29",
-    "notes": [
-      "Press Enter while editing a to-do to start a new one right below it. Its ⋯ menu can add a to-do below or a sub-to-do too.",
-      "Live view settings open in a big window: pick a font and size, bold, text color, outline and background color.",
-      "Choose what sits between groups in the live view (nothing, a line or the group name) and whether finished to-dos show, ticked and struck through."
-    ]
-  },
-  {
-    "version": "0.1.0",
-    "date": "2026-10-18",
-    "notes": [
-      "Patch notes for this module start with this version."
     ]
   }
 ]

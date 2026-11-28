@@ -10,7 +10,8 @@ import { ArrowLeftRight, ArrowRight, ImagePlus, Minus, MoreHorizontal, Plus, Sti
 import { EmptyState } from "@tavora/official-ui/components/ui/empty-state";
 import { Notice } from "@tavora/official-ui/components/ui/notice";
 import { toast, Toaster, undoable } from "@tavora/official-ui/components/ui/toast";
-import { TavoraError, type TavoraSDK, type TavoraTheme } from "@tavora/sdk";
+import { Toolbar } from "@tavora/official-ui/components/ui/toolbar";
+import { TavoraError, type JsonValue, type TavoraSDK, type TavoraTheme } from "@tavora/sdk";
 import type { DocumentHandle } from "@tavora/sdk/store";
 import { computed, defineAsyncComponent, h, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import BoardMenu from "./BoardMenu.vue";
@@ -24,7 +25,9 @@ import { pictureName } from "./copy";
 import { setLanguage, t } from "./i18n";
 import { de, en } from "./locales";
 import { DEFAULT_PALETTE, palettePlace, type PalettePlace } from "./palette";
+import { otherPanelState, panelStateToSave } from "./panelState";
 import { unusedFiles } from "./pictures";
+import { pickPictures } from "./pickPictures";
 import { toolbarPlace, type ToolbarPlace } from "./toolbar";
 import type { ConnectorKind } from "./connectors";
 
@@ -76,6 +79,8 @@ const connectorOpen = ref(false);
 let connectorChoice: ConnectorKind | null = null;
 
 let views: Record<string, View> = {};
+/** What a newer version kept in the panel's state besides; saved back as it was. */
+let otherState: Record<string, JsonValue> = {};
 /** Whether the panel's state has been read; until then there is nothing of it to save. */
 let stateRead = false;
 let viewTimer: ReturnType<typeof setTimeout> | undefined;
@@ -101,7 +106,7 @@ function offerUndo(message: string, run: () => Promise<void>) {
 function saveSelection() {
   // Not before the panel's state is read: a panel hidden while it opens would write over its views with nothing.
   if (!stateRead) return;
-  void sdk.value?.panel.setState({ selected: shown.value?.id ?? null, views, palette: palette.value } as unknown as never).catch(() => undefined);
+  void sdk.value?.panel.setState(panelStateToSave(otherState, { selected: shown.value?.id ?? null, views, palette: palette.value }) as unknown as never).catch(() => undefined);
 }
 
 /** Shows the library's open board; `again` shows the same board anew, from what another panel saved. */
@@ -150,7 +155,7 @@ watch(
 const creationProblem = (reason: unknown) => (reason instanceof BoardNotSaved ? t("save.staysOpen") : t("starter.failed", { error: errorMessage(reason) }));
 
 async function createBoard(kind: BoardKind = "blank") {
-  if (kind === "screenshot") { screenshotInput.value?.click(); return; }
+  if (kind === "screenshot") { void choosePicture(screenshotInput.value, createScreenshotFrom, creationProblem); return; }
   const lib = library.value;
   if (!lib || creatingBoard.value) return;
   creatingBoard.value = true;
@@ -164,13 +169,36 @@ async function createBoard(kind: BoardKind = "blank") {
   finally { creatingBoard.value = false; }
 }
 
-async function createScreenshot(event: Event) {
+/**
+ * Lets the user choose one picture in Tavora's open dialog and hands it to `use`; on a Tavora without that dialog the
+ * file input opens instead, and its change does the rest.
+ */
+async function choosePicture(input: HTMLInputElement | null, use: (file: File) => Promise<void>, problem: (reason: unknown) => string) {
+  const connected = sdk.value;
+  if (!connected) return;
+  let files: File[] | null;
+  try {
+    files = await pickPictures(connected, false);
+  } catch (reason) {
+    notify(problem(reason));
+    return;
+  }
+  if (files === null) input?.click();
+  else if (files[0]) await use(files[0]);
+}
+
+/** The file input's change (a Tavora without its own open dialog): its picture goes on like a chosen one. */
+const fromInput = (use: (file: File) => Promise<void>) => (event: Event) => {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = "";
+  if (file) void use(file);
+};
+
+async function createScreenshotFrom(file: File) {
   const lib = library.value;
   const connected = sdk.value;
-  if (!file || !lib || !connected || creatingBoard.value) return;
+  if (!lib || !connected || creatingBoard.value) return;
   creatingBoard.value = true;
   try {
     const { readBoardPicture } = await import("./readPicture");
@@ -183,6 +211,7 @@ async function createScreenshot(event: Event) {
   } catch (reason) { notify(creationProblem(reason)); }
   finally { creatingBoard.value = false; }
 }
+const createScreenshot = fromInput(createScreenshotFrom);
 
 async function select(id: string) {
   try {
@@ -219,6 +248,7 @@ onMounted(async () => {
 
     const state = await connected.panel.getState<PanelState>();
     stateRead = true;
+    otherState = otherPanelState(state);
     views = state?.views && typeof state.views === "object" ? state.views : {};
     palette.value = palettePlace(state?.palette);
 
@@ -380,19 +410,18 @@ function finishConnector(event: Event) {
 }
 function setGrid(enabled: boolean) { board.value?.setGrid(enabled); }
 
-async function addPicture(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = "";
-  if (!file || !board.value) return;
+const cardProblem = (reason: unknown) => t("card.failed", { error: errorMessage(reason) });
+async function addPictureFrom(file: File) {
+  if (!board.value) return;
   try { await board.value.addPicture(file); }
-  catch (reason) { notify(t("card.failed", { error: errorMessage(reason) })); }
+  catch (reason) { notify(cardProblem(reason)); }
 }
+const addPicture = fromInput(addPictureFrom);
 </script>
 
 <template>
   <div v-if="error" class="p-4" data-testid="connect-error">
-    <Notice variant="error">
+    <Notice variant="destructive">
       {{ t("connectError", { error }) }}
       <template #action>
         <Button type="button" size="sm" variant="secondary" @click="reload">{{ t("retry") }}</Button>
@@ -401,7 +430,7 @@ async function addPicture(event: Event) {
   </div>
   <p v-else-if="!sdk || !shown" class="text-muted-foreground p-4 text-sm">{{ t("loading") }}</p>
   <div v-else class="whiteboard-app flex h-full min-h-0 flex-col" data-testid="whiteboard-app">
-    <header class="board-bar bg-primary/5 border-primary/25 flex flex-none items-center gap-2 border-b px-2 py-1">
+    <Toolbar variant="bar" :label="t('board.toolbar')" data-testid="board-toolbar">
       <div class="board-switcher">
         <BoardMenu
           :boards="list"
@@ -434,7 +463,7 @@ async function addPicture(event: Event) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuItem data-testid="add-note-card" @select="addNote"><StickyNote class="size-4" aria-hidden="true" />{{ t("card.note") }}</DropdownMenuItem>
-          <DropdownMenuItem data-testid="add-picture-card" @select="pictureInput?.click()"><ImagePlus class="size-4" aria-hidden="true" />{{ t("card.picture") }}</DropdownMenuItem>
+          <DropdownMenuItem data-testid="add-picture-card" @select="choosePicture(pictureInput, addPictureFrom, cardProblem)"><ImagePlus class="size-4" aria-hidden="true" />{{ t("card.picture") }}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <input ref="pictureInput" class="hidden" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-testid="card-file" :aria-label="t('card.picture')" @change="addPicture" />
@@ -452,18 +481,18 @@ async function addPicture(event: Event) {
       >
         {{ t(boardState.pictures.allLocked ? "image.unlock" : "image.lock") }}
       </Button>
-      <Button class="board-image-action" type="button" variant="outline" size="sm" :title="t('copy.hint')" data-testid="copy-picture" :disabled="boardState.empty || copying" :disabled-reason="boardState.empty ? t('board.nothingYet') : undefined" @click="copyAsPicture">{{ t("copy.button") }}</Button>
-      <Button class="board-image-action" type="button" variant="outline" size="sm" :title="t('savePicture.hint')" data-testid="save-picture" :disabled="boardState.empty || copying" :disabled-reason="boardState.empty ? t('board.nothingYet') : undefined" @click="saveAsPicture">{{ t("savePicture.button") }}</Button>
+      <Button class="board-image-action" type="button" variant="ghost" size="sm" :title="t('copy.hint')" data-testid="copy-picture" :disabled="boardState.empty || copying" :disabled-reason="boardState.empty ? t('board.nothingYet') : undefined" @click="copyAsPicture">{{ t("copy.button") }}</Button>
+      <Button class="board-image-action" type="button" variant="ghost" size="sm" :title="t('savePicture.hint')" data-testid="save-picture" :disabled="boardState.empty || copying" :disabled-reason="boardState.empty ? t('board.nothingYet') : undefined" @click="saveAsPicture">{{ t("savePicture.button") }}</Button>
       <DropdownMenu>
         <DropdownMenuTrigger as-child><Button class="board-actions-menu" variant="ghost" size="icon-sm" :aria-label="t('board.actions')" :title="t('board.actions')" data-testid="board-actions"><MoreHorizontal class="size-4" /></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem data-testid="compact-copy-picture" :disabled="boardState.empty || copying" :disabled-reason="boardState.empty ? t('board.nothingYet') : undefined" :action="copyAsPicture">{{ t("copy.button") }}</DropdownMenuItem>
-          <DropdownMenuItem data-testid="compact-save-picture" :disabled="boardState.empty || copying" :disabled-reason="boardState.empty ? t('board.nothingYet') : undefined" @select="saveAsPicture">{{ t("savePicture.button") }}</DropdownMenuItem>
+          <DropdownMenuItem class="[&_[data-slot=menu-reason]]:max-w-none" data-testid="compact-copy-picture" :disabled="boardState.empty || copying" :disabled-reason="boardState.empty ? t('board.nothingYet') : undefined" :action="copyAsPicture">{{ t("copy.button") }}</DropdownMenuItem>
+          <DropdownMenuItem class="[&_[data-slot=menu-reason]]:max-w-none" data-testid="compact-save-picture" :disabled="boardState.empty || copying" :disabled-reason="boardState.empty ? t('board.nothingYet') : undefined" @select="saveAsPicture">{{ t("savePicture.button") }}</DropdownMenuItem>
           <DropdownMenuSeparator v-if="boardState.pictures.count > 0" />
           <DropdownMenuItem v-if="boardState.pictures.count > 0" @select="togglePictureLocks">{{ t(boardState.pictures.allLocked ? "image.unlock" : "image.lock") }}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </header>
+    </Toolbar>
     <Notice v-if="deleted" variant="warning" class="mx-2 mt-2 flex-none" data-testid="board-deleted">
       {{ t("deleted.notice") }}
       <template #action>
@@ -488,7 +517,7 @@ async function addPicture(event: Event) {
         @toolbar="placeToolbar"
         @palette="placePalette"
       />
-      <EmptyState v-if="boardState.empty" :title="t('empty.hint')" class="text-muted-foreground pointer-events-none absolute top-1/2 left-1/2 z-[1] w-max max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 border-0 bg-transparent p-0" data-testid="empty-hint" />
+      <EmptyState v-if="boardState.empty" variant="bare" :title="t('empty.hint')" class="text-muted-foreground pointer-events-none absolute top-1/2 left-1/2 z-[1] w-max max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 bg-transparent p-0" data-testid="empty-hint" />
     </main>
     <Toaster />
   </div>

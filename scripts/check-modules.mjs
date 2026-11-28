@@ -27,14 +27,14 @@ export const RULES = {
   "view-flush": "Call flushViewMemory() in onSuspend and onDispose.",
   "panel-state-read": "Read the panel state back on start with panel.getState().",
   catalogs: "Add a test that runs checkCatalogs(en, de) (the kit) or catalogProblems(en, de) (@tavora/sdk/testing) on the module's texts.",
-  motion: "Use the kit's motion tokens and animate transform and opacity only.",
-  "z-index": "No z-index of your own, except inside a canvas or map.",
+  motion: "Use the kit's motion tokens and animate transform and opacity (a hover or state change may also fade colours).",
+  "z-index": "No z-index of your own: use the kit's layers, z-(--layer-lift|sticky|overlay|floating), or -1 for a decoration behind its box.",
   shadow: "No shadow of your own: areas separate by a surface step and border-border.",
   "all-caps": "Write it in sentence case; no all caps.",
-  "focus-ring": "Keep the kit's focus ring; never remove it or draw your own.",
+  "focus-ring": "Keep the kit's focus ring; never remove it or draw your own. A row that only shows a card on hover or focus: HoverRow (or StatTile hoverable).",
   "menu-anchor": "Pass the element as anchor: ui.showMenu({ anchor: element }), never the pointer position.",
   "file-save": "Save through files.saveJson or pictures.save (Tavora's save dialog), not a browser download.",
-  "window-keys": "Listen for keys on your own element (a ref), not the whole window: the component may be shown twice.",
+  "window-keys": "Listen for keys with usePaneKeys(root, handler) or on your own element (a ref), not the whole window: the component may be shown twice.",
 };
 
 /** Problems with an allow comment itself. They are never kept in the baseline. */
@@ -226,7 +226,14 @@ const COLOR_PROP = /^(?:--[\w-]+|color|background(?:-color)?|border(?:-(?:top|ri
 const SCALE = new Set([12, 13, 14, 16, 20]);
 const WEIGHTS = new Set(["400", "500", "600", "normal"]);
 const NEUTRAL_VALUES = /^(?:inherit|initial|unset|revert|revert-layer)$/;
-const ALLOWED_TRANSITION = new Set(["transform", "opacity", "translate", "scale", "rotate", "none"]);
+/** The kit's layers inside a pane (elevation.css). */
+const LAYERS = new Set(["--layer-lift", "--layer-sticky", "--layer-overlay", "--layer-floating"]);
+/** A z-index of no layer (auto, 0, -1 for a decoration behind its own box) or one of the kit's layers as `var(--layer-…)`. */
+const zIndexOk = (v) => /^(?:auto|0|-1)$/.test(v) || LAYERS.has(/^var\((--[\w-]+)\)$/.exec(v)?.[1]);
+/** What may move (transform, opacity) and, for a hover or state change, the colours Tailwind's transition-colors fades. */
+const ALLOWED_TRANSITION = new Set(["transform", "opacity", "translate", "scale", "rotate", "none", "color", "background-color", "border-color", "outline-color", "text-decoration-color", "fill", "stroke"]);
+const BORDER_SIDE_COLOR = /^border-(?:top|right|bottom|left|(?:block|inline)(?:-(?:start|end))?)-color$/;
+const mayTransition = (name) => ALLOWED_TRANSITION.has(name) || BORDER_SIDE_COLOR.test(name);
 
 /** A size in px, or null when it is not a fixed length (em, %, a variable). */
 function pixels(number, unit) {
@@ -301,7 +308,7 @@ function checkDeclaration(property, value, at) {
     const lengths = (withoutCalls(v).match(/\d*\.?\d+(?:px|rem|em)\b/g) ?? []).filter((len) => parseFloat(len) > 0 && !(len.endsWith("px") && parseFloat(len) >= 999));
     if (lengths.length) add("radius", `border-radius ${lengths.join(" ")}`);
   }
-  if (prop === "z-index" && !/^(?:auto|0)$/.test(v) && !NEUTRAL_VALUES.test(v) && !v.startsWith("var(")) add("z-index", `z-index ${v}`);
+  if (prop === "z-index" && !zIndexOk(v) && !NEUTRAL_VALUES.test(v)) add("z-index", `z-index ${v}`);
   if (prop === "box-shadow" && v !== "none" && !NEUTRAL_VALUES.test(v) && withoutCalls(v).trim() !== "") add("shadow", "box-shadow");
   if (prop === "text-transform" && v === "uppercase") add("all-caps", "text-transform: uppercase");
   if (/^outline(?:-style|-width)?$/.test(prop) && /^(?:none|0)(?:\s|$)/.test(v)) add("focus-ring", `outline: ${v}`);
@@ -313,7 +320,7 @@ function checkDeclaration(property, value, at) {
     if (/(?:^|[\s,])\d*\.?\d+m?s(?=[\s,]|$)/.test(own)) reasons.push("a duration of your own");
     if (prop === "transition" || prop === "transition-property") {
       const names = own.split(",").map((part) => part.trim().split(/\s+/)[0]).filter((name) => name && !/^\d/.test(name) && !NEUTRAL_VALUES.test(name));
-      const wrong = names.filter((name) => !ALLOWED_TRANSITION.has(name));
+      const wrong = names.filter((name) => !mayTransition(name));
       if (wrong.length) reasons.push(`it animates ${wrong.join(", ")}`);
     }
     if (reasons.length) add("motion", `${prop}: ${reasons.join(", ")}`);
@@ -396,7 +403,14 @@ const CLASS_RULES = [
   { re: /(?<![\w-])font-\[(\d+)\]/g, check: (m) => (WEIGHTS.has(m[1]) ? null : { rule: "font-weight", message: m[0] }) },
   { re: /(?<![\w-])font-\[(?!var\(|\d)[^\]]*\]/g, check: (m) => ({ rule: "font-family", message: m[0] }) },
   { re: /(?<![\w-])rounded(?:-[a-z]{1,2})?-\[(?!var\()([^\]]*)\]/g, check: (m) => (/[1-9]\d*(?:\.\d+)?(?:px|rem|em)|0?\.\d*[1-9]\d*(?:px|rem|em)/.test(m[1]) ? { rule: "radius", message: m[0] } : null) },
-  { re: /(?<![\w-])-?z-(\d+|\[[^\]]+\])(?![\w-])/g, check: (m) => (/^(?:0|\[0\]|\[auto\])$/.test(m[1]) ? null : { rule: "z-index", message: m[0] }) },
+  {
+    re: /(?<![\w-])(-?)z-(\d+|\[[^\]]+\]|\([^)]+\))(?![\w-])/g,
+    check: (m) => {
+      const inner = m[2].replace(/^[[(](.*)[\])]$/, "$1");
+      const value = m[1] === "-" ? `-${inner}` : inner;
+      return zIndexOk(/^--/.test(value) ? `var(${value})` : value) ? null : { rule: "z-index", message: m[0] };
+    },
+  },
   { re: /(?<![\w-])(?:inset-)?shadow-(?:2xs|xs|sm|md|lg|xl|2xl|inner|\[[^\]]+\])(?![\w-])/g, check: (m) => ({ rule: "shadow", message: m[0] }) },
   { re: /(?<![\w-])(?:inset-)?shadow(?![\w-/:])/g, bare: true, check: (m) => ({ rule: "shadow", message: m[0] }) },
   { re: /(?<![\w-])uppercase(?![\w-])/g, bare: true, check: (m) => ({ rule: "all-caps", message: m[0] }) },
@@ -407,12 +421,12 @@ const CLASS_RULES = [
   { re: /(?<![\w-])transition-all(?![\w-])/g, check: (m) => ({ rule: "motion", message: m[0] }) },
   { re: /(?<![\w-])ease-(?:in|out|in-out|linear)(?![\w-])/g, check: (m) => ({ rule: "motion", message: `${m[0]} (an easing of your own)` }) },
   { re: /(?<![\w-])duration-\d+(?![\w-])/g, check: (m) => ({ rule: "motion", message: `${m[0]} (a duration of your own)` }) },
-  { re: /(?<![\w-])transition-(?:colors|shadow)(?![\w-])/g, check: (m) => ({ rule: "motion", message: `${m[0]} (only transform and opacity)` }) },
+  { re: /(?<![\w-])transition-shadow(?![\w-])/g, check: (m) => ({ rule: "motion", message: `${m[0]} (only transform, opacity and colours)` }) },
   {
     re: /(?<![\w-])transition-\[([^\]]+)\]/g,
-    check: (m) => (m[1].split(",").every((name) => ALLOWED_TRANSITION.has(name.trim()) || name.trim().startsWith("var(")) ? null : { rule: "motion", message: `${m[0]} (only transform and opacity)` }),
+    check: (m) => (m[1].split(",").every((name) => mayTransition(name.trim()) || name.trim().startsWith("var(")) ? null : { rule: "motion", message: `${m[0]} (only transform, opacity and colours)` }),
   },
-  { re: /(?<![\w-:])transition(?![\w-/[])/g, bare: true, check: () => ({ rule: "motion", message: "transition (also animates colours; name transform or opacity)" }) },
+  { re: /(?<![\w-:])transition(?![\w-/[])/g, bare: true, check: () => ({ rule: "motion", message: "transition (also animates shadows and filters; name transform, opacity or colors)" }) },
 ];
 
 function problem(rule, message, what) {
@@ -503,6 +517,7 @@ const RAW_ELEMENTS = {
   details: "Collapsible or Expandable",
   textarea: "Textarea",
   progress: "Progress",
+  meter: "Meter",
   dialog: "Dialog",
 };
 const RAW_INPUTS = { range: "Slider or SliderField", checkbox: "Checkbox, Switch or SwitchField", radio: "RadioGroup", color: "ColorPicker" };
@@ -515,7 +530,7 @@ const ATTRS = `(?:[^>"']|"[^"]*"|'[^']*')*`;
 function templateChecks(code, ctx) {
   const out = [];
   out.push(...colors(code, slotFree(code)));
-  for (const m of matches(/<(button|select|table|details|textarea|progress|dialog)(?=[\s>/])/g, code)) {
+  for (const m of matches(/<(button|select|table|details|textarea|progress|meter|dialog)(?=[\s>/])/g, code)) {
     out.push({ index: m.index, rule: "kit-control", message: `raw <${m[1]}>: use ${RAW_ELEMENTS[m[1]]}` });
   }
   for (const m of matches(new RegExp(`<input\\b(${ATTRS})>`, "g"), code)) {
@@ -525,7 +540,21 @@ function templateChecks(code, ctx) {
     if (kit) out.push({ index: m.index, rule: "kit-control", message: `raw <input type="${type}">: use ${kit}` });
   }
   for (const m of matches(new RegExp(`<Button\\b(?:[^>"']|"[^"]*"|'[^']*')*?\\s:?aria-pressed\\b`, "g"), code)) {
+    // A bare Button is a tile the caller draws, on state included: a Toggle would give it a look.
+    const tag = new RegExp(`<Button\\b(${ATTRS})>`, "y");
+    tag.lastIndex = m.index;
+    if (/(?:^|\s)variant\s*=\s*["']bare["']/.test(tag.exec(code)?.[1] ?? "")) continue;
     out.push({ index: m.index, rule: "kit-control", message: "Button with aria-pressed: use Toggle or ToggleGroup" });
+  }
+  // role="toolbar" promises one Tab stop and arrow keys; the kit's Toolbar keeps that promise.
+  for (const m of matches(new RegExp(`<(?!Toolbar\\b)[\\w-]+\\b(?:[^>"']|"[^"]*"|'[^']*')*?\\srole\\s*=\\s*["']toolbar["']`, "g"), code)) {
+    out.push({ index: m.index, rule: "kit-control", message: 'role="toolbar" of your own: use Toolbar' });
+  }
+  // The panel's tinted tool strip is Toolbar variant="bar"; a copy drifts from it (height, tint, keys).
+  for (const m of matches(new RegExp(`<(?!Toolbar\\b)[\\w-]+\\b(${ATTRS})>`, "g"), code)) {
+    const value = /(?:^|\s)class\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(m[1]);
+    const list = (value?.[1] ?? value?.[2] ?? "").split(/\s+/);
+    if (list.includes("bg-primary/5") && list.includes("border-b")) out.push({ index: m.index, rule: "kit-control", message: 'a tool strip of your own: use Toolbar variant="bar"' });
   }
   for (const m of matches(new RegExp(`<a\\b(?:[^>"']|"[^"]*"|'[^']*')*?\\s:?download\\b`, "g"), code)) out.push({ index: m.index, rule: "file-save", message: "a download link" });
   for (const m of matches(/(?<=\s)(?::|v-bind:)?(?:[\w-]+-)?class\s*=\s*(?:"([^"]*)"|'([^']*)')/g, code)) {

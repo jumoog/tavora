@@ -1,5 +1,355 @@
 [
   {
+    "version": "0.1.101",
+    "date": "2026-11-28",
+    "notes": [
+      "Dialogs: the message sits under the title row, never beside the icon."
+    ]
+  },
+  {
+    "version": "0.1.100",
+    "date": "2026-11-28",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.99",
+    "date": "2026-11-28",
+    "notes": [
+      "Round buttons, toggles, tags and fields give their text a bit more room at the ends."
+    ]
+  },
+  {
+    "version": "0.1.98",
+    "date": "2026-11-28",
+    "notes": [
+      "A long choice in a list field stays on one line; hover it to read it all."
+    ]
+  },
+  {
+    "version": "0.1.97",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.96",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.95",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.94",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.93",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.92",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.91",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.90",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.89",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.88",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.87",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.86",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.85",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.84",
+    "date": "2026-11-27",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.83",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.82",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.81",
+    "date": "2026-11-26",
+    "notes": [
+      "Small look and feel updates."
+    ]
+  },
+  {
+    "version": "0.1.80",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.79",
+    "date": "2026-11-26",
+    "notes": [
+      "Small look and feel updates."
+    ]
+  },
+  {
+    "version": "0.1.78",
+    "date": "2026-11-26",
+    "notes": [
+      "Small changes to the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.77",
+    "date": "2026-11-26",
+    "notes": [
+      "New hover rows in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.76",
+    "date": "2026-11-26",
+    "notes": [
+      "Small fixes in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.75",
+    "date": "2026-11-26",
+    "notes": [
+      "The shared controls gained cards and checkbox rows."
+    ]
+  },
+  {
+    "version": "0.1.74",
+    "date": "2026-11-26",
+    "notes": [
+      "Dialogs come in four set widths, so they line up everywhere."
+    ]
+  },
+  {
+    "version": "0.1.73",
+    "date": "2026-11-26",
+    "notes": [
+      "Tabs have more room above and below the text."
+    ]
+  },
+  {
+    "version": "0.1.72",
+    "date": "2026-11-26",
+    "notes": [
+      "The history button looks like every other on/off button, and buttons, fields and lists line up at the same heights."
+    ]
+  },
+  {
+    "version": "0.1.71",
+    "date": "2026-11-25",
+    "notes": [
+      "Disabled controls all fade the same way, and empty charts say there's no data yet."
+    ]
+  },
+  {
+    "version": "0.1.70",
+    "date": "2026-11-25",
+    "notes": [
+      "Small fixes in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.69",
+    "date": "2026-11-25",
+    "notes": [
+      "Lists you pick from with a search show it as a field of its own."
+    ]
+  },
+  {
+    "version": "0.1.68",
+    "date": "2026-11-25",
+    "notes": [
+      "Save as no longer ends in …."
+    ]
+  },
+  {
+    "version": "0.1.67",
+    "date": "2026-11-25",
+    "notes": [
+      "Buttons in the shared controls can say how it went: Copied, Saved, or a spinner while they work."
+    ]
+  },
+  {
+    "version": "0.1.66",
+    "date": "2026-11-25",
+    "notes": [
+      "New stat tiles, fact lists and bar charts in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.65",
+    "date": "2026-11-25",
+    "notes": [
+      "Menus: rows follow the menu's rounded corners, and in Liquid Glass the row you point at is easy to see."
+    ]
+  },
+  {
+    "version": "0.1.64",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.63",
+    "date": "2026-11-25",
+    "notes": [
+      "New hover card in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.62",
+    "date": "2026-11-25",
+    "notes": [
+      "New tree view in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.61",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.60",
+    "date": "2026-11-25",
+    "notes": [
+      "Tooltips fade out when they close."
+    ]
+  },
+  {
+    "version": "0.1.59",
+    "date": "2026-11-25",
+    "notes": [
+      "Coloured chips get a coloured edge in the Hardware style."
+    ]
+  },
+  {
+    "version": "0.1.58",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.57",
+    "date": "2026-11-25",
+    "notes": [
+      "Built with the newer shared controls. Nothing changes for you."
+    ]
+  },
+  {
+    "version": "0.1.56",
+    "date": "2026-11-25",
+    "notes": [
+      "The shared list with search shows its no-match note in a frame."
+    ]
+  },
+  {
+    "version": "0.1.55",
+    "date": "2026-11-25",
+    "notes": [
+      "Small fixes in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.54",
+    "date": "2026-11-25",
+    "notes": [
+      "A new list with search in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.53",
+    "date": "2026-11-25",
+    "notes": [
+      "New chips and a tag field in the shared controls."
+    ]
+  },
+  {
+    "version": "0.1.52",
+    "date": "2026-11-25",
+    "notes": [
+      "Save in the value dialog is plain text now, without an icon."
+    ]
+  },
+  {
     "version": "0.1.51",
     "date": "2026-11-25",
     "notes": [
@@ -286,101 +636,6 @@
     "date": "2026-11-01",
     "notes": [
       "Menus and tooltips open out of the spot they belong to, and buttons dip a little when you press them."
-    ]
-  },
-  {
-    "version": "0.1.11",
-    "date": "2026-11-01",
-    "notes": [
-      "Dropdowns where you pick a value show an up-and-down arrow."
-    ]
-  },
-  {
-    "version": "0.1.10",
-    "date": "2026-11-01",
-    "notes": [
-      "Settings now open as a dialog over the whole workspace, not inside the small panel."
-    ]
-  },
-  {
-    "version": "0.1.9",
-    "date": "2026-11-01",
-    "notes": [
-      "Settings now open in a dialog in the middle of the panel, behind the usual gear icon."
-    ]
-  },
-  {
-    "version": "0.1.8",
-    "date": "2026-10-31",
-    "notes": [
-      "Text fields and dropdowns look calmer in Dark mode."
-    ]
-  },
-  {
-    "version": "0.1.7",
-    "date": "2026-10-30",
-    "notes": [
-      "The first update that comes straight from the catalog, without a new Tavora version."
-    ]
-  },
-  {
-    "version": "0.1.6",
-    "date": "2026-10-27",
-    "notes": [
-      "A ⚙ menu in the toolbar: pick how many decimal places results show, and how many results the history keeps (10, 25 or 50).",
-      "Short numbers: results from a million on can show as 1.5M, 2B or 3T.",
-      "Copy and your sums always use the full number."
-    ]
-  },
-  {
-    "version": "0.1.5",
-    "date": "2026-10-27",
-    "notes": [
-      "Save as… keeps a result under a name, like iron. Tap it under Values to use it in a sum.",
-      "A sum counts with the value as it is now; if you delete it, the sum tells you.",
-      "Plus has a new row: k, m and b for thousands, millions and billions, and ⌈x⌉ to round up. You can type k, m and b in Basic too."
-    ]
-  },
-  {
-    "version": "0.1.4",
-    "date": "2026-10-25",
-    "notes": [
-      "Enter works on the key you tabbed to, instead of acting on the sum.",
-      "Clear history asks first.",
-      "Only the result line is read out loud, not every key."
-    ]
-  },
-  {
-    "version": "0.1.3",
-    "date": "2026-10-22",
-    "notes": [
-      "The keys keep a size you can press, in small panels too; a short panel scrolls instead.",
-      "The history keeps room for your results below or beside the keypad."
-    ]
-  },
-  {
-    "version": "0.1.2",
-    "date": "2026-10-22",
-    "notes": [
-      "A toolbar on top: switch between the Basic keypad and Plus, and show or hide your history.",
-      "The keypad no longer gets cut off when the panel is wide but not wide enough for the history beside it."
-    ]
-  },
-  {
-    "version": "0.1.1",
-    "date": "2026-10-22",
-    "notes": [
-      "New keys: √, x², ± and ans for your last result, with the Windows shortcuts @, q and F9.",
-      "Copy puts the result on your clipboard as a plain number, also with Ctrl+C.",
-      "Big numbers show their thousands, like 1,234,567."
-    ]
-  },
-  {
-    "version": "0.1.0",
-    "date": "2026-10-22",
-    "notes": [
-      "A quick calculator for each game, with your keyboard too.",
-      "Your last 10 results stay, so you can pick them up again."
     ]
   }
 ]

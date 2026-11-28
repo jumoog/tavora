@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Copy, FolderInput, MoreHorizontal, Pencil, Pin, Trash2 } from "@lucide/vue";
+import { ChevronDown, Copy, Eraser, FolderInput, MoreHorizontal, Pencil, Pin, Trash2 } from "@lucide/vue";
 import { Button } from "@tavora/official-ui/components/ui/button";
 import {
   DropdownMenu,
@@ -20,6 +20,9 @@ import { ref } from "vue";
 
 const showRead = ref(true);
 const sort = ref("recent");
+// A choice inside a submenu: the submenu's entry shows that it holds the chosen one (`chosen`).
+const format = ref("number");
+const decimals = ref("2");
 </script>
 
 <template>
@@ -48,9 +51,32 @@ const sort = ref("recent");
         <DropdownMenuRadioGroup v-model="sort">
           <DropdownMenuRadioItem value="recent">Recently changed</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="name">Name</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="size" disabled disabled-reason="Only for notes with files.">Size</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
+        <!-- Off, it isn't red: the red comes back once it can be chosen. -->
+        <DropdownMenuItem variant="destructive" disabled disabled-reason="Already empty."><Eraser /> Clear</DropdownMenuItem>
         <DropdownMenuItem variant="destructive"><Trash2 /> Delete note</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+    <DropdownMenu>
+      <DropdownMenuTrigger as-child>
+        <Button variant="secondary">Format <ChevronDown /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" class="w-48">
+        <DropdownMenuRadioGroup v-model="format">
+          <DropdownMenuRadioItem value="auto">Automatic</DropdownMenuRadioItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger inset :chosen="format === 'number'">Number</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup :model-value="format === 'number' ? decimals : ''" @update:model-value="(value) => { format = 'number'; decimals = String(value) }">
+                <DropdownMenuRadioItem value="0">0 decimals</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="2">2 decimals</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuRadioItem value="text">Text</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
     <DropdownMenu>

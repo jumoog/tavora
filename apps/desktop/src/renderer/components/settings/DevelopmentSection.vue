@@ -6,10 +6,11 @@
 // then, and Let's go shows them, kept in the library (so in backups and the cloud copy). Once we know publishing
 // isn't set up, a card offers the developer onboarding; on a new PC of a developer, a line points to the recovery key
 // on Publishing instead.
-import { CircleAlert, KeyRound, Loader, RefreshCw, Rocket, Upload } from "@lucide/vue";
+import { ChevronRight, CircleAlert, KeyRound, Loader, RefreshCw, Rocket, Upload } from "@lucide/vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { Badge } from "@tavora/official-ui/components/ui/badge";
 import { Button } from "@tavora/official-ui/components/ui/button";
+import { TextLink } from "@tavora/official-ui/components/ui/text-link";
 import { SegmentedControl } from "@tavora/official-ui/components/ui/segmented-control";
 import type { SettingsSection } from "./settings-index";
 import { account, act, developerKeys, developerState, dialog, inbox, makesModules, releaseStatus, showToast, state } from "../../host";
@@ -140,7 +141,7 @@ onMounted(() => {
     <p v-if="signedIn && recoveryKey" class="mb-6 flex flex-wrap items-center gap-x-2 text-sm" data-testid="dev-modules-recovery">
       <KeyRound class="text-warning size-4 flex-none" aria-hidden="true" />
       {{ t("devModules.recovery") }}
-      <Button variant="link" class="h-auto p-0" @click="emit('show', 'dev-publishing')">{{ t("settings.section.dev-publishing") }}</Button>
+      <TextLink class="text-primary" @click="emit('show', 'dev-publishing')">{{ t("settings.section.dev-publishing") }}</TextLink>
     </p>
 
     <SettingGroup v-if="startCard">
@@ -161,8 +162,8 @@ onMounted(() => {
       <div v-if="!entries.length" class="flex flex-wrap items-center gap-x-6 gap-y-3 py-4" data-testid="dev-modules-none">
         <span class="text-muted-foreground min-w-0 flex-1 basis-56 text-sm">{{ t("devModules.none") }}</span>
         <span class="flex flex-none flex-wrap gap-2">
-          <Button variant="secondary" data-testid="dev-modules-to-folders" @click="emit('show', 'dev-folders')">{{ t("settings.section.dev-folders") }}</Button>
-          <Button variant="ghost" data-testid="dev-modules-to-examples" @click="emit('show', 'dev-help')">{{ t("settings.development-examples.label") }}</Button>
+          <Button variant="secondary" data-testid="dev-modules-to-folders" @click="emit('show', 'dev-folders')">{{ t("settings.section.dev-folders") }}<ChevronRight data-icon="end" /></Button>
+          <Button variant="ghost" data-testid="dev-modules-to-examples" @click="emit('show', 'dev-help')">{{ t("settings.development-examples.label") }}<ChevronRight data-icon="end" /></Button>
         </span>
       </div>
       <ul v-else class="flex flex-col" :aria-label="t('settings.section.development')" data-testid="dev-modules" data-setting="module-contact">
@@ -182,7 +183,7 @@ onMounted(() => {
     <p v-if="problems" class="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-2 text-sm" data-testid="dev-modules-problems">
       <CircleAlert class="text-warning size-4 flex-none" aria-hidden="true" />
       {{ t("devModules.problems") }}
-      <Button variant="link" class="h-auto p-0" @click="emit('show', 'dev-folders')">{{ t("settings.section.dev-folders") }}</Button>
+      <TextLink class="text-primary" @click="emit('show', 'dev-folders')">{{ t("settings.section.dev-folders") }}</TextLink>
     </p>
 
     <SettingGroup v-if="official.available" :title="t('officialPublish.title')" :description="t('officialPublish.description')">

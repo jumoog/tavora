@@ -652,7 +652,7 @@ test("cards move as groups, undo, keep their pictures, and leave room in narrow 
     await setContentSize(app, 540, 620);
     await expect.poll(() => inModule(app, WHITEBOARD, `document.querySelector('[data-testid="board-actions"]').getBoundingClientRect().width > 0`)).toBe(true);
     expect(await inModule(app, WHITEBOARD, `document.querySelector('[data-testid="copy-picture"]').getBoundingClientRect().width`)).toBe(0);
-    expect(await inModule(app, WHITEBOARD, `document.querySelector('header').getBoundingClientRect().height`)).toBeLessThan(45);
+    expect(await inModule(app, WHITEBOARD, `document.querySelector('[data-testid="board-toolbar"]').getBoundingClientRect().height`)).toBeLessThan(45);
     // Fit to the resized viewport, as a user can do with Shift+1.
     await drag(app, {x: 100, y: 200}, {x: 100, y: 200});
     await app.evaluate(({webContents}, id) => {
@@ -803,9 +803,17 @@ test("screenshot starter cancellation creates nothing, then a chosen image is lo
   try {
     await openModule(page,WHITEBOARD);
     await expect.poll(() => inModule(app,WHITEBOARD,off(q("add-card"))).catch(()=>true)).toBe(false);
-    // Cancel the native chooser without opening an OS dialog in the test run.
-    await inModule(app,WHITEBOARD,`${q("starter-file")}.addEventListener('click',event=>event.preventDefault(),{once:true})`);
-    await newBoard(app,"screenshot");
+    // The starter opens Tavora's open dialog (a real click, so the host lets it); the user closes it.
+    await app.evaluate(({ dialog }) => {
+      const seen = globalThis as { openAsked?: number };
+      seen.openAsked = 0;
+      dialog.showOpenDialog = (async () => ((seen.openAsked! += 1), { canceled: true, filePaths: [] })) as unknown as typeof dialog.showOpenDialog;
+    });
+    await click(app, "board-menu");
+    await click(app, "board-new");
+    await expect.poll(() => inModule(app, WHITEBOARD, `!!${q("board-new-screenshot")}`)).toBe(true);
+    await click(app, "board-new-screenshot");
+    await expect.poll(() => app.evaluate(() => (globalThis as { openAsked?: number }).openAsked)).toBe(1);
     expect(Object.keys(await storedBoards(userData))).toEqual(["Board 1"]);
     await inModule(app,WHITEBOARD,`(() => {const files=new DataTransfer();files.items.add(new File(['broken'],'bad.png',{type:'image/png'}));${q("starter-file")}.files=files.files;${q("starter-file")}.dispatchEvent(new Event('change',{bubbles:true}));})()`);
     await expect.poll(() => inModule(app,WHITEBOARD,`${NEWEST_TOAST}?.textContent ?? ''`)).toContain("Could not create the board");

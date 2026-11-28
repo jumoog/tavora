@@ -20,6 +20,7 @@ import { useResizeObserver } from "@vueuse/core";
 import { ChevronDown, ChevronLeft, ChevronRight, X } from "@lucide/vue";
 import { TabsRoot } from "reka-ui";
 import { Button } from "../button";
+import { leaveToolbar } from "../toolbar/context";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "../dropdown-menu";
 import { isComposing } from "../../../lib/keys";
 import { cn } from "../../../lib/utils";
@@ -33,6 +34,8 @@ import { reducedMotion, useReorderMotion } from "../reorder";
 import { bindDrag } from "../../../lib/bind-drag";
 import { checkRename, moveTab, neighbourAfterClose, neighbourTab, revealBy, stepTab, tabsOutOfView, type StripTab } from "./tab-strip";
 import { tabOverflow, type TabOverflow } from "./tab-overflow";
+// Its buttons are parts of it, not stops of a Toolbar around it.
+leaveToolbar();
 
 const props = withDefaults(
   defineProps<{
@@ -399,7 +402,7 @@ function endDrag(settled: boolean) {
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button type="button" variant="ghost" size="sm" class="gap-0.5 px-1.5 text-xs tabular-nums" :aria-label="moreLabel" :title="moreLabel" data-testid="strip-hidden-tabs">
-            <ChevronDown aria-hidden="true" />{{ hiddenTabs.length }}
+            {{ hiddenTabs.length }}<ChevronDown aria-hidden="true" data-icon="end" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="end" class="max-w-72 min-w-52" data-testid="strip-hidden-menu">
@@ -414,7 +417,7 @@ function endDrag(settled: boolean) {
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-    <Tooltip :open="renameTip && !!renameProblem" :anchor="renameAnchor" :title="renameProblem" tone="danger" compact @dismiss="renameTip = false" />
+    <Tooltip :open="renameTip && !!renameProblem" :anchor="renameAnchor" :title="renameProblem" tone="destructive" compact @dismiss="renameTip = false" />
     <span :id="renameTipId" class="sr-only" role="alert">{{ renameProblem }}</span>
     <div v-if="$slots.add" class="relative z-10 flex flex-none items-center pl-1" data-testid="tab-strip-add">
       <slot name="add" />

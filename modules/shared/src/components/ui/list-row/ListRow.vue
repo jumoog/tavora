@@ -3,6 +3,7 @@
 // front (`leading`), the label, a second line (`description`) and something at the end (`trailing`, such as a kind, a
 // count or a temperature). The label is cut off with "…"; `wrap` lets label and second line wrap instead.
 // `selected` marks the current row (a soft primary tint; `aria-current`, or `aria-selected` in a `role="option"` row).
+// A row that leads to a page or view takes `navigation`: selected, it says `aria-current="page"`, as NavList does.
 // `highlighted` is the keyboard highlight of a list that keeps the focus itself (a listbox): it only changes the look.
 // An `a` that is off loses its `href`, so it can't be opened in a new tab either.
 // `as="div"` is a row that looks the same but does nothing, such as the channel you are already in.
@@ -11,21 +12,26 @@ import type { HTMLAttributes } from "vue"
 import { computed, useAttrs } from "vue"
 import { useSoftDisabled } from "../../../lib/soft-disabled"
 import { cn } from "../../../lib/utils"
+import { CONTROL_MIN_HEIGHT, type ControlSize } from "../../../lib/control-size"
 import { DIP_PRESS } from "../button"
 
 const props = withDefaults(
   defineProps<{
     as?: "button" | "a" | "div"
     selected?: boolean
+    /** The row leads to a page or view, so a selected one says `aria-current="page"`. */
+    navigation?: boolean
     highlighted?: boolean
     /** Wraps the label and the second line instead of cutting them off. */
     wrap?: boolean
     disabled?: boolean
     /** Why it is off. While `disabled` it stays hoverable and focusable, and the reason shows in a tooltip beside it. */
     disabledReason?: string
+    /** Its least height on the kit's size scale (it grows with a second line). */
+    size?: ControlSize
     class?: HTMLAttributes["class"]
   }>(),
-  { as: "button", selected: false, highlighted: false, wrap: false, disabled: false },
+  { as: "button", selected: false, navigation: false, highlighted: false, wrap: false, disabled: false, size: "default" },
 )
 
 defineOptions({ inheritAttrs: false })
@@ -42,10 +48,12 @@ const HOVER_FILL = "bg-[color-mix(in_srgb,var(--foreground)_10%,var(--accent))]"
 
 /**
  * An option row says it is chosen with `aria-selected` (always set, as listboxes expect); any other with `aria-current`.
+ * A list whose `aria-selected` follows its highlight (a palette: PaletteItem) passes its own `aria-selected`, which wins.
  * Called from the template, so a `role` that changes later is read again (attributes aren't tracked by a computed).
  */
 function selection() {
-  return attrs.role === "option" ? { "aria-selected": props.selected ? "true" : "false" } : props.selected ? { "aria-current": "true" } : {}
+  if (attrs.role === "option") return { "aria-selected": attrs["aria-selected"] !== undefined ? String(attrs["aria-selected"]) : props.selected ? "true" : "false" }
+  return props.selected ? { "aria-current": props.navigation ? "page" : "true" } : {}
 }
 </script>
 
@@ -61,7 +69,8 @@ function selection() {
     :data-highlighted="highlighted ? '' : undefined"
     :class="
       cn(
-        'group/list-row flex min-h-[var(--style-control-height,32px)] w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm outline-none transition-[color,background-color,translate] duration-(--duration-press) ease-(--ease-out-strong) focus-visible:inset-ring-2 focus-visible:inset-ring-ring',
+        'group/list-row flex w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm outline-none transition-[color,background-color,translate] duration-(--duration-press) ease-(--ease-out-strong) focus-visible:inset-ring-2 focus-visible:inset-ring-ring',
+        CONTROL_MIN_HEIGHT[size],
         $slots.description && 'py-1.5',
         live && ['cursor-pointer', `hover:${HOVER_FILL}`, DIP_PRESS],
         highlighted && HOVER_FILL,

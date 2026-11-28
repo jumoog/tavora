@@ -17,7 +17,6 @@ import {
   ListChecks,
   ListOrdered,
   Pin,
-  PinOff,
   Quote,
   SquareCode,
   Strikethrough,
@@ -25,6 +24,8 @@ import {
 } from "@lucide/vue";
 import { cn, errorMessage } from "@tavora/official-ui";
 import { Button } from "@tavora/official-ui/components/ui/button";
+import { Input } from "@tavora/official-ui/components/ui/input";
+import { Toggle } from "@tavora/official-ui/components/ui/toggle";
 import { isComposing } from "@tavora/official-ui/lib/keys";
 import {
   DropdownMenu,
@@ -34,6 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@tavora/official-ui/components/ui/dropdown-menu";
+import { Toolbar } from "@tavora/official-ui/components/ui/toolbar";
 import { Placeholder } from "@tiptap/extensions";
 import { EditorContent, useEditor } from "@tiptap/vue-3";
 import type { DocumentHandle } from "@tavora/sdk/store";
@@ -86,7 +88,7 @@ let boundId: string | null = null;
 let unbind: (() => void)[] = [];
 /** The title field's text; empty means the first line is the title. */
 const titleDraft = ref("");
-const titleInput = ref<HTMLInputElement | null>(null);
+const titleInput = ref<InstanceType<typeof Input> | null>(null);
 let titleFocused = false;
 /** Which parts of the note have changes that were not handed to the document store yet. */
 let contentDirty = false;
@@ -96,7 +98,7 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 /** The editor has typing of its own that another panel's copy must not replace: waiting for the store, or being saved. */
 const busy = () => contentDirty || titleDirty || saveState.value === "pending" || saveState.value === "saving";
 
-const { adding, lightbox, fileInput, imageUsage, imageBar, addImages, onFiles, onFilePicked, refreshImageUsage, updateImageBar, setImage, openSelectedImage, removeSelectedImage } = useNoteImages({
+const { adding, lightbox, fileInput, imageUsage, imageBar, addImages, onFiles, chooseImages, onFilePicked, refreshImageUsage, updateImageBar, setImage, openSelectedImage, removeSelectedImage } = useNoteImages({
   store: () => props.store,
   editor: () => editor.value,
   loadedNote: () => loadedNote.value,
@@ -493,7 +495,7 @@ const statusText = (state: SaveState): string => (state === "idle" ? "" : t(`sav
 
 <template>
   <section ref="root" class="flex h-full min-w-0 flex-col" :data-ctrl="ctrlHeld" :aria-label="t('editor.note')" data-testid="note-editor" :data-loaded="loadedNote ?? ''">
-    <header class="border-primary/25 bg-primary/5 flex h-10 flex-none items-center gap-1 border-b px-2">
+    <Toolbar variant="bar" :label="t('editor.toolbar')">
       <Button
         v-if="narrow"
         variant="ghost"
@@ -506,7 +508,7 @@ const statusText = (state: SaveState): string => (state === "idle" ? "" : t(`sav
       >
         <PanelLeftOpen />
       </Button>
-      <div class="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden" role="toolbar" :aria-label="t('editor.formatting')">
+      <div class="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden" role="group" :aria-label="t('editor.formatting')">
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <Button variant="ghost" size="icon-sm" :aria-label="t('editor.textStyle')" :title="t('editor.textStyle')">
@@ -548,7 +550,7 @@ const statusText = (state: SaveState): string => (state === "idle" ? "" : t(`sav
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" class="min-w-60">
-            <DropdownMenuItem data-testid="image-choose" @select="fileInput?.click()">{{ t("image.choose") }}</DropdownMenuItem>
+            <DropdownMenuItem data-testid="image-choose" @select="chooseImages()">{{ t("image.choose") }}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>{{ t("image.quality") }}</DropdownMenuLabel>
             <DropdownMenuItem v-for="quality in (['optimized', 'original'] as const)" :key="quality" :data-testid="`quality-${quality}`" @select.prevent="store.setImageQuality(quality)">
@@ -566,20 +568,18 @@ const statusText = (state: SaveState): string => (state === "idle" ? "" : t(`sav
         </DropdownMenu>
         <template v-for="(group, index) in shownGroups" :key="index">
           <span class="bg-border mx-1 h-4 w-px flex-none" aria-hidden="true" />
-          <Button
+          <Toggle
             v-for="tool in group"
             :key="tool.label"
             variant="ghost"
-            size="icon-sm"
-            :class="cn('flex-none', tool.active && 'bg-accent text-foreground')"
-            :aria-label="tool.label"
-            :aria-pressed="tool.active"
-            :title="tool.label"
+            size="sm"
+            :model-value="tool.active"
+            :label="tool.label"
             @mousedown.prevent
-            @click="tool.run()"
+            @update:model-value="tool.run()"
           >
             <component :is="tool.icon" />
-          </Button>
+          </Toggle>
         </template>
         <DropdownMenu v-if="moreTools.length">
           <DropdownMenuTrigger as-child>
@@ -629,33 +629,30 @@ const statusText = (state: SaveState): string => (state === "idle" ? "" : t(`sav
           <Eraser />
         </Button>
       </template>
-      <Button
+      <Toggle
         v-else
         variant="ghost"
-        size="icon-sm"
-        class="flex-none"
+        size="sm"
         data-testid="toggle-pin"
-        :aria-label="entry?.pinned ? t('editor.unpin') : t('editor.pin')"
-        :aria-pressed="entry?.pinned ?? false"
-        :title="entry?.pinned ? t('editor.unpin') : t('editor.pin')"
-        @click="emit('togglePin')"
+        :model-value="entry?.pinned ?? false"
+        :label="t('editor.pin')"
+        @update:model-value="emit('togglePin')"
       >
-        <PinOff v-if="entry?.pinned" />
-        <Pin v-else />
-      </Button>
-    </header>
+        <Pin />
+      </Toggle>
+    </Toolbar>
     <div v-if="store.deleted.value" class="bg-muted flex flex-none items-center gap-2 border-b px-3 py-1.5 text-sm" role="status" data-testid="deleted-banner">
       <span class="text-muted-foreground min-w-0 flex-1 truncate">{{ t("editor.deleted") }}</span>
       <Button variant="outline" size="sm" data-testid="restore-note" @click="restoreDeleted">{{ t("editor.restore") }}</Button>
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto" :style="lookVars" @scroll.passive="(linkPopover = null), updateImageBar()">
       <div class="mx-auto max-w-[760px] px-4 py-3">
-        <input
+        <Input
           v-if="noteId !== SCRATCHPAD_ID"
           ref="titleInput"
           v-model="titleDraft"
-          type="text"
-          class="note-title placeholder:text-muted-foreground mb-3 w-full min-w-0 border-b border-transparent bg-transparent pb-1 text-xl font-semibold outline-none"
+          variant="bare"
+          class="-mx-1 mb-3 h-auto w-[calc(100%+0.5rem)] px-1 py-0.5 text-xl font-semibold disabled:opacity-100"
           data-testid="note-title-input"
           :maxlength="MAX_FIXED_TITLE"
           :placeholder="derivedTitle"
@@ -689,9 +686,6 @@ const statusText = (state: SaveState): string => (state === "idle" ? "" : t(`sav
 }
 .note-content > * + * {
   margin-top: 8px;
-}
-.note-title:focus {
-  border-bottom-color: var(--primary);
 }
 .note-content h1 {
   color: var(--primary);

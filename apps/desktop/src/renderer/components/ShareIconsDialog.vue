@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Images, Loader, LogIn, Upload } from "@lucide/vue";
+import { Images, Loader } from "@lucide/vue";
 import { computed, ref } from "vue";
 import { Button } from "@tavora/official-ui/components/ui/button";
 import { DialogButton, DialogFooter } from "@tavora/official-ui/components/ui/dialog";
-import { Checkbox } from "@tavora/official-ui/components/ui/checkbox";
+import { CheckboxField } from "@tavora/official-ui/components/ui/checkbox-field";
 import { useTask } from "@tavora/official-ui/use-task";
 import { MAX_SHARE_BATCH } from "../../shared/host-actions";
 import type { HostAction } from "../../shared/host-api";
@@ -141,7 +141,7 @@ async function share() {
     testid="share-icons-dialog"
     :status="status"
     :busy="busy"
-    class="sm:max-w-[460px]"
+    size="md"
     @close="dialog = null"
   >
     <div class="flex flex-col gap-4">
@@ -157,16 +157,16 @@ async function share() {
       </div>
       <ul class="-mx-2 max-h-[280px] overflow-y-auto" :aria-label="t('shareIcons.list')">
         <li v-for="row in rows" :key="row.key">
-          <label class="hover:bg-accent flex cursor-pointer items-center gap-3 rounded-md px-2 py-2">
-            <Checkbox
-              :model-value="ticked.has(row.key)"
-              :disabled="busy"
-              :data-testid="`share-icon-${row.key}`"
-              @update:model-value="(checked) => toggle(row.key, checked === true)"
-            />
-            <img :src="row.icon" alt="" class="bg-secondary size-10 flex-none rounded-lg object-contain p-1" draggable="false" />
-            <span class="min-w-0 flex-1 truncate">{{ row.name }}</span>
-          </label>
+          <CheckboxField
+            :model-value="ticked.has(row.key)"
+            :label="row.name"
+            :disabled="busy"
+            class="h-auto gap-3 py-2 text-base"
+            :data-testid="`share-icon-${row.key}`"
+            @update:model-value="(checked) => toggle(row.key, checked === true)"
+          >
+            <template #leading><img :src="row.icon" alt="" class="bg-secondary size-10 flex-none rounded-lg object-contain p-1" draggable="false" /></template>
+          </CheckboxField>
         </li>
       </ul>
     </template>
@@ -191,8 +191,8 @@ async function share() {
         {{ t("shareIcons.progress", progress) }}
       </span>
       <DialogButton type="button" close :disabled="busy" @click="dialog = null">{{ empty ? t("common.close") : t("common.cancel") }}</DialogButton>
-      <DialogButton v-if="!empty && !signedIn" type="button" :icon="LogIn" data-testid="share-icons-sign-in-button" @click="signIn">{{ t("account.signIn") }}</DialogButton>
-      <DialogButton v-else-if="!empty" type="button" :icon="Upload" :loading="busy" data-testid="share-icons-submit" :disabled="busy || looking || count === 0" @click="share">
+      <DialogButton v-if="!empty && !signedIn" type="button" data-testid="share-icons-sign-in-button" @click="signIn">{{ t("account.signIn") }}</DialogButton>
+      <DialogButton v-else-if="!empty" type="button" :busy="busy" data-testid="share-icons-submit" :disabled="busy || looking || count === 0" @click="share">
         {{ t("shareIcons.submit", { count: Math.max(count, 1) }) }}
       </DialogButton>
     </DialogFooter>

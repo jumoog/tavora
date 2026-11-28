@@ -3,8 +3,10 @@ import type { HTMLAttributes } from "vue"
 import { useVModel } from "@vueuse/core"
 import { ref } from "vue"
 import { useSoftDisabled } from "../../../lib/soft-disabled"
+import { controlSize, type ControlSize } from "../../../lib/control-size"
 import { cn } from "../../../lib/utils"
 import { useFieldControl } from "../field/use-field-control"
+import { BARE_FIELD, INPUT_PILL, INPUT_SIZE, inputLook } from "./look"
 
 defineOptions({ inheritAttrs: false })
 const props = defineProps<{
@@ -17,6 +19,10 @@ const props = defineProps<{
    * copied), and the reason shows in a tooltip beside it.
    */
   disabledReason?: string
+  /** The kit's size scale: as tall as a Button of the same size. */
+  size?: ControlSize
+  /** `bare`: no edge until hovered or focused, for a title edited in place or a quick-add line. */
+  variant?: "default" | "bare"
 }>()
 
 const emits = defineEmits<{
@@ -38,14 +44,10 @@ const field = useFieldControl({ element: () => element.value, value: () => model
     ref="element"
     v-model="modelValue"
     data-slot="input"
+    :data-variant="props.variant === 'bare' ? 'bare' : undefined"
     v-bind="{ ...soft.attrs(), ...field.attrs() }"
     :disabled="soft.disabled()"
     :readonly="soft.soft() || undefined"
-    :class="cn(
-      'file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/10 border-input h-[var(--style-control-height,32px)] w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
-      'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3',
-      'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
-      props.class,
-    )"
+    :class="cn(...inputLook, INPUT_SIZE[controlSize(props.size)], INPUT_PILL[controlSize(props.size)], props.variant === 'bare' && BARE_FIELD, props.class)"
   >
 </template>

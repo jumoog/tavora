@@ -3,11 +3,12 @@
 // interrupts: it breathes out twice when it shows up, a ring along its edge fills while the version downloads, and a
 // press opens a popover beside it with what is new, the download's progress and Restart now. Restarting is always the
 // user's press; otherwise the update installs when Tavora is closed.
-import { ArrowDownToLine, RefreshCw } from "@lucide/vue";
+import { ArrowDownToLine, Download, RefreshCw } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
 import { Button } from "@tavora/official-ui/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@tavora/official-ui/components/ui/popover";
 import { Progress } from "@tavora/official-ui/components/ui/progress";
+import { TextLink } from "@tavora/official-ui/components/ui/text-link";
 import { cn } from "@tavora/official-ui/lib/utils";
 import { act, state, useFloating } from "../host";
 import { t } from "../i18n";
@@ -78,9 +79,9 @@ const more = computed(() => !allNotes.value && (found.value?.notes.length ?? 0) 
   <Popover v-if="found" v-model:open="open">
     <RailTooltip :text="label" :disabled="expanded || open">
       <PopoverTrigger as-child>
-        <button
-          type="button"
-          class="update-marker text-primary hover:bg-accent mx-2 flex items-center gap-2.5 rounded-lg px-1 transition-colors group-data-[expanded=true]/rail:px-2 group-data-[expanded=true]/rail:py-[5px] focus-visible:-outline-offset-2"
+        <Button
+          variant="bare"
+          class="update-marker text-primary hover:bg-accent hover:text-inherit mx-2 flex items-center gap-2.5 rounded-lg px-1 transition-colors group-data-[expanded=true]/rail:px-2 group-data-[expanded=true]/rail:py-[5px] focus-visible:-outline-offset-2"
           data-rail-item
           data-testid="rail-update"
           :data-status="found.status"
@@ -91,7 +92,7 @@ const more = computed(() => !allNotes.value && (found.value?.notes.length ?? 0) 
             <ArrowDownToLine v-else class="size-5" />
           </RailFooterTile>
           <span v-if="expanded" class="truncate text-sm font-medium">{{ label }}</span>
-        </button>
+        </Button>
       </PopoverTrigger>
     </RailTooltip>
     <PopoverContent side="right" align="end" :side-offset="10" class="w-[23rem] p-0" :aria-label="title" data-testid="update-popover" @escape-key-down="closedByKey = true" @close-auto-focus="closeAutoFocus">
@@ -108,7 +109,7 @@ const more = computed(() => !allNotes.value && (found.value?.notes.length ?? 0) 
               <span>{{ note }}</span>
             </li>
           </ul>
-          <Button v-if="more" variant="link" size="xs" class="mt-1.5 h-auto px-0" data-testid="update-popover-more" @click="allNotes = true">{{ t("update.popover.more") }}</Button>
+          <TextLink v-if="more" class="text-primary mt-1.5 text-xs" data-testid="update-popover-more" @click="allNotes = true">{{ t("update.popover.more") }}</TextLink>
         </template>
       </div>
       <div :class="cn('flex min-h-14 items-center gap-3 border-t px-4 py-3', found.status === 'downloading' && 'min-h-0 py-4')">
@@ -121,7 +122,7 @@ const more = computed(() => !allNotes.value && (found.value?.notes.length ?? 0) 
         </template>
         <template v-else>
           <span class="flex-1" />
-          <Button size="sm" data-testid="update-popover-download" @click="act({ type: 'download-update' })">{{ failed ? t("update.popover.retry") : t("settings.updates.download") }}</Button>
+          <Button size="sm" data-testid="update-popover-download" @click="act({ type: 'download-update' })"><Download />{{ failed ? t("update.popover.retry") : t("settings.updates.download") }}</Button>
         </template>
       </div>
     </PopoverContent>

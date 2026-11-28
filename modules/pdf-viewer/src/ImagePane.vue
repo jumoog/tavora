@@ -4,7 +4,7 @@
 import { ZoomPane } from "@tavora/official-ui/components/ui/zoom-pane";
 import { Notice } from "@tavora/official-ui/components/ui/notice";
 import { nextTick, ref, watch } from "vue";
-import { shownFit, type FileView } from "./files";
+import { fitToSave, type FileView } from "./files";
 import { t } from "./i18n";
 
 const props = defineProps<{ url: string; name: string; view: FileView }>();
@@ -48,8 +48,9 @@ watch(
   ([zoom, gliding]) => {
     if (!ready || zoom === undefined || gliding) return;
     const fit = Math.abs(zoom - fitZoom) < 0.002 ? "page" : null;
-    // While the fit is the one shown, what is stored stays (a newer version's fit shows as the default).
-    emit("view", { zoom, fit: fit === shownFit(props.view.fit, "image") ? props.view.fit : fit });
+    // Every change after the first fit is the reader's (a zoom, the Whole map button), so it is saved as it is, also when it is
+    // the fit that was shown for a newer version's one (fitToSave with `picked`).
+    emit("view", { zoom, fit: fitToSave(fit, props.view.fit, "image", true) });
   },
 );
 
@@ -62,7 +63,7 @@ function toggle() {
 </script>
 
 <template>
-  <Notice v-if="failed" variant="error" class="m-3" data-testid="image-error">{{ t("image.failed") }}</Notice>
+  <Notice v-if="failed" variant="destructive" class="m-3" data-testid="image-error">{{ t("image.failed") }}</Notice>
   <div v-else ref="box" class="h-full min-h-0 p-2" @dblclick="toggle">
     <ZoomPane ref="pane" class="h-full" double-click="off" :whole-label="t('image.whole')" :label="name" :min-zoom="0.05" :max-zoom="8" :fit-floor="0.05" data-testid="image-pane">
       <img :src="url" :alt="name" class="block max-w-none select-none" draggable="false" data-testid="image-view" @load="loaded" @error="failed = true" />

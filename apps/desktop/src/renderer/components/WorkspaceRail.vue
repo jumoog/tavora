@@ -21,6 +21,7 @@ import UpdateMarker from "./UpdateMarker.vue";
 import RailWorkspace from "./RailWorkspace.vue";
 import FolderTile from "./FolderTile.vue";
 import RailTooltip from "./RailTooltip.vue";
+import { Button } from "@tavora/official-ui/components/ui/button";
 
 const COMPACT = 72;
 const MIN_WIDTH = 200;
@@ -392,8 +393,8 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
     <div class="rail-entry relative flex min-w-0 flex-1 flex-col pl-2" :class="!expanded && 'pr-2'" :data-active="state!.screen === 'welcome'">
       <span class="rail-pill" aria-hidden="true" />
       <RailTooltip :text="t('rail.home')" :disabled="expanded">
-        <button
-          type="button"
+        <Button
+          variant="bare"
           :class="
             cn(
               'flex h-10 items-center gap-2.5 rounded-lg',
@@ -420,17 +421,17 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
             />
           </span>
           <span v-if="expanded" class="text-base font-semibold">Tavora</span>
-        </button>
+        </Button>
       </RailTooltip>
     </div>
-      <button
-        type="button"
+      <Button
+        variant="bare"
         :class="
           cn(
             'app-no-drag text-muted-foreground hover:text-foreground focus-visible:ring-ring grid flex-none place-items-center focus-visible:ring-2 focus-visible:outline-none',
             expanded
               ? 'hover:bg-rail-hover size-8 rounded-md'
-              : 'bg-card border-foreground/20 hover:border-foreground/40 absolute top-[18px] -right-[14px] z-20 size-7 rounded-md border opacity-0 shadow-sm shadow-black/30 transition-opacity group-hover/rail:opacity-100 focus-visible:opacity-100',
+              : 'bg-card border-foreground/20 hover:border-foreground/40 hover:bg-transparent focus-visible:border-transparent absolute top-[18px] -right-[14px] z-20 size-7 rounded-md border opacity-0 shadow-sm shadow-black/30 transition-opacity group-hover/rail:opacity-100 focus-visible:opacity-100',
           )
         "
         data-testid="rail-toggle"
@@ -441,7 +442,7 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
         @click="toggleRail"
       >
         <component :is="expanded ? PanelLeftClose : PanelLeftOpen" class="size-[18px]" />
-      </button>
+      </Button>
     </div>
 
     <!-- Favorites and the Games title stay put; only the games below them scroll. -->
@@ -524,8 +525,8 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
                   :lines="folderWorkspaces(entry.id).slice(0, FOLDER_TIP_NAMES).map((id) => workspace(id).name)"
                   :more="Math.max(0, folderWorkspaces(entry.id).length - FOLDER_TIP_NAMES)"
                 >
-                <button
-                  type="button"
+                <Button
+                  variant="bare"
                   :class="
                     cn(
                       'flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left',
@@ -546,7 +547,7 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
                     :open="openFolders.has(entry.id)"
                   />
                   <span v-if="expanded" class="flex-1 truncate text-base font-medium">{{ folder(entry.id).name }}</span>
-                </button>
+                </Button>
                 </RailTooltip>
               </div>
             </MenuArea>
@@ -582,8 +583,8 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
              compact. Its dialog adds a game or a personal workspace. -->
         <div class="rail-entry group relative mt-1 flex px-2" data-testid="rail-add">
           <RailTooltip :text="t('rail.add.full')">
-            <button
-              type="button"
+            <Button
+              variant="bare"
               :class="
                 cn(
                   'flex min-w-0 flex-1 items-center rounded-lg text-left',
@@ -605,15 +606,15 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
               >
                 <Plus class="size-5" />
               </span>
-            </button>
+            </Button>
           </RailTooltip>
         </div>
     </div>
     </div>
     <div v-if="moreAbove" class="from-rail pointer-events-none absolute inset-x-0 top-0 h-8 bg-linear-to-b to-transparent" aria-hidden="true" data-testid="rail-fade-top" />
     <div v-if="moreBelow" class="from-rail pointer-events-none absolute inset-x-0 bottom-0 flex h-14 items-end justify-center bg-linear-to-t to-transparent" data-testid="rail-fade-bottom">
-      <button
-        type="button"
+      <Button
+        variant="bare"
         tabindex="-1"
         class="rail-more text-muted-foreground hover:text-foreground pointer-events-auto mb-0.5 flex h-6 w-10 items-center justify-center rounded-full"
         :aria-label="t('rail.scrollDown')"
@@ -622,7 +623,7 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
         @click="scrollMore"
       >
         <ChevronDown class="size-5" />
-      </button>
+      </Button>
     </div>
     </div>
     </section>
@@ -635,8 +636,8 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
       <RailModuleUpdates :expanded="expanded" />
       <RailInboxButton :expanded="expanded" />
       <RailTooltip :text="t('rail.settings')" :disabled="expanded">
-        <button
-          type="button"
+        <Button
+          variant="bare"
           :class="cn('group text-muted-foreground hover:text-foreground mx-2 flex items-center gap-2.5 rounded-lg px-1 group-data-[expanded=true]/rail:px-2 group-data-[expanded=true]/rail:py-[5px] transition-colors focus-visible:-outline-offset-2', expanded && 'hover:bg-rail-hover')"
           data-rail-item
           data-testid="rail-settings"
@@ -649,7 +650,7 @@ const folderHint = (id: string) => hintFor({ kind: "folder", id, place: { list: 
             <Settings class="size-5 transition-transform duration-300 group-hover:rotate-45 motion-reduce:group-hover:rotate-0" />
           </RailFooterTile>
           <span v-if="expanded" class="text-sm font-medium">{{ t("rail.settings") }}</span>
-        </button>
+        </Button>
       </RailTooltip>
     </div>
     <div class="flex flex-col pt-1 pb-2">

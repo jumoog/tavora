@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // A dialog that holds typed text isn't closed by Escape, a click outside or the X: `dismissible` is off while there is
 // text, and each try asks before it throws the text away. While Save runs, `busy` keeps it open and turns the X off.
-import { NotebookPen, Save } from "@lucide/vue";
+import { NotebookPen } from "@lucide/vue";
 import { ConfirmDialog } from "@tavora/official-ui";
 import { Button } from "@tavora/official-ui/components/ui/button";
 import { Dialog, DialogButton, DialogContent, DialogFooter, DialogHeader } from "@tavora/official-ui/components/ui/dialog";
@@ -35,7 +35,7 @@ async function save() {
   <Button variant="secondary" data-testid="ask-before-closing" @click="open">Write a note…</Button>
   <Dialog v-model:open="writing">
     <DialogContent
-      class="top-[12vh] translate-y-0 sm:max-w-[420px]"
+      anchor="top"
       :dismissible="!text.trim()"
       :busy="saver.busy.value"
       :data-status="saver.state.value.status"
@@ -45,7 +45,7 @@ async function save() {
       <Textarea v-model="text" placeholder="Your note" aria-label="Note" :disabled="saver.busy.value" />
       <DialogFooter>
         <DialogButton close :disabled="saver.busy.value" @click="text.trim() ? (asking = true) : close()">Cancel</DialogButton>
-        <DialogButton :icon="Save" :loading="saver.busy.value" :disabled="saver.busy.value || !text.trim()" @click="save">Save</DialogButton>
+        <DialogButton :busy="saver.busy.value" :disabled="saver.busy.value || !text.trim()" @click="save">Save</DialogButton>
       </DialogFooter>
     </DialogContent>
   </Dialog>

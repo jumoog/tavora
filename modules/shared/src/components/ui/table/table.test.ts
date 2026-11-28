@@ -96,16 +96,32 @@ describe("Table", () => {
       h(Table, null, () =>
         h(TableBody, null, () => [
           h(TableRow, { selected: true }, () => h(TableCell, null, () => "a")),
-          h(TableRow, { tone: "positive", marked: true }, () => h(TableCell, null, () => "b")),
+          h(TableRow, { tone: "success", marked: true }, () => h(TableCell, null, () => "b")),
         ]),
       ),
     )
     const [selected, toned] = root.querySelectorAll("[data-slot=table-row]")
     expect(selected!.getAttribute("data-state")).toBe("selected")
-    expect(toned!.getAttribute("data-tone")).toBe("positive")
+    expect(toned!.getAttribute("data-tone")).toBe("success")
     expect(toned!.hasAttribute("data-marked")).toBe(true)
     expect(toned!.classList.contains("[&_[data-numeric]]:text-success")).toBe(true)
     expect(toned!.classList.contains("[&_[data-numeric]]:font-bold")).toBe(true)
+  })
+
+  it("reads the old tone names as success and destructive", () => {
+    const root = mount(() =>
+      h(Table, null, () =>
+        h(TableBody, null, () => [
+          h(TableRow, { tone: "positive" }, () => h(TableCell, null, () => "a")),
+          h(TableRow, { tone: "negative" }, () => h(TableCell, null, () => "b")),
+        ]),
+      ),
+    )
+    const [better, worse] = root.querySelectorAll("[data-slot=table-row]")
+    expect(better!.getAttribute("data-tone")).toBe("success")
+    expect(better!.classList.contains("[&_[data-numeric]]:text-success")).toBe(true)
+    expect(worse!.getAttribute("data-tone")).toBe("destructive")
+    expect(worse!.classList.contains("[&_[data-numeric]]:text-destructive")).toBe(true)
   })
 
   it("spans group headings and notes across the table", () => {
@@ -156,5 +172,15 @@ describe("Table sort", () => {
     await nextTick()
     expect(sort.value).toEqual({ column: "score", direction: "descending" })
     expect(heads().map((th) => th.getAttribute("aria-sort"))).toEqual([null, "descending", null])
+  })
+})
+
+describe("Table flush", () => {
+  it("takes the padding off the outer edges only, and keeps a marked row's line off its text", () => {
+    const root = mount(() => h(Table, { flush: true }, () => h(TableBody, null, () => h(TableRow, { marked: true }, () => h(TableCell, null, () => "Life")))))
+    const table = q(root, "table")
+    expect(table.className).toContain("[&_:is(th,td):first-child]:ps-0")
+    expect(table.className).toContain("[&_:is(th,td):last-child]:pe-0")
+    expect(table.className).toContain("[&_tr[data-marked]>:first-child]:ps-2")
   })
 })

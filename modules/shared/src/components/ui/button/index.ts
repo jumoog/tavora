@@ -1,7 +1,9 @@
 import type { VariantProps } from "class-variance-authority"
 import { cva } from "class-variance-authority"
+import { clsx } from "clsx"
 
 export { default as Button } from "./Button.vue"
+export { ACTION_TIMING, type ButtonAction, type ButtonActionState } from "./action"
 
 // A pressed button dips 1px and its shadows turn inward. `not-aria-disabled` keeps a soft (off but hoverable) button still.
 // How the whole button moves when pressed. Small buttons shrink to 97% and dip 1px (`scale`). On a wide button 3% is
@@ -9,7 +11,7 @@ export { default as Button } from "./Button.vue"
 // (a picker, a list row) asks for `dip`; any other that a caller stretches (`w-full`, `block`, `flex`, `flex-1`, `grow`)
 // gets it automatically, so nobody has to remember. Same guard as PRESS: fine pointer, no reduced motion.
 // Written out in full: Tailwind only finds class names that appear in the source as plain strings.
-const SCALE_PRESS =
+export const SCALE_PRESS =
   "[@media(hover:hover)_and_(pointer:fine)_and_(prefers-reduced-motion:no-preference)]:not-aria-disabled:active:scale-[0.97]" +
   " [&.w-full]:[@media(hover:hover)_and_(pointer:fine)_and_(prefers-reduced-motion:no-preference)]:not-aria-disabled:active:scale-100 [&.w-full]:[@media(hover:hover)_and_(pointer:fine)_and_(prefers-reduced-motion:no-preference)]:not-aria-disabled:active:translate-y-px" +
   " [&.block]:[@media(hover:hover)_and_(pointer:fine)_and_(prefers-reduced-motion:no-preference)]:not-aria-disabled:active:scale-100 [&.block]:[@media(hover:hover)_and_(pointer:fine)_and_(prefers-reduced-motion:no-preference)]:not-aria-disabled:active:translate-y-px" +
@@ -21,8 +23,22 @@ export const DIP_PRESS = "[@media(hover:hover)_and_(pointer:fine)_and_(prefers-r
 const PRESS =
   "[@media(hover:hover)_and_(pointer:fine)_and_(prefers-reduced-motion:no-preference)]:not-aria-disabled:active:translate-y-px not-aria-disabled:active:shadow-[inset_0_1px_3px_color-mix(in_srgb,black_25%,transparent)]"
 
-export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,border-color,box-shadow,opacity,scale,translate] duration-(--duration-press) ease-(--ease-out-strong) disabled:pointer-events-none disabled:opacity-50 aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+// What every Button has, framed or not: the transition, the off look and its icons.
+const COMMON =
+  "transition-[color,background-color,border-color,box-shadow,opacity,scale,translate] duration-(--duration-press) ease-(--ease-out-strong) disabled:pointer-events-none disabled:opacity-(--disabled-opacity) aria-disabled:opacity-(--disabled-opacity) [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none"
+
+// The box every variant but `bare` starts from.
+const FRAMED =
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium shrink-0 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive " + COMMON
+
+// `bare` draws nothing of its own: no frame, fill, padding, size, corners or text style, so the caller draws its own tile
+// with a few classes. What stays is what makes it a button: the keyboard outline, the press dip, the off look and icon
+// sizing. A hover only comes from the caller. A design style may still round it, as it rounds every button (looks.css).
+const BARE =
+  "inline-flex items-center focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring " + COMMON
+
+const variants = cva(
+  "",
   {
     variants: {
       variant: {
@@ -39,19 +55,22 @@ export const buttonVariants = cva(
         danger:
           "bg-destructive/10 text-destructive hover:bg-destructive/25 hover:text-destructive dark:bg-destructive/15 dark:hover:bg-destructive/30",
         outline:
-          "border bg-background shadow-xs hover:border-input hover:bg-[color-mix(in_srgb,var(--foreground)_10%,var(--accent))] hover:text-accent-foreground dark:bg-input/10 dark:border-input dark:hover:bg-input/25",
+          "border [--pill-border:1px] bg-background shadow-xs hover:border-input hover:bg-[color-mix(in_srgb,var(--foreground)_10%,var(--accent))] hover:text-accent-foreground dark:bg-input/10 dark:border-input dark:hover:bg-input/25",
         secondary:
           "bg-secondary text-secondary-foreground shadow-[inset_0_1px_0_color-mix(in_srgb,white_5%,transparent)] hover:bg-[color-mix(in_srgb,var(--foreground)_10%,var(--secondary))] " + PRESS,
         ghost:
           "hover:bg-[color-mix(in_srgb,var(--foreground)_10%,var(--accent))] hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        bare: BARE,
       },
       // Heights follow the style's control height (32 px in Classic and without a host); a caller's own height wins.
+      // The sizes with text are pills near a full round (pill.css): the side paddings come from --pill-px (text end) and
+      // --pill-px-icon (icon end), which are exactly the --pill-pad and --pill-pad-icon given here below that.
       size: {
-        "default": "h-[var(--style-control-height,32px)] px-3 py-1.5",
-        "xs": "h-[calc(var(--style-control-height,32px)-8px)] gap-1 rounded-md px-2 text-xs [&_svg:not([class*='size-'])]:size-3 [&_svg:not([class*='size-'])]:stroke-2",
-        "sm": "h-[calc(var(--style-control-height,32px)-4px)] rounded-md gap-1.5 px-3",
-        "lg": "h-[calc(var(--style-control-height,32px)+8px)] rounded-md px-6",
+        "default": "tavora-pill h-[var(--style-control-height,32px)] px-(--pill-px) py-1.5 [--pill-height:var(--style-control-height,32px)] [--pill-pad:--spacing(3)] [--pill-pad-icon:--spacing(2.5)] [--pill-icon:--spacing(4)]",
+        "xs": "tavora-pill h-[calc(var(--style-control-height,32px)-8px)] gap-1 rounded-md px-(--pill-px) text-xs [&_svg:not([class*='size-'])]:size-3 [&_svg:not([class*='size-'])]:stroke-2 [--pill-height:calc(var(--style-control-height,32px)-8px)] [--pill-pad:--spacing(2)] [--pill-pad-icon:--spacing(1.5)] [--pill-icon:--spacing(3)]",
+        "sm": "tavora-pill h-[calc(var(--style-control-height,32px)-4px)] rounded-md gap-1.5 px-(--pill-px) [--pill-height:calc(var(--style-control-height,32px)-4px)] [--pill-pad:--spacing(3)] [--pill-pad-icon:--spacing(2.5)] [--pill-icon:--spacing(4)]",
+        "lg": "tavora-pill h-[calc(var(--style-control-height,32px)+8px)] rounded-md px-(--pill-px) [--pill-height:calc(var(--style-control-height,32px)+8px)] [--pill-pad:--spacing(6)] [--pill-pad-icon:--spacing(4)] [--pill-icon:--spacing(4)]",
         "icon": "size-[var(--style-control-height,32px)]",
         "icon-xs": "size-[calc(var(--style-control-height,32px)-8px)] rounded-md [&_svg:not([class*='size-'])]:size-3.5 [&_svg:not([class*='size-'])]:stroke-2",
         "icon-sm": "size-[calc(var(--style-control-height,32px)-4px)]",
@@ -86,17 +105,33 @@ export const buttonVariants = cva(
     },
   },
 )
-export type ButtonVariants = VariantProps<typeof buttonVariants>
+export type ButtonVariants = VariantProps<typeof variants>
+
+/** The Button's classes. Every variant but `bare` is a framed box with a size; `bare` takes neither. */
+export function buttonVariants(props: ButtonVariants = {}): string {
+  return props.variant === "bare" ? variants({ ...props, size: null }) : clsx(FRAMED, variants(props))
+}
 
 // A button with an icon and text has 2px less room on the icon side, so it looks balanced (on lg the sides are 16px
-// and 18px). The icon is taken to lead; one after the text says so with `data-icon="end"`. Left out when the caller
-// sets its own padding (`px-0`, `pl-2`…), so a narrow or icon-only button keeps the padding it asked for.
+// and 18px): the icon side takes --pill-px-icon, from the size's --pill-pad-icon. The icon is taken to lead; one after
+// the text says so with `data-icon="end"`. Left out when the caller sets its own padding (`px-0`, `pl-2`…), so a narrow
+// or icon-only button keeps the padding it asked for.
 // Written out in full: Tailwind only finds class names that appear in the source as plain strings.
+const ICON_SIDE = "has-[>svg:not([data-icon=end])]:pl-(--pill-px-icon) has-[>svg[data-icon=end]]:pr-(--pill-px-icon)"
 export const BUTTON_ICON_PADDING: Partial<Record<NonNullable<ButtonVariants["size"]>, string>> = {
-  default: "has-[>svg:not([data-icon=end])]:pl-2.5 has-[>svg[data-icon=end]]:pr-2.5",
-  xs: "has-[>svg:not([data-icon=end])]:pl-1.5 has-[>svg[data-icon=end]]:pr-1.5",
-  sm: "has-[>svg:not([data-icon=end])]:pl-2.5 has-[>svg[data-icon=end]]:pr-2.5",
-  lg: "has-[>svg:not([data-icon=end])]:pl-4 has-[>svg:not([data-icon=end])]:pr-4.5 has-[>svg[data-icon=end]]:pl-4.5 has-[>svg[data-icon=end]]:pr-4",
+  default: ICON_SIDE,
+  xs: ICON_SIDE,
+  sm: ICON_SIDE,
+  lg: `${ICON_SIDE} has-[>svg]:[--pill-pad:--spacing(4.5)]`,
+}
+
+// The same lighter icon side for a button with an `action`, whose content sits one level down (it can't be found with
+// `has-[>svg]`): the button checks itself whether its content starts with an icon.
+export const ACTION_ICON_PADDING: Partial<Record<NonNullable<ButtonVariants["size"]>, string>> = {
+  default: "pl-(--pill-px-icon)",
+  xs: "pl-(--pill-px-icon)",
+  sm: "pl-(--pill-px-icon)",
+  lg: "pl-(--pill-px-icon) [--pill-pad:--spacing(4.5)]",
 }
 
 /** A class split at the colons outside brackets: its variants (`max-[400px]`, `has-[>svg:not(.a)]`, `[&:hover]`…), then the utility. */

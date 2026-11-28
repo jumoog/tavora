@@ -14,6 +14,7 @@ import { tabsIndicatorKey } from "./context"
 // DOM. When no tab can be found or measured, the active tab draws its own line instead.
 // `indicator: false` leaves it to the tabs: each draws its own line at once, for a strip whose tabs come, go and
 // move all the time (TabStrip).
+// With `class="flex-wrap"` the tabs go on to a next row and the list grows with them.
 const props = withDefaults(defineProps<TabsListProps & { class?: HTMLAttributes["class"]; indicator?: boolean }>(), { indicator: true })
 
 const delegatedProps = reactiveOmit(props, "class", "indicator")
@@ -28,7 +29,7 @@ useSlidingIndicator(root, { selector: '[role="tab"][data-state="active"]', enabl
     ref="root"
     data-slot="tabs-list"
     v-bind="delegatedProps"
-    :class="cn('text-muted-foreground group/tabs relative inline-flex h-[var(--style-control-height,32px)] w-fit items-center gap-1 border-b', props.class)"
+    :class="cn('text-muted-foreground group/tabs relative inline-flex h-[var(--style-control-height,32px)] w-fit items-center gap-1 border-b [&.flex-wrap]:h-auto [&.flex-wrap]:min-h-[var(--style-control-height,32px)]', props.class)"
   >
     <!-- Where the tab's own bottom border used to be: the measured box's bottom 2 px. A border, not a background, so
          it stays when Windows high contrast takes backgrounds away. -->

@@ -22,11 +22,13 @@ async function addInto(app: ElectronApplication, moduleId: string, formExpr: str
   await inModule(
     app,
     moduleId,
-    `(() => {
+    `(async () => {
       const form = ${formExpr};
       const input = form.querySelector("input");
       input.value = ${JSON.stringify(text)};
       input.dispatchEvent(new Event("input", { bubbles: true }));
+      // The kit's Input passes the text on a tick later.
+      await new Promise((resolve) => setTimeout(resolve));
       form.requestSubmit();
     })()`,
     index,
@@ -196,6 +198,8 @@ test("notes: what you typed just before the panel closed is still there", async 
   await inModule(app, NOTES, `${q("editor")}.focus()`);
   // Away at once, well within the note's save delay: the page saves as it closes.
   await typeInModule(app, NOTES, "Left at once");
+  // typeInModule can return before the page has the text: what counts as typed is what the editor shows.
+  await expect.poll(() => editorText(app)).toBe("Left at once");
   await openWorkspace(page, "satisfactory");
   // The old page is gone before the new one is read, so it can't stand in for it.
   await expect.poll(() => notesPages(app)).toBe(0);
@@ -206,6 +210,8 @@ test("notes: what you typed just before the panel closed is still there", async 
   // Quitting right after typing keeps it too.
   await inModule(app, NOTES, `(() => { const editor = ${q("editor")}; editor.focus(); getSelection().selectAllChildren(editor); getSelection().collapseToEnd(); })()`);
   await typeInModule(app, NOTES, " and quit");
+  // Without this the quit can overtake the keys, which a person typing can't.
+  await expect.poll(() => editorText(app)).toBe("Left at once and quit");
   await app.close();
   const again = await launch(userData);
   await openWorkspace(again.page, "poe2");
@@ -385,9 +391,9 @@ test("to-dos: groups, sub-to-dos, editing in place, objectives and finished task
       const input = ${q("task-title-input")};
       input.value = "Find the Ancient Crypt again";
       input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
     })()`,
   );
+  await inModule(app, TODOS, `${q("task-title-input")}.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))`);
   await expect.poll(() => taskTitles(app)).toContain("Find the Ancient Crypt again");
   await inModule(app, TODOS, `${taskTitled("Find the Ancient Crypt again")}.querySelector('[data-testid="task-open"]').click()`);
   await expect.poll(() => inModule(app, TODOS, `!!${q("task-title-input")}`)).toBe(true);
@@ -398,9 +404,9 @@ test("to-dos: groups, sub-to-dos, editing in place, objectives and finished task
       const input = ${q("task-title-input")};
       input.value = "Find the Ancient Crypt";
       input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
     })()`,
   );
+  await inModule(app, TODOS, `${q("task-title-input")}.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))`);
   await expect.poll(() => taskTitles(app)).toContain("Find the Ancient Crypt");
 
   // The description is written in a popover from the to-do's menu; Ctrl+Enter saves.
@@ -413,9 +419,10 @@ test("to-dos: groups, sub-to-dos, editing in place, objectives and finished task
       const input = ${q("description-input")};
       input.value = "Behind the waterfall";
       input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true, cancelable: true }));
     })()`,
   );
+  // Its own turn, as a key press is: the kit field passes the text on a tick after the input event.
+  await inModule(app, TODOS, `${q("description-input")}.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true, cancelable: true }))`);
   await expectModuleText(app, TODOS, "task-details-preview", "Behind the waterfall");
 
   // Pinned tasks show up as current objectives.
@@ -543,7 +550,7 @@ test("ui playground: lists its pages in a side menu, finds them, shows each exam
   const pageTitle = () => inModule<string>(app, PLAYGROUND, `${q("page-title")}.textContent.trim()`);
 
   // Every page is in the menu, Colours is open first, and the header names its group and title.
-  await expect.poll(menu).toHaveLength(29);
+  await expect.poll(menu).toHaveLength(34);
   expect((await menu()).slice(0, 6)).toEqual(["colours", "text", "spacing", "motion", "writing", "buttons"]);
   expect(await pageTitle()).toBe("Colours");
   await openPage(app, "tabs");
@@ -560,7 +567,7 @@ test("ui playground: lists its pages in a side menu, finds them, shows each exam
   await expect.poll(menu).toEqual(["pick"]);
   await inModule(app, PLAYGROUND, `${q("page-search")}.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))`);
   await ready(app, PLAYGROUND, "page-pick");
-  await expect.poll(menu).toHaveLength(29);
+  await expect.poll(menu).toHaveLength(34);
 
   // Show code shows the example's own file, and hides it again.
   const box = `document.querySelector('[data-testid="example-Combobox"]')`;
@@ -610,10 +617,10 @@ test("ui playground: lists its pages in a side menu, finds them, shows each exam
   // Every example is switched off from outside (a disabled, inert fieldset around it); none takes a prop for it.
   expect(await inModule(app, PLAYGROUND, `document.querySelectorAll('[data-slot="example-body"] > fieldset[disabled][inert]').length === document.querySelectorAll('[data-slot="example-body"]').length`)).toBe(true);
   expect(await inModule(app, PLAYGROUND, `[...${q("page-pick")}.querySelectorAll('[data-slot="example-body"] [role="combobox"], [data-slot="example-body"] input')].every((el) => el.matches(":disabled"))`)).toBe(true);
-  // Everything looks off too: a number field fades as a whole (its parts don't fade again).
+  // Everything looks off too: a number field fades as a whole by the shared --disabled-opacity (its parts don't fade again).
   await openPage(app, "numbers");
   const field = `${q("example-NumberField")}.querySelector('[data-slot="number-field"]')`;
-  expect(await inModule(app, PLAYGROUND, `getComputedStyle(${field}).opacity`)).toBe("0.5");
+  expect(await inModule(app, PLAYGROUND, `getComputedStyle(${field}).opacity`)).toBe("0.75");
   expect(await inModule(app, PLAYGROUND, `getComputedStyle(${field}.querySelector("button")).opacity`)).toBe("1");
   await openPage(app, "pick");
   // Show code still works while the examples are off.
@@ -643,7 +650,7 @@ test("ui playground: the name dialog selects its text, counts and locks while bu
     inModule(app, PLAYGROUND, `(() => { const input = ${q("name-input")}; input.value = ${JSON.stringify(value)}; input.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 
   // The name is selected on open, the count shows the limit, and a name over it can't be confirmed.
-  await press("Rename…");
+  await press("Rename");
   await expect.poll(() => inModule(app, PLAYGROUND, `(() => { const i = ${q("name-input")}; return !!i && document.activeElement === i && i.selectionStart === 0 && i.selectionEnd === i.value.length; })()`)).toBe(true);
   expect(await inModule(app, PLAYGROUND, `${q("name-count")}.textContent.trim()`)).toBe("8 / 30");
   await type("x".repeat(31));
@@ -723,8 +730,8 @@ test.describe("ui playground pages", () => {
     const expected: Record<string, string[]> = {
       colours: ["Tokens", "TextOnSurface", "DoDont"],
       text: ["TypeScale", "Weights", "Numbers", "Capitals", "Mono"],
-      spacing: ["Scale", "Radius", "NestedCorners", "Depth"],
-      motion: ["Curves", "Durations", "Rules", "ReducedMotion"],
+      spacing: ["Scale", "Radius", "NestedCorners", "Depth", "Elevation", "Layers"],
+      motion: ["Curves", "Durations", "GameMotion", "Rules", "ReducedMotion"],
       writing: ["FewWords", "Descriptions", "PlainWords", "YouDu", "Names"],
     };
     for (const [id, names] of Object.entries(expected)) {
@@ -745,6 +752,11 @@ test.describe("ui playground pages", () => {
     await openPage(app, "spacing");
     expect(await inModule(app, PLAYGROUND, `document.querySelectorAll('[data-step]').length`)).toBe(4);
     await expect.poll(() => inModule(app, PLAYGROUND, `[...document.querySelectorAll('[data-step]')].every((el) => /\\d+px/.test(el.parentElement.textContent))`)).toBe(true);
+    // Elevation steps cast a shadow, and the layers read their numbers from the tokens.
+    expect(await inModule(app, PLAYGROUND, `[...document.querySelectorAll('[data-testid="elevation-step"]')].map((el) => getComputedStyle(el).boxShadow !== "none")`)).toEqual([true, true, true]);
+    await expect
+      .poll(() => inModule(app, PLAYGROUND, `["lift", "sticky", "overlay", "floating"].map((name) => document.querySelector('dd[data-token="--layer-' + name + '"]').textContent.trim())`))
+      .toEqual(["1", "10", "20", "50"]);
 
     // Motion: the times come from the tokens, and Play moves the dot (reduced motion jumps there at once).
     await openPage(app, "motion");

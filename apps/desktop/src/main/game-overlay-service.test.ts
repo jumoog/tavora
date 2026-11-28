@@ -6,7 +6,7 @@ import { LIMITS, type JsonValue } from "@tavora/sdk/protocol";
 import { DEFAULT_RECT, placeLegacy } from "../shared/overlay-anchor";
 import { fillScale } from "../shared/overlay-content";
 import type { Foreground, ForegroundProbe } from "./foreground";
-import { GameOverlays, isOverlayAction, layerBinding, toggleBinding } from "./game-overlay-service";
+import { FAILED_LOOKS_ALLOWED, GameOverlays, isOverlayAction, layerBinding, toggleBinding } from "./game-overlay-service";
 import type { OverlayWindow, OverlayWindowRequest } from "./game-layer-windows";
 import type { OverlayPanel } from "./game-overlay-window";
 import type { VeilWindow } from "./game-veil-window";
@@ -527,13 +527,43 @@ describe("which window is in front", () => {
     expect(service.needsWatcher()).toBe(false);
   });
 
-  it("closes everything when Windows can't be asked", async () => {
-    const { service, world, live } = await setup();
-    show(service);
-    world.broken = true;
-    service.tick();
-    expect(live()).toHaveLength(0);
-    expect(service.frontGame()).toBeNull();
+  it("closes everything when Windows can't be asked, look after look", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { service, world, live } = await setup();
+      show(service);
+      world.broken = true;
+      for (let look = 1; look < FAILED_LOOKS_ALLOWED; look += 1) service.tick();
+      expect(live()).toHaveLength(1);
+      service.tick();
+      expect(live()).toHaveLength(0);
+      expect(service.frontGame()).toBeNull();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("passes over a look that failed once, and goes on looking", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const { service, world, live } = await setup();
+      show(service);
+      // Failures that don't come FAILED_LOOKS_ALLOWED times in a row never add up.
+      for (let round = 0; round < 3; round += 1) {
+        world.broken = true;
+        for (let look = 1; look < FAILED_LOOKS_ALLOWED; look += 1) service.tick();
+        world.broken = false;
+        service.tick();
+      }
+      expect(live()).toHaveLength(1);
+      expect(service.frontGame()).not.toBeNull();
+      const asked = world.probeCalls;
+      service.tick();
+      expect(world.probeCalls).toBe(asked + 1);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("says once that Windows can't be asked, and doesn't ask again", async () => {
@@ -542,7 +572,7 @@ describe("which window is in front", () => {
       const { service, world, live } = await setup();
       show(service);
       world.broken = true;
-      service.tick();
+      for (let look = 0; look < FAILED_LOOKS_ALLOWED; look += 1) service.tick();
       const asked = world.probeCalls;
       for (let look = 0; look < 5; look += 1) service.tick();
       expect(warn).toHaveBeenCalledTimes(1);
@@ -573,6 +603,18 @@ describe("modes and settings", () => {
     world.foreground = { program: GAME_EXE, bounds: { ...SCREEN }, notification: 0 };
     service.tick();
     expect(live()[0]!.shown).toBe(false);
+  });
+
+  it("says a module's item is on screen while its game is in front, so the module's own keys work there too", async () => {
+    const { service, world } = await setup();
+    show(service);
+    const clock = { owner: "official", moduleId: CLOCK.manifest.id, workspaceId: "elden" };
+    expect(service.moduleShowing(clock)).toBe(true);
+    expect(service.moduleShowing({ ...clock, workspaceId: "poe2" })).toBe(false);
+    expect(service.moduleShowing({ ...clock, owner: "local" })).toBe(false);
+    world.foreground = null;
+    service.tick();
+    expect(service.moduleShowing(clock)).toBe(false);
   });
 
   it("has no key for an Always overlay or while the switch is off", async () => {

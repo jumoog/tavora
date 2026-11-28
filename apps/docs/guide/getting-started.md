@@ -114,7 +114,7 @@ vp run dev
 
 With Vite+, use `vp run dev`, not `vp dev`: `vp dev` starts a dev server instead of building the module.
 
-In Tavora, open **Settings > Developer > Project folders**, choose **Add folder…** and pick the project folder, or the folder you keep all your module projects in: Tavora loads every project directly inside it, and finds new ones by itself. The module appears in Add module, and its panels reload by themselves every time `dev` rebuilds.
+In Tavora, open **Settings > Developer > Project folders**, choose **Add folder** and pick the project folder, or the folder you keep all your module projects in: Tavora loads every project directly inside it, and finds new ones by itself. The module appears in Add module, and its panels reload by themselves every time `dev` rebuilds.
 
 ## Talk to the host
 
@@ -171,7 +171,7 @@ Values you store must be JSON. Type parameters such as `get<number>()` are not c
 
 Settings go in `tavora.storage`, the user's work in `tavora.documents`, pictures in `tavora.blobs` and where a panel is scrolled to in `tavora.panel`. Which to use when, and how two open panels avoid overwriting each other, is in [Saving data](./saving-data.md).
 
-## More from the host
+## Other host calls
 
 | API | What it does |
 | --- | --- |
@@ -187,7 +187,7 @@ Settings go in `tavora.storage`, the user's work in `tavora.documents`, pictures
 
 What reaches outside the panel needs the user's yes first; see [Permissions and consent](./permissions.md). Following the theme and the language is in [Look and languages](./look-and-languages.md).
 
-## Made for one game
+## A module for one game
 
 A module made for one game, such as a build planner for Path of Exile 2, lists that game in its manifest:
 
@@ -232,6 +232,6 @@ Tell users what changed in `changelog.json`, which the starter makes and the man
 ]
 ```
 
-Users read them under the module in **Settings > Modules > Patch notes**. After an update, the notes newer than the version they had are marked New until they open them. Each line is plain text of at most 500 characters, at most 20 lines per version and 100 versions; Publishing refuses a changelog Tavora could not show. Needs Tavora 0.18.2 or newer, so set `minTavora` to at least `0.18.2`.
+Users read them under the module in **Settings > Modules > Patch notes**. After an update, the notes newer than the version they had are marked New until they open them. Each line is plain text of at most 500 characters, at most 20 lines per version and 100 versions; Publishing refuses a changelog Tavora could not show; **Save to project** drops the oldest version of a full one. Needs Tavora 0.18.2 or newer, so set `minTavora` to at least `0.18.2`.
 
 Something not working? See [Troubleshooting](./troubleshooting.md).

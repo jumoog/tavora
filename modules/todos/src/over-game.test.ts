@@ -123,6 +123,8 @@ describe("over the game", () => {
     const add = $("[data-testid=plate-add] input") as HTMLInputElement;
     add.value = "Tame a wolf";
     add.dispatchEvent(new Event("input"));
+    // The kit's Input passes the text on a tick later.
+    await nextTick();
     $("[data-testid=plate-add]")!.dispatchEvent(new Event("submit", { cancelable: true }));
     await settle();
     expect(stored(host).groups[0]!.tasks.map((item) => item.title)).toEqual(["Find the crypt", "Light both torches", "Tame a wolf"]);
@@ -199,6 +201,26 @@ describe("over the game", () => {
     vanish.documents.put({ id: LIST_ID, title: LIST_TITLE, data: done });
     await settle();
     expect(plateTexts()).toEqual(["Light the torch"]);
+  });
+});
+
+describe("The tick's hit area", () => {
+  it("ticks from a click in the 32 px square around the circle, once, and shows a faint tick on hover", async () => {
+    const host = await mount();
+    host.documents.put({ id: LIST_ID, title: LIST_TITLE, data: { version: 2, groups: [{ id: "g", name: "Main", color: "", tasks: [task("t1", "Find the crypt")] }] } });
+    await settle();
+    const area = $("[data-testid=task-t1] [data-testid=task-tick-area]")!;
+    expect(area.className).toContain("h-8");
+    expect(area.className).toContain("w-8");
+    expect(area.querySelector("[data-testid=task-tick-hint]")).not.toBeNull();
+    // Beside the circle: it ticks. On the circle: it ticks once, not twice.
+    area.click();
+    await settle();
+    expect(stored(host).groups[0]!.tasks[0]!.done).toBe(true);
+    expect(area.querySelector("[data-testid=task-tick-hint]")).toBeNull();
+    $("[data-testid=task-t1] [data-testid=task-done]")!.click();
+    await settle();
+    expect(stored(host).groups[0]!.tasks[0]!.done).toBe(false);
   });
 });
 

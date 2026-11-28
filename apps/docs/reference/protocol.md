@@ -165,10 +165,11 @@ A module can keep pictures, PDF files and sounds that are too big for a document
 - **Only after the user did something:** call it from the click, right-click or key press that asked for it (within 2 seconds); each press opens one menu, otherwise `PERMISSION_DENIED`. One menu shows at a time: a new one closes the last, and Esc, a click elsewhere or switching workspaces closes it too. It resolves with the chosen item's `id`, or `null`.
 - **Where:** pass the element the menu is for as `anchor` (the button for a dropdown, the right-clicked row for a context menu); the SDK reads its box when you call. On the wire that box is `at`, in your panel's CSS pixels from its top left corner (`getBoundingClientRect()` values: `{ x, y, width, height }`), and `at` still works if you have no element. The menu opens next to it, never on top of it or at the pointer. `side` (`"bottom"`, `"top"`, `"right"`, `"left"`; default bottom) and `align` (`"start"`, `"center"`, `"end"`; default start) say where it opens when there is room; Tavora keeps it inside the window.
 - **What:** `items` is a list of entries:
-  - `{ type: "item", id, label, hint?, color?, checked?, radio?, disabled?, danger? }`: `id` is what you get back (unique in the menu, up to 64 letters, digits, `.`, `_`, `:` or `-`). `hint` is small text on the right, such as a shortcut. `color` adds a dot: `#rgb`/`#rrggbb`, a colour function of numbers such as `oklch(0.7 0.17 150)`, or `transparent` for an empty ring. `checked` shows a check mark (a dot with `radio`); in a list where any item sets it, the others keep the column so labels line up. `danger` makes it red.
+  - `{ type: "item", id, label, hint?, color?, checked?, radio?, disabled?, disabledReason?, danger? }`: `id` is what you get back (unique in the menu, up to 64 letters, digits, `.`, `_`, `:` or `-`). `hint` is small text on the right, such as a shortcut. `color` adds a dot: `#rgb`/`#rrggbb`, a colour function of numbers such as `oklch(0.7 0.17 150)`, or `transparent` for an empty ring. `checked` shows a check mark (a dot with `radio`); in a list where any item sets it, the others keep the column so labels line up. `danger` makes it red, except while it is switched off.
+  - **Say why an item is off** with `disabledReason` next to `disabled: true`: a short sentence on one line, up to 120 characters ("Already used by another line."). The item stays reachable with the pointer and the arrow keys and can't be picked. It shows the reason in its row where the hint sits, instead of the hint; a long one is cut with "…", and screen readers get all of it. A disabled item without a reason is skipped, as before. A reason on an item that is on, or with a line break, is `INVALID_PARAMS`. Tavora 0.25.68 and newer: check `sdk.supports("ui.showMenu.disabledReason")`. On an older Tavora the SDK shows the reason as the item's `hint` when it has none (cut to 30 characters) and leaves it out otherwise; a raw caller leaves it out itself.
   - `{ type: "separator" }` and `{ type: "heading", label }`.
   - `{ type: "submenu", label, color?, disabled?, items }`: one level only; its items hold no further submenus.
-- **Text only:** labels are plain text (at most 80 characters, hints 30), never HTML, and a menu holds at most 100 entries, submenus included. Anything else is `INVALID_PARAMS`. There are no sliders or other controls in menus; keep those in your page.
+- **Text only:** labels are plain text (at most 80 characters, hints 30, reasons 120), never HTML, and a menu holds at most 100 entries, submenus included. Anything else is `INVALID_PARAMS`. There are no sliders or other controls in menus; keep those in your page.
 
 ```ts
 button.addEventListener("click", async () => {
@@ -177,6 +178,7 @@ button.addEventListener("click", async () => {
     align: "end",
     items: [
       { type: "item", id: "rename", label: "Rename", hint: "F2" },
+      { type: "item", id: "pin", label: "Pin", disabled: true, disabledReason: "Already pinned." },
       { type: "submenu", label: "Color", items: [{ type: "item", id: "red", label: "Red", color: "#e5675a", radio: true, checked: true }] },
       { type: "separator" },
       { type: "item", id: "delete", label: "Delete", danger: true },
@@ -262,7 +264,7 @@ A connector is a part of Tavora that reaches outside the module's panel, such as
 - `leaderboards.status` gives `{ online, signedIn, available, shown, name }`: Tavora's service answered (while it can't be reached, `available` and `shown` are false and `name` is `null`; ask again later); signed in to Tavora; the service runs this module's boards (a catalog module once Tavora allowed it, a development copy always); the user agreed to show their results here; and, once `shown`, the name the boards show for them (their Tavora profile name, or a neutral one such as `"User · K7"`), else `null`. It never fails for being offline.
 - `leaderboards.show` asks the user, in Tavora's own words in this panel, whether to show their Tavora name and results; signed out, it offers to sign in instead (the user signs in in Settings, then your module asks again). It answers the status after the user's answer, and asks nothing while offline. Only right after a real click or key press in the panel, once per click, and not while the panel is over the game.
 - `leaderboards.hide` takes the user off this module's boards; the service deletes their results for it. Only right after a real click or key press.
-- `leaderboards.submit` with `{ board, results }` sends 1 to 50 finished games to a board of the manifest. A result on a streak or rate board is `{ id, outcome: "won" | "lost", at, day }`, on a score, total or average board `{ id, value, at, day }`: `id` a UUID you make once per game (`crypto.randomUUID()`), `at` when it ended in milliseconds since 1970, `day` the local calendar day as `YYYY-MM-DD`, which decides the day, week, month and year the game counts for (the SDK and Tavora fill it in from `at` when you leave it out; on a daily board give the puzzle's day), `value` a number (0 or more on a total board). It answers `{ accepted, rejected }`: `accepted` lists the ids the board took, also ones it had already, so sending a result again is safe; `rejected` lists `{ id, reason }`, with `reason` `invalid` (its shape is off), `time` (`at` in the future or more than a year ago), `archive` (a result that ended outside its `day`), `day-taken` (the board has another result for that day) or `full` (the account keeps too many results for this module). A refused result never counts: drop it. Each result is taken or refused on its own; one without a string `id` is left out of both lists. `PERMISSION_DENIED` while the user is signed out, hasn't agreed, or the board isn't live on the service yet, and `NETWORK_ERROR` while the service can't be reached or is busy: keep the results and send them later. An unknown board, or no or more than 50 results, is `INVALID_PARAMS`.
+- `leaderboards.submit` with `{ board, results }` sends 1 to 50 finished games to a board of the manifest. A result on a streak or rate board is `{ id, outcome: "won" | "lost", at, day }`, on a score, total or average board `{ id, value, at, day }`: `id` a UUID you make once per game (`crypto.randomUUID()`), `at` when it ended in milliseconds since 1970, `day` the local calendar day as `YYYY-MM-DD`, which decides the day, week, month and year the game counts for (the SDK and Tavora fill it in from `at` when you leave it out; on a daily board give the puzzle's day), `value` a number (0 or more on a total board). It answers `{ accepted, rejected }`: `accepted` lists the ids the board took, also ones it had already, so sending a result again is safe; `rejected` lists `{ id, reason }`, with `reason` `invalid` (its shape is off), `time` (`at` in the future or more than a year ago), `archive` (a result that ended outside its `day`), `day-taken` (the board has another result for that day) or `full` (the account keeps too many results for this module). A refused result never counts: drop it. Each result is taken or refused on its own; one without a string `id` is left out of both lists. `PERMISSION_DENIED` while the user is signed out, hasn't agreed, or the board isn't live on the service yet, and `NETWORK_ERROR` while the service can't be reached or is busy: keep the results and send them later. An unknown board, no or more than 50 results, or a call whose body is over 30 KB is `INVALID_PARAMS`. The body is the board's settings (its kind, and `daily`, `order` or `minGames` where the kind has them) and each result's fields, so the room for results differs a little by kind: send fewer at once when it is refused.
 - `leaderboards.top` with `{ board, period?, day?, limit? }` gives `{ rows }`, the best lines of a board, `limit` of them (1 to 100, default 20). `period` is `day`, `week` (Monday to Sunday), `month`, `year` or `all` (the default); `day`, the user's local day, picks which one (default today; a past day reads a past period, nothing later than tomorrow). Streak boards have no `day` period: it answers no rows. Each row is `{ rank, of, name, self }` with the board's numbers: `current` and `best` on a streak board, `value` (the best) on a score board, `value` (the sum) and `games` on a total board, `value` (the mean) and `games` on an average board, `value` (the share won, 0 to 100) with `games` and `wins` on a rate board. `of` is how many users the board has in that period; average and rate boards list a user only after `minGames` games. Equal lines share a rank. `self` marks the user's own line, which comes last when they are further down. On a daily board, pass the user's local `day`: a streak whose last day was before yesterday shows `current` 0. Signed out it still answers, without a `self` line. A development copy's test boards show only the user's own line.
 - `leaderboards.mine` with `{ day? }` gives `{ boards }`: every board of the manifest as `{ id, name, periods }`, `name` in Tavora's language and `periods` the user's own standing for `day`, `week`, `month`, `year` and `all` (`{ rank, of, ...numbers }` as in a `top` row, or `null` where they aren't on the board). Signed out, not shown or offline, every standing is `null`. Tavora's profile card shows the same.
 
@@ -298,6 +300,7 @@ The same [`overlay`](./manifest.md#overlay) page can also be shown over the user
 - The call gives `"off"` while the user has Game overlays off (they are off at first); Tavora then opens Settings > Overlays & Streaming. It gives `"full"` when the setup the overlay lands in already has 8 items; the user can remove one on the Overlay page. Otherwise it gives `"shown"`, also when the overlay was already added.
 - The overlay shows only while its game is running and in front (or, in All games, any library game without a setup of its own), and hides when the user switches to another window, Tavora included. The user picks per overlay whether it is always shown or toggled by a key, how see-through it is, and whether it hides from screen capture (it shows in capture at first). They place and resize it on the Overlay page, or in the game by holding the in-game layer open with the "Tavora over game" key. Its place sticks to the nearest corner or edge of the game window and scales with the window's height, and the page is scaled the same way: it is laid out as in a 1080 px high window, and shown bigger or smaller with the game window.
 - Tavora keeps overlays in setups: Everywhere (over any program), All games, and one per game workspace. An overlay asked for from a game workspace lands in that game's setup, which Tavora adds when there is none; one asked for from a personal workspace lands in All games. Your module never puts anything in Everywhere; the user does. Each setup has room for 8 items (`LIMITS.maxGameOverlays`), panels in game included. In Everywhere the overlay is placed and scaled on the main screen instead of a game window, so lay it out for any size.
+- While an overlay of your module is on screen (over a game, on the Overlay page, or open in OBS), the panel that published its key last keeps running for it, also while its workspace isn't shown and while Tavora is minimized; until one has, every panel of the module in that workspace does. It isn't paused for being out of sight (no `lifecycle.suspend`), so keep publishing from there. An OBS source counts for half a minute after it closed, so a refresh doesn't stop your panel.
 - Tavora draws its own window above the game. It does not touch the game: nothing is injected into it or drawn by it. Games that run in exclusive full screen hide it; the user is told to switch the game to borderless. Windows only; elsewhere the call gives `"off"`.
 - The page has no bridge and runs under the same policy as a Stream overlay page, with no network. Clicks go through it to the game, so it can't take input.
 - Theme and language don't reach the page, and its size is the user's choice, so lay it out for any size and keep its background transparent.
@@ -337,7 +340,7 @@ While it runs only for the game (the hidden panel, or the panel of a workspace n
 
 A module lists what it can do on a key press in the manifest's [`actions`](./manifest.md#actions), such as Start/Pause. `hotkeys.set` opens Tavora's own dialog, where the user presses the keys for one action on one target (an item id, say); `label` names the target there. The binding belongs to the current workspace. A module never learns which key it is.
 
-When the user presses it, one panel of the module in the workspace shown now, the one used last, gets the `hotkeys.pressed` event with `{ action, target }`, so one press is one action however many panels are open. Hotkeys work system-wide, also while the game has the focus, but only while their workspace is shown in Tavora and the module has a panel in it. The game doesn't get a key that is a hotkey. Settings > Overlays & Streaming lists every hotkey, and the user can remove them there.
+When the user presses it, one panel of the module in the workspace shown now, the one used last, gets the `hotkeys.pressed` event with `{ action, target }`, so one press is one action however many panels are open. Hotkeys work system-wide, also while the game has the focus, but only while their workspace is shown in Tavora and the module has a panel in it, or while one of the module's items from that workspace shows over the game or the screen and a panel of it runs for it (a timer's Start key works in game while Tavora shows Home; the panel of that workspace gets the press). A key of the workspace shown wins one that such a workspace has too. The game doesn't get a key that is a hotkey. Settings > Overlays & Streaming lists every hotkey, and the user can remove them there.
 
 ### Documents
 
@@ -517,14 +520,14 @@ A Tavora older than **Since** throws `UNKNOWN_METHOD` for the call; `sdk.support
 | `folders.changed` | `{ folder, changed, removed, rescan }` | files of the module's types changed in a folder the panel watches (`folders.watch`); only with the `folders` capability. Tavora 0.23.113+ |
 | `discord.state` | `DiscordState` | the connection to the Discord app changed; only with the `discord` capability, after `discord.state` was asked |
 | `discord.event` | `{ event, data }` | a Discord event the panel subscribed to; only with the `discord` capability |
-| `hotkeys.pressed` | `{ action, target }` | the user pressed a hotkey set for this module in the workspace shown now; sent to one panel of the module there, the one used last |
+| `hotkeys.pressed` | `{ action, target }` | the user pressed a hotkey set for this module in the workspace shown now, or in a workspace whose item of the module shows over the game; sent to one panel of the module there, the one used last |
 | `panel.navigate` | `{ requestId, content }` | another panel of this module asked this one to show `content` (`panels.open`); answer with `panel.navigated` within 5 seconds. The SDK does it for you: use `panel.onNavigate` (Tavora 0.17.18 and newer) |
 | `overlay.overGameChanged` | `{ keys }` | the user added or removed one of this module's game overlays of the panel's workspace on the Overlay page; `keys` is what `overlay.overGame` gives now. The SDK hands it to `overlay.onOverGameChange` (Tavora 0.23.43 and newer) |
 | `panel.openSettings` | `{ key }` | the user pressed Settings on the frame of one of this module's overlays on the Overlay page. Tavora has put the panel in its dialog already (it hears `panel.dialog` first); show the settings of what `key` shows. The SDK hands it to `panel.onOpenSettings`, and keeps one that comes before the handler exists (Tavora 0.23.43 and newer) |
 | `panel.dialog` | `{ open }` | the panel's dialog opened or closed, by `panel.setDialog` or the user (the close button or a click beside it). The SDK hands it to `panel.onDialogChange` (Tavora 0.21.95 and newer) |
 | `panel.maximized` | `{ maximized }` | the panel started or stopped filling the workspace, by the user or `panel.setMaximized`. The SDK hands it to `panel.onMaximizedChange` (Tavora 0.20.20 and newer) |
 | `panel.overGame` | `{ over }` | the panel went over the game (the user opened the in-game layer) or came back to its slot. The SDK hands it to `panel.onOverGameChange` (Tavora 0.24.90 and newer) |
-| `lifecycle.suspend` | `null` | the panel is hidden (window minimized or hidden, its tab is in the background, or another group is maximized); pause timers and animations. Also sent right after the handshake if the panel connects while hidden |
+| `lifecycle.suspend` | `null` | the panel is hidden (window minimized or hidden, its tab is in the background, or another group is maximized); pause timers and animations. Not sent while the panel runs for an overlay on screen or with its game, also while Tavora is minimized. Also sent right after the handshake if the panel connects while hidden |
 | `lifecycle.resume` | `null` | the panel is visible again |
 | `lifecycle.behind` | `{ behind }` | Tavora's window went behind another program, usually the game (`behind: true`), or came back in front. The panel is not hidden and keeps running; only what the user must be there to see, such as a toast with Undo, should wait. A panel shown over the game is never behind. Also sent right after the handshake if the panel connects while the window is behind. The SDK hands it to `lifecycle.onBehindChange` (Tavora 0.23.82 and newer) |
 | `lifecycle.dispose` | `null` | the panel is closing. Saves sent right after it are still answered for a moment (at most a second), nothing else. Best effort only: it may never arrive, so never rely on it to save |
@@ -623,9 +626,9 @@ Without the capability every one of them fails with `PERMISSION_DENIED` and `cap
 | `systemInfo.watch` | one watch per panel, 26 drives; Tavora reads at most once a second, for all panels together. The connection is checked every 5 seconds, whatever the panels ask |
 | `media.control` | one per press; an app gets 5 s to answer |
 | `discord.command` | 15 s, answers and events up to 512 KB; 32 subscriptions per panel |
-| `leaderboards.submit` | 50 results per call; the service keeps 10,000 results per account and module and takes 60 requests a minute per account and module |
+| `leaderboards.submit` | 50 results per call and 30 KB of body, which depends on the board's kind; the service keeps 10,000 results per account and module and takes 60 requests a minute per account and module |
 | `leaderboards.top` | 100 lines |
-| `ui.showMenu` | one menu per click or key press, 100 entries, labels 80 characters, hints 30 |
+| `ui.showMenu` | one menu per click or key press, 100 entries, labels 80 characters, hints 30, reasons 120 on one line |
 | `overlay.publish` | 16 KB of state per overlay, 200 overlays per module and workspace; keys up to 64 letters, digits, `-` and `_` |
 | `hotkeys` | 100 per module and workspace; labels 60 characters on one line; targets like overlay keys |
 
@@ -716,8 +719,9 @@ These need a Tavora with `ui.tooltip.defineSkin` (its version is in the table ab
   (hidden from screen readers); the label stays the stat's name. `icon` needs a Tavora with
   `sdk.supports("ui.tooltip.propertyIcon")`: an older one refuses the unknown key, and with it the whole tooltip, so
   the SDK leaves it out there (a raw caller does that itself).
-- `content.effect` is a text (up to 1,000 characters) or up to 40 runs `{ text, accent? }` (1,000 characters in all);
-  `accent: true` runs take the accent colour.
+- `content.effect` is a text (up to 1,000 characters) or up to 40 runs `{ text, accent?, strong?, italic? }` (1,000
+  characters in all); `accent: true` runs take the accent colour, and bold and italic ones need
+  [formatting](#formatting).
 - `content.skin` names one of the module's skins; only the card and unit layouts wear it. A name that isn't defined shows the
   plain card, without an error.
 - `ui.tooltip.defineSkin({ name, skin })` defines or replaces a skin for every panel of the module, until Tavora
@@ -782,6 +786,49 @@ These need a Tavora with `sdk.supports("ui.tooltip.unit")` (`UNIT_CARD_TAVORA` i
 - On an older Tavora the SDK leaves `layout` and `skin` out of `ui.tooltip.show`, puts the `effect` text into a
   section row (first section, plain text), and `defineSkin` does nothing (`sdk.supports("ui.tooltip.skin")` tells); a raw caller checks the version itself, since an older Tavora
   rejects the unknown keys.
+
+### Formatting
+
+These need a Tavora with `sdk.supports("ui.tooltip.formatting")` (`TOOLTIP_FORMATTING_TAVORA` in `@tavora/sdk/protocol`).
+They work in every layout and look, and are drawn as the kit's panel parts of the same name, in the card's own colours
+and sizes, so a card looks the same in a panel (`ItemCard`, `ItemTooltip`) and here.
+
+- A run (of `effect`, a paragraph or the footer) may be `strong: true` (bold) and `italic: true` (slanted, the game's
+  names or quotes), next to `accent`. A "\n" in an effect or a paragraph is a line break.
+- `content.blocks` are up to 12 parts after the sections (in the card layout before the requirements, in the unit
+  layout before the icon row):
+  - `{ type: "text", text?, runs?, tone?, size?, box? }`: a paragraph (`TooltipText`), `text` or up to 40 `runs` (not
+    both), up to 1,000 characters. `tone: "muted"` is the softer text, `size: "small"` the small size, `box: true` the
+    effect box around it.
+  - `{ type: "heading", text }`: a small heading over the part under it (`TooltipHeading`), up to 100 characters.
+  - `{ type: "list", items }`: up to 20 lines with bullets (`TooltipList`), each a text (up to 300 characters) or
+    `{ text, meta? }`, `meta` (up to 40) a short value at the right.
+  - `{ type: "tags", tags }`: up to 8 tags in the badge look (`TooltipTags`), each a text (up to 24 characters) or
+    `{ text, color? }`, `color` `#rrggbb` only, for its text and edge.
+- `content.footer` is a line across the card's bottom, under a line, above Tavora's own footer (`TooltipFooter`): a text
+  or up to 40 runs, up to 300 characters, on one line (it wraps when long). A bold label: `[{ text: "Skill points: ",
+  strong: true }, { text: "3" }]`.
+- Texts in blocks and the footer are plain: a line break only in a paragraph, and no other control characters, no
+  zero-width marks and none of the marks that reorder text. Anything else is `INVALID_PARAMS`.
+- On an older Tavora, which refuses the unknown keys and with them the whole tooltip, the SDK leaves `strong` and
+  `italic` out (the text stays) and turns `blocks` and `footer` into sections after the module's own: a heading becomes
+  the title of the rows under it, a paragraph one row, a list's lines rows with `meta` as their status, tags one row
+  ("Stone · Legendary"), the footer a last section of one row; within the 12 sections and 100 rows that Tavora takes. A
+  raw caller does that itself.
+
+```ts
+await tavora.ui.tooltip.show({
+  id: "skill:multi-shot",
+  anchor: element,
+  content: {
+    title: "Multi Shot",
+    layout: "card",
+    effect: [{ text: "Shooting " }, { text: "Regular Arrows", italic: true }, { text: " has a " }, { text: "20%", accent: true }, { text: " chance." }],
+    blocks: [{ type: "text", runs: [{ text: "Practice makes the arrow fly true.", italic: true }], tone: "muted" }],
+    footer: [{ text: "Skill points: ", strong: true }, { text: "3" }],
+  },
+});
+```
 
 The neutral look draws with Tavora's own colours and follows the user's theme; `tone` and the affix
 colours are ignored there. The `poe` look is the gold, brown and purple one of Path of Exile 2 item

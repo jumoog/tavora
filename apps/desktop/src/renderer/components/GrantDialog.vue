@@ -11,9 +11,9 @@
 // panel when it is added or still misses access, or the running panel that asks for a connector on request. Cancel then
 // closes the panels that wait for the answer; Allow lets the host start them (main/host.ts questionOf).
 // Running while its game runs (a panel type's `withGame`, main/with-game.ts) is asked here too, with the rest.
-import { Check, Cpu, Folder, Gamepad2, Gauge, Globe, Headphones, Monitor, Music, Radio, ShieldCheck, Trophy } from "@lucide/vue";
+import { Cpu, Folder, Gamepad2, Gauge, Globe, Headphones, Monitor, Music, Radio, ShieldCheck, Trophy } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
-import { Button } from "@tavora/official-ui/components/ui/button";
+import { TextLink } from "@tavora/official-ui/components/ui/text-link";
 import { DialogButton, DialogFooter } from "@tavora/official-ui/components/ui/dialog";
 import { act, aiUsage, closeDialog, dialog, discord, nextUpdateAsk, openPanels, openSettings, state, stopUpdateAsks, type GrantRequest } from "../host";
 import { t } from "../i18n";
@@ -181,7 +181,7 @@ async function allow() {
   <component
     :is="inPanel ? 'section' : ModalDialog"
     v-if="module"
-    v-bind="inPanel ? { class: 'flex w-full max-w-[460px] flex-col gap-4', 'aria-labelledby': titleId, 'data-testid': 'grant-question' } : { title, icon: ShieldCheck, class: 'sm:max-w-[480px]', testid: 'grant-dialog' }"
+    v-bind="inPanel ? { class: 'flex w-full max-w-[460px] flex-col gap-4', 'aria-labelledby': titleId, 'data-testid': 'grant-question' } : { title, icon: ShieldCheck, size: 'lg', testid: 'grant-dialog' }"
     @close="close()"
   >
     <h2 v-if="inPanel" :id="titleId" class="text-lg font-semibold">{{ title }}</h2>
@@ -202,7 +202,7 @@ async function allow() {
       <p v-else class="bg-muted text-muted-foreground rounded-md px-3 py-2 text-sm">{{ t("grant.aiUsageNone") }}</p>
       <p class="text-muted-foreground text-sm">
         {{ t("grant.aiUsageNote") }}
-        <Button type="button" variant="link" class="text-foreground inline h-auto p-0 align-baseline font-[inherit] text-[inherit] whitespace-normal underline underline-offset-2" @click="editAccounts">{{ t("grant.aiUsageAccounts") }}</Button>
+        <TextLink wrap class="text-foreground underline underline-offset-2" @click="editAccounts">{{ t("grant.aiUsageAccounts") }}</TextLink>
       </p>
     </section>
     <section v-if="connectors.includes('system-info')" class="flex flex-col gap-2" :aria-label="t('grant.systemInfo')" data-testid="grant-system-info">
@@ -269,7 +269,7 @@ async function allow() {
       <DialogButton type="button" close autofocus data-testid="grant-cancel" @click="close()">
         {{ request.review ? t("grant.notNow") : t("common.cancel") }}
       </DialogButton>
-      <DialogButton type="button" :icon="Check" :loading="busy" data-testid="grant-allow" :disabled="busy" @click="allow">{{ update ? t("grant.updateAllow") : t("grant.allow") }}</DialogButton>
+      <DialogButton type="button" :busy="busy" data-testid="grant-allow" :disabled="busy" @click="allow">{{ update ? t("grant.updateAllow") : t("grant.allow") }}</DialogButton>
     </DialogFooter>
   </component>
 </template>

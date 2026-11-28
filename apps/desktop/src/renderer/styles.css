@@ -6,10 +6,14 @@
 @import "./fonts.css";
 /* The curves and durations every animation uses (shared with the modules). */
 @import "../../../../modules/shared/src/motion.css";
+/* Shadow steps for floating layers and the z-index layers (shared with the modules). */
+@import "../../../../modules/shared/src/elevation.css";
 /* Balanced titles, the play triangle, the edge around pictures (shared with the modules). */
 @import "../../../../modules/shared/src/details.css";
 /* How each part looks in a style other than Classic (shared with the modules). */
 @import "../../../../modules/shared/src/looks.css";
+/* Round ends: the padding and icon inset of a control that turns into a pill (shared with the modules). */
+@import "../../../../modules/shared/src/pill.css";
 /* The shared controls (@tavora/official-ui) use Tailwind classes too. */
 @source "../../../../modules/shared/src/components";
 
@@ -57,7 +61,9 @@
   --toast-foreground: #171412;
 
   --radius: 8px;
-  /* How far a disabled control fades: enough to read as off, while its text keeps 3:1 in every official theme. */
+  /* How far every disabled kit control fades (Button, fields, menu rows, Calendar days, switches...): one value, so off
+     looks the same everywhere, with or without a reason. 0.75 is the lowest that keeps a disabled button's text at 3:1
+     in every official theme (the Danger button in Tavora dark sets the limit; e2e accessibility.spec.ts checks it). */
   --disabled-opacity: 0.75;
 }
 
@@ -468,15 +474,6 @@ nav[data-expanded="true"] .footer-slot > [aria-hidden="true"] {
   .module-tile {
     @apply bg-background text-primary flex flex-none items-center justify-center rounded-lg border;
   }
-}
-
-/* Disabled buttons, inputs and text areas in the UI kit fade by --disabled-opacity instead of their own 50%, so "Save",
-   "Send code" or "Remove" stay readable while off. Switches keep the kit's 50%, so a disabled one never looks live.
-   Outside any layer on purpose, so it wins over the kit's disabled:opacity-50. */
-[data-slot="button"]:disabled,
-[data-slot="input"]:disabled,
-[data-slot="textarea"]:disabled {
-  opacity: var(--disabled-opacity);
 }
 
 /* Settings > Appearance: the theme list is long, so it shows a scrollbar, which the select list otherwise hides. */

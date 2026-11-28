@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { createApp, h, nextTick, type App } from "vue"
 import type { TooltipContent } from "@tavora/sdk"
 import { ItemCard, type ItemCardSkin } from "."
-import { ITEM_CARD_TYPE, UNIT_CARD_TYPE } from "../../tooltip/typography"
+import { ITEM_CARD_TYPE, TOOLTIP_TYPE, UNIT_CARD_TYPE } from "../../tooltip/typography"
 import { heldSkinFonts } from "./skin-font"
 
 let app: App | undefined
@@ -70,7 +70,7 @@ describe("ItemCard", () => {
     expect(Array.from(stats.children, (c) => c.textContent)).toEqual(["", "", "Per level", "Damage", "12", "+3", "Range", "3", ""])
     app!.unmount()
     const rich = mount({ ...levels, layout: "rich" })
-    expect(Array.from(rich.querySelectorAll(".tavora-item-card-props dd"), (d) => d.textContent)).toEqual(["12 · +3", "3"])
+    expect(Array.from(rich.querySelectorAll(".tavora-item-card-prop-value"), (d) => d.textContent)).toEqual(["12 · +3", "3"])
   })
 
   it("shows a stat's extra values in columns of their own under their headings, and after the value in the rich layout", () => {
@@ -92,7 +92,7 @@ describe("ItemCard", () => {
     expect(mount(card).querySelector(".tavora-item-card-stats")!.hasAttribute("data-columns")).toBe(false)
     app!.unmount()
     const rich = mount({ ...levels, layout: "rich", properties: [...levels.properties!, { label: "Shield", value: "", more: ["", "4", " "] }] })
-    expect(Array.from(rich.querySelectorAll(".tavora-item-card-props dd"), (d) => d.textContent)).toEqual(["6 · 12 · 18", "0.6", "6 · – · 8.6 · +1", "– · – · 4"])
+    expect(Array.from(rich.querySelectorAll(".tavora-item-card-prop-value"), (d) => d.textContent)).toEqual(["6 · 12 · 18", "0.6", "6 · – · 8.6 · +1", "– · – · 4"])
   })
 
   it("draws the tags over the picture in its bottom corners, coloured ones in their colour, and as badges without a picture", () => {
@@ -158,7 +158,7 @@ describe("ItemCard", () => {
   it("shows the rich layout with the picture beside the text, and no skin there", () => {
     const el = mount({ ...card, layout: "rich" }, skin)
     expect(el.dataset.layout).toBe("rich")
-    expect(el.querySelector(".tavora-item-card-rich > img")).not.toBeNull()
+    expect(el.querySelector(".tavora-item-card-rich-art > img")).not.toBeNull()
     expect(el.querySelector(".tavora-item-card-heading h3")!.textContent).toBe("Archer Tower")
     expect(el.hasAttribute("data-skinned")).toBe(false)
     expect(el.style.getPropertyValue("--skin-surface")).toBe("")
@@ -208,7 +208,7 @@ describe("ItemCard", () => {
     const body = el.querySelector(".tavora-item-card-unit-body")!
     expect([...body.children].map((c) => c.className)).toEqual(["tavora-item-card-unit-effect", "tavora-item-card-unit-stats", "tavora-item-card-icons", "tavora-item-card-pips", "tavora-item-card-extra"])
     expect([...body.querySelector(".tavora-item-card-unit-stats")!.children].map((c) => c.textContent)).toEqual(["Health:", "3.95", "E+12", "Hits/Second:", "99.999", " (MAX)", "Crit Chance:", "5%", ""])
-    expect([...body.querySelectorAll(".tavora-item-card-unit-icon")].map((i) => i.getAttribute("aria-label"))).toEqual(["Steel Coat (95)", "Static"])
+    expect([...body.querySelectorAll(".tavora-item-card-unit-icon")].map((i) => i.getAttribute("aria-label"))).toEqual(["Steel Coat, 95", "Static"])
     expect([...body.querySelectorAll(".tavora-item-card-pip")].map((p) => p.hasAttribute("data-on"))).toEqual([true, true, false])
     expect(body.querySelector(".tavora-item-card-extra")!.textContent).toBe("+67")
     expect(el.querySelector(".tavora-item-card-badge")).toBeNull()
@@ -229,7 +229,7 @@ describe("ItemCard", () => {
     const properties = [{ label: "Health", value: "3.95", suffix: "E+12" }]
     expect(mount({ title: "A", layout: "card", properties }).querySelector(".tavora-item-card-value")!.textContent).toBe("3.95E+12")
     app!.unmount()
-    expect(mount({ title: "A", properties }).querySelector("dd")!.textContent).toBe("3.95E+12")
+    expect(mount({ title: "A", properties }).querySelector(".tavora-item-card-prop-value")!.textContent).toBe("3.95E+12")
   })
 
   it("keeps text as text, and a plain-text effect as one run", () => {
@@ -237,5 +237,78 @@ describe("ItemCard", () => {
     expect(el.querySelector("h3")!.textContent).toBe("<b>x</b>")
     expect(el.querySelector("b, i")).toBeNull()
     expect(el.querySelector(".tavora-item-card-effect")!.textContent).toBe("<i>y</i>")
+  })
+})
+
+describe("ItemCard in the PoE look", () => {
+  const item: TooltipContent = { look: "poe", tone: "rare", title: "Doom Loop", subtitle: "Ultimate Robe", image: "robe.png", badges: ["ilvl 82"], requirements: [{ label: "Level", value: "65" }], properties: [{ label: "Energy Shield", value: "312" }], sections: [{ rows: [{ text: "+98 to maximum Energy Shield", badges: ["[P1]"], status: "Crafted" }, { text: "42% increased Energy Shield", connected: true }] }] }
+
+  it("wears the look and colours the title by its rarity, in the rich layout as in the shared tooltip", () => {
+    const el = mount(item)
+    expect(el.dataset.look).toBe("poe")
+    expect(el.querySelector("h3")!.dataset.tone).toBe("rare")
+    // The requirements sit under the picture, the stats read "Label: value", the rows keep their status and tags.
+    expect(el.querySelector(".tavora-item-card-rich-art > img")).not.toBeNull()
+    expect(el.querySelector(".tavora-item-card-rich-art .tavora-item-card-requirements dd")!.textContent).toBe("65")
+    expect(el.querySelector(".tavora-item-card-props > div")!.textContent).toBe("Energy Shield: 312")
+    expect([...el.querySelector(".tavora-item-card-affixes")!.children].map((c) => [c.tagName, c.textContent])).toEqual([["SMALL", "Crafted"], ["SPAN", "[P1]"]])
+    expect(el.style.getPropertyValue("--ic-title-size")).toBe(`${TOOLTIP_TYPE.title}px`)
+  })
+
+  it("wears it on a card too, but not with a skin or on a unit", () => {
+    expect(mount({ ...item, layout: "card" }).dataset.look).toBe("poe")
+    app!.unmount()
+    expect(mount({ ...item, layout: "card" }, skin).hasAttribute("data-look")).toBe(false)
+    app!.unmount()
+    expect(mount({ ...item, layout: "unit" }).hasAttribute("data-look")).toBe(false)
+    app!.unmount()
+    expect(mount({ ...item, look: "neutral" }).hasAttribute("data-look")).toBe(false)
+  })
+
+  it("keeps the left column for the PoE look even without a picture, as the shared tooltip does", () => {
+    expect(mount({ ...item, image: undefined, requirements: undefined }).querySelector(".tavora-item-card-rich-art")).not.toBeNull()
+    app!.unmount()
+    expect(mount({ title: "Plain", properties: [{ label: "A", value: "1" }] }).querySelector(".tavora-item-card-rich-art")).toBeNull()
+  })
+})
+
+describe("ItemCard with formatting", () => {
+  const formatted: TooltipContent = {
+    title: "Multi Shot",
+    effect: [{ text: "Shooting " }, { text: "Regular Arrows", italic: true }, { text: " has a " }, { text: "20%", accent: true, strong: true }, { text: " chance." }],
+    sections: [{ rows: [{ text: "Affix" }] }],
+    blocks: [
+      { type: "text", runs: [{ text: "A flavour line", italic: true }], tone: "muted", size: "small" },
+      { type: "heading", text: "Found in" },
+      { type: "list", items: ["Spire", { text: "Shroud", meta: "Rare" }] },
+      { type: "tags", tags: ["Stone", { text: "Legendary", color: "#e0a243" }] },
+    ],
+    footer: [{ text: "Skill points: ", strong: true }, { text: "3" }],
+  }
+  const partSlots = (el: Element) => [...el.querySelectorAll("[data-slot^=tooltip-]")].map((p) => p.getAttribute("data-slot"))
+
+  it("draws bold and italic runs in the effect", () => {
+    expect(mount({ ...formatted, layout: "card" }).querySelector(".tavora-item-card-effect")!.innerHTML).toBe('Shooting <em>Regular Arrows</em> has a <span data-accent=""><strong>20%</strong></span> chance.')
+  })
+
+  it("draws the blocks after the sections and the footer at the bottom, with the kit's parts, in every layout", () => {
+    for (const layout of ["card", "rich", "unit"] as const) {
+      const el = mount({ ...formatted, layout })
+      expect(partSlots(el)).toEqual(["tooltip-text", "tooltip-heading", "tooltip-list", "tooltip-tags", "tooltip-footer"])
+      const text = el.querySelector("[data-slot=tooltip-text]")!
+      expect(text.getAttribute("data-tone")).toBe("muted")
+      expect(text.innerHTML).toBe("<em>A flavour line</em>")
+      expect(text.previousElementSibling!.className).toBe("tavora-item-card-section")
+      expect(el.querySelector("[data-slot=tooltip-footer]")!.innerHTML).toBe("<strong>Skill points: </strong>3")
+      app!.unmount()
+    }
+    // Last in a card and in the rich layout; before the pips in a unit.
+    expect(mount({ ...formatted, layout: "card" }).lastElementChild!.getAttribute("data-slot")).toBe("tooltip-footer")
+    app!.unmount()
+    expect(mount({ ...formatted, layout: "rich" }).lastElementChild!.getAttribute("data-slot")).toBe("tooltip-footer")
+  })
+
+  it("draws neither without them", () => {
+    expect(partSlots(mount(card))).toEqual([])
   })
 })

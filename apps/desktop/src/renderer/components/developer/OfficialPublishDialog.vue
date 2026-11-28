@@ -7,8 +7,8 @@ import { Check, ChevronRight, Circle, KeyRound, Loader, Upload } from "@lucide/v
 import { computed, ref } from "vue";
 import { Button } from "@tavora/official-ui/components/ui/button";
 import { DialogButton, DialogFooter } from "@tavora/official-ui/components/ui/dialog";
-import { Checkbox } from "@tavora/official-ui/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@tavora/official-ui/components/ui/collapsible";
+import { CheckboxField } from "@tavora/official-ui/components/ui/checkbox-field";
 import { act, showToast, state } from "../../host";
 import { t } from "../../i18n";
 import { officialDialog } from "../../official-publish";
@@ -50,7 +50,7 @@ function cancel() {
 </script>
 
 <template>
-  <ModalDialog v-if="dialog.show !== 'none'" :title="title" :icon="Upload" class="sm:max-w-[520px]" testid="official-publish-dialog" :busy="uploading || busy" @close="cancel">
+  <ModalDialog v-if="dialog.show !== 'none'" :title="title" :icon="Upload" size="lg" testid="official-publish-dialog" :busy="uploading || busy" @close="cancel">
     <!-- Building, signing or uploading: the steps, with the current one marked. -->
     <template v-if="dialog.show === 'steps'">
       <ol class="flex flex-col gap-2 text-sm" :aria-label="title" data-testid="official-publish-steps">
@@ -108,17 +108,18 @@ function cancel() {
         <KeyRound class="size-4 flex-none" aria-hidden="true" />
         {{ t("officialPublish.preview.savedKey") }}
       </p>
-      <label v-else-if="key.canRemember" class="flex items-start gap-2 text-sm">
-        <Checkbox v-model="remember" class="mt-0.5 flex-none" data-testid="official-publish-remember" />
-        <span class="flex flex-col gap-0.5">
-          <span>{{ t("officialPublish.preview.remember") }}</span>
-          <span class="text-muted-foreground">{{ t("officialPublish.preview.rememberHint") }}</span>
-        </span>
-      </label>
+      <CheckboxField
+        v-else-if="key.canRemember"
+        v-model="remember"
+        class="-mx-2 w-auto"
+        :label="t('officialPublish.preview.remember')"
+        :description="t('officialPublish.preview.rememberHint')"
+        data-testid="official-publish-remember"
+      />
 
       <DialogFooter>
         <DialogButton close :disabled="busy || dialog.confirming" data-testid="official-publish-cancel" @click="cancel">{{ t("common.cancel") }}</DialogButton>
-        <DialogButton :icon="Upload" :disabled="busy || dialog.confirming" data-testid="official-publish-upload" @click="upload">
+        <DialogButton :disabled="busy || dialog.confirming" data-testid="official-publish-upload" @click="upload">
           {{ key.saved ? t("officialPublish.preview.upload") : t("officialPublish.preview.chooseKey") }}
         </DialogButton>
       </DialogFooter>

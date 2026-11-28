@@ -5,11 +5,16 @@ import { Search, X } from "@lucide/vue"
 import { reactiveOmit } from "@vueuse/core"
 import { ComboboxInput, useForwardPropsEmits } from "reka-ui"
 import { onMounted, ref } from "vue"
+import { controlSize, type ControlSize } from "../../../lib/control-size"
+import { INPUT_SIZE } from "../input/look"
 import { cn } from "../../../lib/utils"
 import { Button } from "../button"
+import { leaveToolbar } from "../toolbar/context"
 import { useFieldControl } from "../field/use-field-control"
 import { uiText } from "../text"
 import { freeKeys } from "./free-keys"
+// Its buttons are parts of it, not stops of a Toolbar around it.
+leaveToolbar()
 
 defineOptions({
   inheritAttrs: false,
@@ -21,12 +26,12 @@ defineOptions({
 // `free`: the text is the value and the list only suggests (use it with `ignore-filter` and `:reset-search-term-on-blur="false"` on the
 // Combobox). Enter then keeps what is typed and says so with `commit`; only an item reached with the arrow keys is picked.
 const props = withDefaults(
-  defineProps<ComboboxInputProps & { class?: HTMLAttributes["class"], icon?: boolean, clearable?: boolean, clearLabel?: string, free?: boolean }>(),
+  defineProps<ComboboxInputProps & { class?: HTMLAttributes["class"], icon?: boolean, clearable?: boolean, clearLabel?: string, free?: boolean, size?: ControlSize }>(),
   { icon: true, clearable: true },
 )
 const emits = defineEmits<ComboboxInputEmits & { commit: [text: string] }>()
 
-const delegatedProps = reactiveOmit(props, "class", "icon", "clearable", "clearLabel", "free")
+const delegatedProps = reactiveOmit(props, "class", "icon", "clearable", "clearLabel", "free", "size")
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
@@ -76,8 +81,9 @@ function clear() {
       autocomplete="off"
       spellcheck="false"
       :class="cn(
-        'placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/10 border-input h-[var(--style-control-height,32px)] w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+        'placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/10 border-input h-[var(--style-control-height,32px)] w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-(--disabled-opacity)',
         'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3',
+        INPUT_SIZE[controlSize(props.size)],
         icon && 'pl-8',
         'pr-9',
         props.class,

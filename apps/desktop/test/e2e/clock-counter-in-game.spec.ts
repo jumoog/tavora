@@ -318,7 +318,7 @@ test("an item's settings use Tavora's settings layout: the panel, the overlay an
 
     // Where it shows: over the game (set on the Overlay page) and on stream (the OBS link).
     await click(app, "page-game");
-    await expect.poll(() => everything()).toContain("Not over your game");
+    await expect.poll(() => everything()).toContain("Off in your game");
     await shotOfPanel(app, "settings-in-game.png");
     await click(app, "page-stream");
     await expect.poll(() => everything()).toContain("Copy OBS link");
@@ -451,7 +451,7 @@ test("a row's ··· menu moves it up and down (off at the ends), and a right-cl
     // The first row can't go up; the last can't go down.
     await inModule(app, ID, `${menuOf(0)}.click()`);
     await expect.poll(() => inModule<string[]>(app, ID, `[...document.querySelectorAll('[role=menuitem]')].map((item) => item.textContent.trim() + (item.hasAttribute("data-disabled") ? " (off)" : ""))`)).toEqual([
-      "Settings…",
+      "Settings",
       "Move up (off)",
       "Move down",
       "DeleteDel",

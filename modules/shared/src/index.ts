@@ -18,10 +18,12 @@ export { errorMessage } from "./documents";
 export { createOptimistic, useOptimistic, useOptimisticKeyed, type Optimistic, type OptimisticOptions, type UseOptimistic, type UseOptimisticKeyed } from "./optimistic";
 export { useTask, type Task, type TaskOptions, type TaskState, type TaskStatus } from "./use-task";
 export { useFocusRecovery, type FocusRecovery } from "./focus-recovery";
+export { usePaneKeys, isTypingTarget, type PaneKeyHandler, type PaneKeysOptions } from "./pane-keys";
+export { useSlotGrid, type SlotGrid, type SlotGridOptions, type SlotKey } from "./components/ui/slot-grid";
 export { copyImage, copyText } from "./clipboard";
 export { renderToImage, type RenderToImageOptions } from "./render-to-image";
 
-export{Tooltip,TooltipRows,useTooltip,type TooltipRow,type TooltipTrend,type TooltipWidth,type UseTooltip,type UseTooltipOptions,type UseSharedTooltipOptions,type TooltipTargetOptions,type TooltipCard}from"./components/tooltip";
+export{Tooltip,TooltipRows,TooltipText,TooltipHeading,TooltipTags,TooltipList,TooltipIcons,TooltipArt,TooltipFooter,useTooltip,isTruncated,type TooltipRow,type TooltipTrend,type TooltipWidth,type TooltipDismissReason,type TooltipTextRun,type TooltipTag,type TooltipListItem,type TooltipIcon,type UseTooltip,type UseTooltipOptions,type UseSharedTooltipOptions,type TooltipTargetOptions,type TooltipCard}from"./components/tooltip";
 export{ItemCard,type ItemCardSkin}from"./components/ui/item-card";
 export{installTitleTooltips}from"./title-tooltips";
 /** Writes the views zoomable panes are waiting to save; call it from `onSuspend` and `onDispose`. */

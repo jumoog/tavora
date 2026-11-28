@@ -8,6 +8,7 @@ import { t } from "../../i18n";
 import ProfileAvatar from "./ProfileAvatar.vue";
 import RailFooterTile from "../RailFooterTile.vue";
 import RailTooltip from "../RailTooltip.vue";
+import { Button } from "@tavora/official-ui/components/ui/button";
 
 defineProps<{ expanded: boolean }>();
 
@@ -27,8 +28,8 @@ const status = computed(() => (playing.value ? t("rail.playing", { name: playing
 
 <template>
   <RailTooltip :text="profile.name.trim() || t('profile.label')" :disabled="expanded || profileOpen">
-    <button
-      type="button"
+    <Button
+      variant="bare"
       :class="
         cn(
           // In front of the card of a running game, which peeks out from behind it (RunningGameButton.vue).
@@ -59,6 +60,6 @@ const status = computed(() => (playing.value ? t("rail.playing", { name: playing
       <RailFooterTile v-else>
         <ProfileAvatar :name="profile.name" :initials="profile.initials" :picture-url="profile.pictureUrl" :size="40" square />
       </RailFooterTile>
-    </button>
+    </Button>
   </RailTooltip>
 </template>

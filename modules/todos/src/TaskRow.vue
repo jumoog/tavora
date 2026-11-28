@@ -8,12 +8,14 @@
 //
 // Every control sits in a box as tall as one title line (32 px), so all of
 // them share the first line's centre.
-import { ChevronRight, Ellipsis, GripVertical, Pin, Trash2 } from "@lucide/vue";
+import { Check, ChevronRight, Ellipsis, GripVertical, Pin, Trash2 } from "@lucide/vue";
 import { cn } from "@tavora/official-ui";
 import { Button } from "@tavora/official-ui/components/ui/button";
+import { Checkbox } from "@tavora/official-ui/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@tavora/official-ui/components/ui/dropdown-menu";
 import { isComposing } from "@tavora/official-ui/lib/keys";
 import { Popover, PopoverAnchor, PopoverContent } from "@tavora/official-ui/components/ui/popover";
+import { Textarea } from "@tavora/official-ui/components/ui/textarea";
 import { computed, inject, nextTick, ref } from "vue";
 import { t } from "./i18n";
 import { PANEL, ROW_FOCUS } from "./panel";
@@ -44,7 +46,8 @@ const rowFocus = inject(ROW_FOCUS, null);
 
 const menuOpen = ref(false);
 const title = ref("");
-const titleInput = ref<HTMLTextAreaElement | null>(null);
+const titleField = ref<InstanceType<typeof Textarea> | null>(null);
+const titleInput = () => titleField.value?.$el as HTMLTextAreaElement | undefined;
 /** Set while a level change moves this row, so the focus it loses does not close the editor. */
 let moving = false;
 
@@ -58,9 +61,9 @@ const hasMeta = computed(() => props.compact || props.children.total > 0 || prop
 // another panel saved first, so every value it uses is read now, never inside it.
 const actions = taskActions(props.store, panel, rowFocus);
 const change = actions.change;
-const checked = (event: Event) => (event.target as HTMLInputElement).checked;
 const setTaskDone = (done: boolean) => actions.setDone(props.task, done);
 const remove = () => actions.remove(props.task);
+
 
 // ── Editing the title in place ───────────────────────────────────────
 
@@ -69,7 +72,7 @@ async function startEdit() {
   panel.draft.value = null;
   panel.editing.value = editKey.value;
   await nextTick();
-  const input = titleInput.value;
+  const input = titleInput();
   input?.focus();
   input?.setSelectionRange(input.value.length, input.value.length);
 }
@@ -87,23 +90,24 @@ function close(keep: boolean) {
 function onFocusOut(event: FocusEvent) {
   if (moving) return;
   const next = event.relatedTarget as Node | null;
-  if (next && titleInput.value?.closest("[data-task-row]")?.contains(next)) return;
+  if (next && titleInput()?.closest("[data-task-row]")?.contains(next)) return;
   close(true);
 }
 
 async function changeLevel(outdent: boolean) {
   const taskId = id.value;
   if (outdent ? !props.task.parentId : !canIndent(props.group, props.index)) return;
-  const caret = titleInput.value?.selectionStart ?? null;
+  const caret = titleInput()?.selectionStart ?? null;
   save();
   moving = true;
   change((data) => (outdent ? outdentTask(data, taskId) : indentTask(data, taskId)));
   // Moving the row in the page takes the focus away; give it back where it was.
   await nextTick();
   moving = false;
-  if (!editing.value || !titleInput.value) return;
-  titleInput.value.focus();
-  if (caret !== null) titleInput.value.setSelectionRange(caret, caret);
+  const input = titleInput();
+  if (!editing.value || !input) return;
+  input.focus();
+  if (caret !== null) input.setSelectionRange(caret, caret);
 }
 
 function onTitleKey(event: KeyboardEvent) {
@@ -134,7 +138,7 @@ function addBelow(level: number) {
 
 const describing = ref(false);
 const description = ref("");
-const descriptionInput = ref<HTMLTextAreaElement | null>(null);
+const descriptionInput = ref<InstanceType<typeof Textarea> | null>(null);
 let cancelled = false;
 /** A menu item that needs the focus (the description, a new to-do) runs once the menu has closed and let go of it. */
 const menuFocus = afterMenu();
@@ -157,7 +161,7 @@ function cancelDescription() {
 
 function focusDescription(event: Event) {
   event.preventDefault();
-  const input = descriptionInput.value;
+  const input = descriptionInput.value?.$el as HTMLTextAreaElement | undefined;
   input?.focus();
   input?.setSelectionRange(input.value.length, input.value.length);
 }
@@ -195,7 +199,7 @@ function choose(action: RowAction) {
     :class="
       cn(
         'group/task relative rounded-md',
-        editing ? 'bg-background ring-ring/60 ring-1' : 'hover:bg-accent/60',
+        editing ? 'bg-background' : 'hover:bg-accent/60',
         drop === 'before' && 'drop-before',
         drop === 'after' && 'drop-after',
       )
@@ -221,40 +225,46 @@ function choose(action: RowAction) {
       >
         <GripVertical class="size-3.5" />
       </span>
-      <span v-if="!compact" class="flex h-8 w-4 flex-none items-center justify-center">
-        <button
+      <span v-if="!compact" class="relative z-(--layer-lift) flex h-8 w-4 flex-none items-center justify-center">
+        <Button
           v-if="children.total"
-          type="button"
-          class="text-muted-foreground hover:text-foreground flex size-5 items-center justify-center rounded-sm"
+          variant="ghost"
+          size="icon-xs"
+          class="text-muted-foreground hover:text-foreground hover:bg-transparent"
           :aria-expanded="!folded"
           :aria-label="folded ? t('task.unfold', { title: task.title }) : t('task.fold', { title: task.title })"
           data-testid="task-fold"
           @click="panel.toggleFolded(task.id)"
         >
           <ChevronRight :class="cn('size-3.5 transition-transform', !folded && 'rotate-90')" />
-        </button>
+        </Button>
       </span>
-      <span class="flex h-8 flex-none items-center px-0.5">
-        <input
-          type="checkbox"
-          class="todo-check"
-          :checked="task.done"
+      <!-- The tick's hit area is a 32 px square around the circle (the control height), so it is easy to hit; a click anywhere in it ticks. It overlaps its neighbours by 4 px each side, so the row's layout stays as it was; the fold button sits above it. -->
+      <span class="group/tick relative -mx-1 flex h-8 w-8 flex-none cursor-pointer items-center justify-center" data-testid="task-tick-area" @click.self="setTaskDone(!task.done)">
+        <!-- Round, so it reads as a to-do rather than a setting. -->
+        <Checkbox
+          class="data-[state=checked]:before:-inset-[1.5px] group-hover/tick:border-primary size-5 cursor-pointer rounded-full border-[1.5px] border-[color-mix(in_oklab,var(--primary)_45%,var(--muted-foreground))]"
+          :model-value="task.done"
           :aria-label="task.done ? t('task.notDone', { title: task.title }) : t('task.done', { title: task.title })"
           data-testid="task-done"
-          @change="setTaskDone(checked($event))"
+          @update:model-value="setTaskDone($event === true)"
         />
+        <!-- A faint tick in the circle while you hover the area, in the row's colour: what a click will do. -->
+        <Check v-if="!task.done" class="text-primary pointer-events-none absolute size-3 opacity-0 transition-opacity duration-(--duration-press) group-hover/tick:opacity-45" :stroke-width="3" aria-hidden="true" data-testid="task-tick-hint" />
       </span>
 
       <Popover :open="describing" @update:open="setDescribing">
         <PopoverAnchor as-child>
           <div class="flex min-w-0 flex-1 flex-col">
             <!-- The title and its editor have the same box, font and wrapping, so switching between them moves nothing. -->
-            <textarea
+            <!-- The field's 1px border is taken off the padding, so the text stays where the title was. -->
+            <Textarea
               v-if="editing"
-              ref="titleInput"
+              ref="titleField"
               v-model="title"
-              rows="1"
-              class="block field-sizing-content w-full resize-none overflow-hidden border-0 bg-transparent px-1 py-1.5 font-(family-name:--todo-font) text-(length:--todo-text) leading-(--todo-leading) break-words outline-none"
+              variant="bare"
+              autosize
+              class="block overflow-hidden rounded-sm px-[3px] py-[5px] font-(family-name:--todo-font) text-(length:--todo-text) leading-(--todo-leading) break-words"
               :aria-label="t('task.title')"
               data-testid="task-title-input"
               :maxlength="MAX.title"
@@ -296,14 +306,14 @@ function choose(action: RowAction) {
           @open-auto-focus="focusDescription"
           @escape-key-down="cancelDescription"
         >
-          <textarea
+          <Textarea
             ref="descriptionInput"
             v-model="description"
             :maxlength="MAX.details"
             :placeholder="t('task.description')"
             :aria-label="t('task.description')"
             data-testid="description-input"
-            class="placeholder:text-muted-foreground border-input focus-visible:border-ring field-sizing-content block max-h-60 min-h-20 w-full resize-none rounded-md border bg-transparent px-2 py-1.5 text-sm outline-none"
+            class="block max-h-60 min-h-20 resize-none px-2 py-1.5 text-sm"
             @keydown="onDescriptionKey"
           />
           <p class="text-muted-foreground mt-1.5 px-0.5 text-[11px]">{{ t("task.descriptionHint") }}</p>
@@ -330,18 +340,22 @@ function choose(action: RowAction) {
       </span>
       <span class="flex h-8 flex-none items-center">
         <DropdownMenu v-model:open="menuOpen">
-          <DropdownMenuTrigger
-            :class="
-              cn(
-                'text-muted-foreground hover:text-foreground flex size-7 items-center justify-center rounded-md opacity-40 group-hover/task:opacity-100 focus-visible:opacity-100',
-                (menuOpen || editing) && 'opacity-100',
-              )
-            "
-            :aria-label="t('moreFor', { name: task.title })"
-            :title="t('more')"
-            data-testid="task-menu"
-          >
-            <Ellipsis class="size-4" />
+          <DropdownMenuTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              :class="
+                cn(
+                  'text-muted-foreground hover:text-foreground opacity-40 group-hover/task:opacity-100 hover:bg-transparent focus-visible:opacity-100',
+                  (menuOpen || editing) && 'opacity-100',
+                )
+              "
+              :aria-label="t('moreFor', { name: task.title })"
+              :title="t('more')"
+              data-testid="task-menu"
+            >
+              <Ellipsis />
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" @close-auto-focus="menuFocus.closed">
             <RowMenuItems :entries="menuEntries()" @choose="choose" />

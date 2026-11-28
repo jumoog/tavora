@@ -44,6 +44,17 @@ async function setup(options: { synced?: Record<string, StoredFile>; problems?: 
 }
 
 describe("saving a drawing", () => {
+  it("saves the shown default when the user picks it over a background a newer version added", async () => {
+    const { saver, read } = await setup({ data: { background: "paper" } });
+    saver.change(scene([rectangle()]));
+    await saver.flush();
+    expect(read()?.background).toBe("paper");
+    // Picking white changes nothing Excalidraw reports: the board already shows white.
+    saver.pickBackground("#ffffff");
+    await saver.flush();
+    expect(read()?.background).toBe("#ffffff");
+  });
+
   it("keeps a background a newer version added while the board shows the default", async () => {
     const { saver, read } = await setup({ data: { background: "paper" } });
     saver.change(scene([rectangle()]));
@@ -270,6 +281,19 @@ describe("bringing a deleted board back", () => {
     expect(copy).toMatchObject({ name: "Atlas", createdAt, background: "paper", grid: true, later: "keep me", files: { f1: kept, f2: undone } });
     expect(copy.elements).toHaveLength(3);
   });
+
+  it("keeps the default the user picked over a background a newer version added, also once picked after the delete", async () => {
+    const { saver, panel } = await setup({ data: { background: "paper" } });
+    saver.change(scene([rectangle()]));
+    await saver.flush();
+
+    panel.host.documents.delete(ID);
+    await vi.waitFor(() => expect(saver.state.deleted).toBe(true));
+    expect(saver.copy()?.background).toBe("paper");
+    // Picking white changes nothing Excalidraw reports: the board already shows white.
+    saver.pickBackground("#ffffff");
+    expect(saver.copy()?.background).toBe("#ffffff");
+  });
 });
 
 describe("letting go", () => {
@@ -297,6 +321,18 @@ describe("letting go", () => {
     saver.change(scene([kept, later]));
     await saver.flush();
     expect(read()?.elements).toHaveLength(2);
+  });
+
+  it("resume saves a background picked while the delete was going on", async () => {
+    const { saver, read } = await setup({ data: { background: "paper" } });
+    saver.change(scene([rectangle()]));
+    await saver.flush();
+    saver.discard();
+    // Picking white changes nothing Excalidraw reports: the board already shows white.
+    saver.pickBackground("#ffffff");
+    saver.resume();
+    await saver.flush();
+    expect(read()?.background).toBe("#ffffff");
   });
 
   it("resume leaves a board deleted elsewhere alone", async () => {

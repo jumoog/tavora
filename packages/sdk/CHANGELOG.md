@@ -1,3 +1,27 @@
+## 0.4.17
+
+Formatting in the shared tooltip, drawn as the kit's panel parts, so a card looks the same in a panel and above the workspace. It comes with the next Tavora (`TOOLTIP_FORMATTING_TAVORA` in `protocol.ts`; the number is given when it merges), so `MIN_TAVORA` stays (Tavora 0.21.43).
+
+- `TooltipEffectRun` (now also `TooltipTextRun`) takes `strong` and `italic` next to `accent`, in the effect, a paragraph and the footer.
+- `TooltipContent.blocks` (`TooltipBlock`, up to 12): parts after the sections, a paragraph (`text` or `runs`, `tone: "muted"`, `size: "small"`, `box`; line breaks kept), a heading, a list (`items`, each with an optional `meta`) and tags (`tags`, each with an optional `#rrggbb` colour).
+- `TooltipContent.footer`: a line across the card's bottom, a text or runs, up to 300 characters on one line.
+- The shared check (`checkTooltip`) takes them with their limits, and refuses control characters (but a line break in a paragraph), zero-width marks and the marks that reorder text in blocks and the footer.
+- An older Tavora refuses the new keys, and with them the whole tooltip, so the SDK leaves `strong` and `italic` out there and turns the blocks and the footer into sections of plain rows (within the 12 sections and 100 rows it takes). `sdk.supports("ui.tooltip.formatting")` tells which case you are in; the memory host does the same.
+
+## 0.4.16
+
+A switched-off menu item can say why. It comes with the next Tavora (`MENU_DISABLED_REASON_TAVORA` in `protocol.ts`; the number is given when it merges), so `MIN_TAVORA` stays (Tavora 0.21.43).
+
+- `MenuEntry` items take `disabledReason` next to `disabled: true`: one line of up to 120 characters (`LIMITS.maxMenuReason`). Tavora keeps the item reachable with the pointer and the arrow keys, shows the reason in a tooltip beside it and to screen readers, and doesn't let it be picked. A reason on an item that is on, or with a line break or another control character, is `INVALID_PARAMS`.
+- An older Tavora refuses the new key, and with it the whole menu, so the SDK shows the reason as the item's `hint` there when it has none (cut to 30 characters) and leaves it out otherwise. `sdk.supports("ui.showMenu.disabledReason")` tells which case you are in; the memory host does the same.
+
+## 0.4.15
+
+The memory host checks a few more things as Tavora does. `MIN_TAVORA` stays (Tavora 0.21.43).
+
+- `protocol.ts`: `leaderboardSubmitProblem`, `leaderboardSubmitBody`, `leaderboardDeclaration`, `leaderboardResultFields` and `LEADERBOARD_SUBMIT_MAX_BYTES`: the body of `leaderboards.submit` depends on the board's kind, and at most 30 KB of it goes to the service. Tavora and the memory host use them.
+- `@tavora/sdk/testing`: the `leaderboards` option can carry each board's `kind`, `daily`, `order` and `minGames`; `submit` then refuses results past 30 KB with INVALID_PARAMS, before the sign-in check. `files.exportJson(undefined)` answers INVALID_PARAMS instead of throwing. An empty picture or file, and a picture to copy or save past `LIMITS.maxClipboardImageBytes`, are refused.
+
 ## 0.4.14
 
 Modules can copy text. `MIN_TAVORA` stays (Tavora 0.21.43).

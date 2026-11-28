@@ -9,9 +9,10 @@ import { leaveRow } from "@tavora/official-ui/components/ui/animated-list";
 import { Button } from "@tavora/official-ui/components/ui/button";
 import { liftedDragImage, useReorderMotion } from "@tavora/official-ui/components/ui/reorder";
 import { settingsDialogSize } from "@tavora/official-ui/components/ui/module-settings";
-import { Switch } from "@tavora/official-ui/components/ui/switch";
+import { SwitchField } from "@tavora/official-ui/components/ui/switch";
 import { handleUndoKey, Toaster, undoable, type Undoable, type UndoAnswer } from "@tavora/official-ui/components/ui/toast";
 import { EmptyState } from "@tavora/official-ui/components/ui/empty-state";
+import { Toolbar } from "@tavora/official-ui/components/ui/toolbar";
 import type { JsonValue, MenuOptions, TavoraSDK } from "@tavora/sdk";
 import { computed, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch, type ComponentPublicInstance } from "vue";
 import AddInput from "./AddInput.vue";
@@ -341,12 +342,7 @@ function dropTask() {
   <Settings v-else-if="place === 'dialog'" :look="look" :panel-look="panelLook" :state="liveState" :saved-at="savedAt" @update:look="setLook" @update:panel-look="setPanelLook" />
   <EditPlate v-else-if="place === 'game'" :store="store" :list="list" :collapsed="collapsed" :look="look" />
   <div v-else class="@container relative flex h-full min-h-0 flex-col" :style="panelStyle" data-testid="todos-app">
-    <header
-      class="border-primary/25 bg-primary/5 flex h-10 flex-none items-center gap-1 border-b px-2"
-      role="toolbar"
-      :aria-label="t('app.toolbar')"
-      data-testid="todos-toolbar"
-    >
+    <Toolbar variant="bar" :label="t('app.toolbar')" data-testid="todos-toolbar">
       <p :class="['min-w-0 flex-1 px-1 text-xs', !store.error.value && 'truncate']" :role="store.error.value ? 'alert' : 'status'" data-testid="todos-status">
         <span v-if="store.error.value" class="text-destructive">{{ store.error.value }}</span>
         <span v-else-if="list.groups.some((group) => group.tasks.length)" class="text-muted-foreground tabular-nums">
@@ -366,17 +362,23 @@ function dropTask() {
         <ChevronsDownUp v-else />
       </Button>
       <!-- A switch: on keeps finished to-dos in the list. In a small panel (over the game, say) only the switch stays, so the toolbar keeps its room for the count. -->
-      <label class="text-muted-foreground flex h-8 flex-none cursor-pointer items-center gap-2 rounded-md px-2 text-sm" :title="t(finished === 'stay' ? 'app.keepFinished.on' : 'app.keepFinished.off')">
-        <span :class="['hidden @min-[20rem]:inline', finished === 'stay' && 'text-foreground']">{{ t("app.keepFinished") }}</span>
-        <Switch :model-value="finished === 'stay'" :aria-label="t('app.keepFinished')" data-testid="finished-mode" :data-mode="finished" @update:model-value="toggleFinished" />
-      </label>
+      <SwitchField
+        :model-value="finished === 'stay'"
+        :label="t('app.keepFinished')"
+        placement="end"
+        class="text-muted-foreground w-auto flex-none gap-2"
+        :label-class="['hidden @min-[20rem]:inline', finished === 'stay' && 'text-foreground']"
+        :title="t(finished === 'stay' ? 'app.keepFinished.on' : 'app.keepFinished.off')"
+        :switch-attrs="{ 'data-testid': 'finished-mode', 'data-mode': finished }"
+        @update:model-value="toggleFinished"
+      />
       <Button variant="ghost" size="icon-sm" :aria-label="t('settings.title')" :title="t('settings.title')" data-testid="live-settings" @click="openSettings">
         <SettingsIcon />
       </Button>
-    </header>
+    </Toolbar>
 
     <div ref="listEl" class="min-h-0 flex-1 overflow-y-auto p-2" @dragend="dragEnd">
-      <EmptyState v-if="!list.groups.length" class="border-0" :title="t('app.empty')" data-testid="empty" data-focus-empty>
+      <EmptyState v-if="!list.groups.length" variant="bare" :title="t('app.empty')" data-testid="empty" data-focus-empty>
         <template #action><AddInput class="w-full max-w-80" outlined :placeholder="t('app.addTodo')" :maxlength="MAX.title" data-testid="first-task" @add="firstTask" /></template>
       </EmptyState>
 

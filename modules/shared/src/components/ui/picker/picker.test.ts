@@ -50,6 +50,22 @@ describe("Picker", () => {
     expect(headings()).toEqual(["Stone"])
   })
 
+  it("draws the search as a field of its own, and its clear button empties it", async () => {
+    await mount({ search: "Search builds" })
+    const field = document.querySelector<HTMLInputElement>("[data-testid=pick-search]")!
+    expect(field.dataset.slot).toBe("input")
+    expect(field.className).toContain("border")
+    expect(document.querySelector("[data-testid=pick-search-clear]")).toBeNull()
+    field.value = "gold"
+    field.dispatchEvent(new Event("input"))
+    for (let tick = 0; tick < 4; tick++) await nextTick()
+    expect(rows()).toEqual(["gold"])
+    document.querySelector<HTMLButtonElement>("[data-testid=pick-search-clear]")!.click()
+    for (let tick = 0; tick < 4; tick++) await nextTick()
+    expect(field.value).toBe("")
+    expect(rows()).toHaveLength(4)
+  })
+
   it("fills the button, the rows, the headings and the room above the list from its slots", async () => {
     const root = await mount(
       {},
@@ -95,5 +111,35 @@ describe("Picker", () => {
   it("gives the current slot no option while the value isn't in the list", async () => {
     const root = await mount({ modelValue: "gone" }, { current: ({ option }: { option?: PickerOption }) => h("b", { "data-testid": "current" }, option ? option.label : "none") })
     expect(root.querySelector("[data-testid=current]")?.textContent).toBe("none")
+  })
+
+  it("says a label the button cuts short in its title, and nothing for one that fits", async () => {
+    const scroll = Object.getOwnPropertyDescriptor(Element.prototype, "scrollWidth")!
+    Object.defineProperty(Element.prototype, "scrollWidth", { configurable: true, get(this: Element) { return this.textContent?.length ?? 0 } })
+    Object.defineProperty(Element.prototype, "clientWidth", { configurable: true, get: () => 10 })
+    try {
+      const long = await mount({ open: false, modelValue: "towers" })
+      expect(long.querySelector("button")?.getAttribute("title")).toBe("Double towers")
+      app!.unmount()
+      const off = await mount({ open: false, modelValue: "towers", disabled: true })
+      expect(off.querySelector("button")?.getAttribute("title")).toBeNull()
+      expect(off.querySelector("button")?.hasAttribute("disabled")).toBe(true)
+      app!.unmount()
+      const short = await mount({ open: false, modelValue: "tower", options: [{ value: "tower", label: "Wall" }] })
+      expect(short.querySelector("button")?.getAttribute("title")).toBeNull()
+    } finally {
+      Object.defineProperty(Element.prototype, "scrollWidth", scroll)
+      Object.defineProperty(Element.prototype, "clientWidth", { configurable: true, get: () => 0 })
+    }
+  })
+
+  it("stays reachable while off with a reason, and does not open", async () => {
+    const root = await mount({ open: undefined, disabled: true, disabledReason: "Sign in first." })
+    const button = root.querySelector("button")!
+    expect(button.hasAttribute("disabled")).toBe(false)
+    expect(button.getAttribute("aria-disabled")).toBe("true")
+    button.click()
+    for (let tick = 0; tick < 4; tick++) await nextTick()
+    expect(document.querySelector("[data-testid=pick-menu]")).toBeNull()
   })
 })

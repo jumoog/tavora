@@ -10,7 +10,8 @@ import { Button } from "@tavora/official-ui/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@tavora/official-ui/components/ui/dropdown-menu";
 import { settingsDialogSize } from "@tavora/official-ui/components/ui/module-settings";
 import { handleUndoKey, Toaster, type Undoable } from "@tavora/official-ui/components/ui/toast";
-import { liftedDragImage, reducedMotion, useReorderMotion } from "@tavora/official-ui/components/ui/reorder";
+import { dropLine, liftedDragImage, reducedMotion, useReorderMotion } from "@tavora/official-ui/components/ui/reorder";
+import { Toolbar } from "@tavora/official-ui/components/ui/toolbar";
 import type { TavoraSDK } from "@tavora/sdk";
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from "vue";
 import { plural, setLanguage, t } from "./i18n";
@@ -226,9 +227,8 @@ function endDrag(): void {
 }
 
 /** The line where a row would land, for reduced motion; otherwise the gap that opens is the place. */
-function dropLine(row: Row): string | false {
-  if (!reducedMotion()) return false;
-  return drop.value?.id === rowId(row) && (drop.value.after ? "shadow-[0_2px_0_0_var(--primary)]" : "shadow-[0_-2px_0_0_var(--primary)]");
+function dropClass(row: Row): string | false {
+  return reducedMotion() && dropLine(drop.value, rowId(row));
 }
 
 /** Moves a row one place, at once (a key or the menu never animates). */
@@ -558,7 +558,7 @@ onBeforeUnmount(() => {
   <p v-else-if="!store" class="text-muted-foreground p-4 text-sm" data-testid="status">{{ t("loading") }}</p>
   <ItemEditor v-else-if="dialogOpen && editedItem" :key="editedItem.id" :title="dialogTitle ?? ''" :titled="titled" :item="editedItem" :start="startPage" :start-count="startCount" />
   <div v-else class="relative flex h-full min-h-0 flex-col" data-testid="clock-counter-app">
-    <header class="border-primary/25 bg-primary/5 flex h-10 flex-none items-center gap-1 border-b px-2" role="toolbar" :aria-label="t('app.toolbar')">
+    <Toolbar variant="bar" :label="t('app.toolbar')">
       <p class="min-w-0 flex-1 truncate px-1 text-xs" role="status">
         <span v-if="store.error.value || error" class="text-destructive">{{ store.error.value ?? error }}</span>
         <span v-else-if="notice" class="text-foreground" data-testid="notice">{{ notice }}</span>
@@ -576,7 +576,7 @@ onBeforeUnmount(() => {
           <DropdownMenuItem v-for="kind in KINDS" :key="kind" :data-testid="`pick-${kind}`" @select="addItem(kind, false)"><component :is="KIND_ICONS[kind]" />{{ t(`kind.${kind}`) }}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </header>
+    </Toolbar>
 
     <div ref="scroller" class="min-h-0 flex-1 overflow-y-auto p-2 outline-none" tabindex="-1">
       <div v-if="!list.items.length" class="flex h-full flex-col items-center justify-center gap-3 px-4 py-10 text-center" data-testid="empty" data-focus-empty>
@@ -587,14 +587,14 @@ onBeforeUnmount(() => {
           </Button>
         </div>
       </div>
-      <div ref="listEl" class="flex flex-col gap-2" @dragover="onDragOver" @drop="onDrop">
+      <div ref="listEl" class="flex flex-col gap-2 [--tavora-drop-gap:--spacing(2)]" @dragover="onDragOver" @drop="onDrop">
         <div
           v-for="row in rows"
           :key="row.type === 'item' ? row.item.id : `group-${row.key}`"
           :data-reorder-id="rowId(row)"
           :draggable="rows.length > 1"
           class="rounded-lg"
-          :class="dropLine(row)"
+          :class="dropClass(row)"
           :data-testid="`row-${rowId(row)}`"
           @dragstart="onDragStart($event, rowId(row))"
           @dragend="endDrag"

@@ -2,30 +2,17 @@
   "version": 1,
   "about": "Known breaks of the module rules (tavora docs/module-rules.md). pnpm check:modules fails only on new ones; --update-baseline rewrites this file.",
   "files": {
-    "modules/calculator/src/App.vue": {
-      "kit-control": {
-        "<Button variant=\"ghost\" size=\"icon-sm\" :class=\"settings.history && 'bg-accent text-accent-foreground'\"": 1
-      }
-    },
     "modules/clock-counter/src/App.vue": {
       "dom-query": {
         "setTimeout(() => document.querySelector<HTMLElement>(focus)?.focus(), 60);": 1
       },
       "focus-ring": {
         "<div ref=\"scroller\" class=\"min-h-0 flex-1 overflow-y-auto p-2 outline-none\" tabindex=\"-1\">": 1
-      },
-      "shadow": {
-        "return drop.value?.id === rowId(row) && (drop.value.after ? \"shadow-[0_2px_0_0_var(--primary)]\" : \"shadow-[0_-2px_0_0_var(--primary)]\");": 2
       }
     },
     "modules/clock-counter/src/ItemCard.vue": {
       "focus-ring": {
         "class=\"bg-card rounded-lg border outline-none\"": 1
-      }
-    },
-    "modules/clock-counter/src/active.ts": {
-      "motion": {
-        "export const ROW_FADE = \"transition-[background-color,border-color] duration-(--duration-press) ease-(--ease-out-strong) motion-reduce:transition-none\";": 1
       }
     },
     "modules/clock-counter/src/items.ts": {
@@ -87,17 +74,6 @@
         "class=\"hover:bg-primary/40 focus-visible:bg-primary/60 absolute inset-y-0 -right-[3px] z-10 w-1.5 cursor-col-resize touch-none outline-none\"": 1
       }
     },
-    "modules/notes/src/ImageBar.vue": {
-      "kit-control": {
-        "<Button v-for=\"choice in choices\" :key=\"choice.id\"": 1
-      },
-      "shadow": {
-        "class=\"bg-popover text-popover-foreground fixed z-50 flex items-center gap-0.5 rounded-md border p-1 text-xs shadow-lg\"": 1
-      },
-      "z-index": {
-        "class=\"bg-popover text-popover-foreground fixed z-50 flex items-center gap-0.5 rounded-md border p-1 text-xs shadow-lg\"": 1
-      }
-    },
     "modules/notes/src/ImageLightbox.vue": {
       "palette": {
         "class=\"flex h-full max-h-none w-full max-w-none items-center justify-center border-0 bg-black/80 p-4 sm:max-w-none\"": 1
@@ -106,22 +82,9 @@
         "onMounted(() => addEventListener(\"keydown\", onKey, true));": 1
       }
     },
-    "modules/notes/src/LinkPopover.vue": {
-      "shadow": {
-        "class=\"bg-popover text-popover-foreground fixed z-50 flex max-w-[272px] items-center gap-0.5 rounded-md border py-1 pr-1 pl-2.5 text-xs shadow-lg\"": 1
-      },
-      "z-index": {
-        "class=\"bg-popover text-popover-foreground fixed z-50 flex max-w-[272px] items-center gap-0.5 rounded-md border py-1 pr-1 pl-2.5 text-xs shadow-lg\"": 1
-      }
-    },
     "modules/notes/src/NoteEditor.vue": {
       "focus-ring": {
-        "class=\"note-title placeholder:text-muted-foreground mb-3 w-full min-w-0 border-b border-transparent bg-transparent pb-1 text-xl font-semibold outline-none\"": 1,
         "outline: none;": 1
-      },
-      "kit-control": {
-        "<Button v-else variant=\"ghost\" size=\"icon-sm\"": 1,
-        "<Button v-for=\"tool in group\" :key=\"tool.label\"": 1
       },
       "radius": {
         "border-radius: 3px;": 1,
@@ -137,22 +100,6 @@
     "modules/notes/src/NoteList.vue": {
       "dom-query": {
         "setTimeout(() => document.querySelector<HTMLElement>(`[data-testid=\"note-${id}\"] button`)?.focus(), 60);": 1
-      },
-      "kit-control": {
-        "<button type=\"button\" :class=\"cn('hover:bg-accent relative flex size-8 items-center justify-center rounded-md', entry.id === selectedId && 'bg-accent ring-primary ring-1')\"": 1,
-        "<button v-if=\"query\" type=\"button\" class=\"text-muted-foreground hover:text-foreground absolute right-1 rounded-sm p-1\"": 1,
-        "<input v-model=\"query\" type=\"search\" data-testid=\"search\"": 1
-      },
-      "shadow": {
-        "return drop.value?.id === entry.id && (drop.value.after ? \"shadow-[0_2px_0_0_var(--primary)]\" : \"shadow-[0_-2px_0_0_var(--primary)]\");": 2
-      }
-    },
-    "modules/notes/src/NoteRow.vue": {
-      "focus-ring": {
-        "class=\"bg-background border-ring placeholder:text-muted-foreground h-6 w-full min-w-0 rounded-sm border px-1 text-sm font-medium outline-none\"": 1
-      },
-      "kit-control": {
-        "<button v-else type=\"button\" class=\"flex min-w-0 flex-1 flex-col items-start gap-0.5 rounded-md px-3 py-2 text-left\"": 1
       }
     },
     "modules/pdf-viewer/src/PdfPage.vue": {
@@ -174,12 +121,6 @@
       "z-index": {
         "z-index: 1;": 1,
         "z-index: 2;": 1
-      }
-    },
-    "modules/playground/src/examples/buttons/ToggleButtons.vue": {
-      "kit-control": {
-        "<Button size=\"icon-sm\" variant=\"ghost\" aria-label=\"Bold\" title=\"Bold\" :aria-pressed=\"true\" class=\"bg-secondary\"><Bold /></Button>": 1,
-        "<Button size=\"icon-sm\" variant=\"ghost\" aria-label=\"Italic\" title=\"Italic\" :aria-pressed=\"false\"><Italic /></Button>": 1
       }
     },
     "modules/playground/src/examples/colour-stars/CustomColour.vue": {
@@ -229,11 +170,6 @@
         "const DEFAULTS = { seconds: true, twentyFour: true, size: \"m\", color: \"#ffffff\", every: \"15\" };": 1
       }
     },
-    "modules/playground/src/examples/spacing/Depth.vue": {
-      "shadow": {
-        "<div class=\"bg-popover text-popover-foreground flex h-20 items-center justify-center rounded-md border text-sm shadow-md\">Menu</div>": 1
-      }
-    },
     "modules/playground/src/examples/toggles/StyleTiles.vue": {
       "palette": {
         "<span :class=\"['absolute inset-x-2 rounded-sm bg-black/70', option.value === 'card' ? 'top-2 bottom-2' : option.value === 'bar' ? 'bottom-2 h-2' : 'top-1/2 h-1 -translate-y-1/2 bg-black/40']\" />": 2
@@ -262,14 +198,6 @@
         "const LABEL = \"text-muted-foreground flex-none text-[0.6875rem] font-medium tracking-wide uppercase\";": 1
       }
     },
-    "modules/system-monitor/src/MetricCard.vue": {
-      "all-caps": {
-        "<span class=\"text-muted-foreground flex-none text-[0.6875rem] font-medium tracking-wide uppercase\">{{ title }}</span>": 1
-      },
-      "font-size": {
-        "<span class=\"text-muted-foreground flex-none text-[0.6875rem] font-medium tracking-wide uppercase\">{{ title }}</span>": 1
-      }
-    },
     "modules/system-monitor/src/SystemSection.vue": {
       "all-caps": {
         "const LABEL = \"text-muted-foreground flex-none text-[0.6875rem] font-medium tracking-wide uppercase\";": 1
@@ -286,19 +214,7 @@
         "const LABEL = \"text-muted-foreground flex-none text-[0.6875rem] font-medium tracking-wide uppercase\";": 1
       }
     },
-    "modules/todos/src/AddInput.vue": {
-      "focus-ring": {
-        "'placeholder:text-muted-foreground focus-visible:border-ring h-8 w-full min-w-0 rounded-md border bg-transparent pr-2 text-sm outline-none',": 1
-      }
-    },
     "modules/todos/src/GroupSection.vue": {
-      "focus-ring": {
-        "class=\"focus-visible:border-ring h-7 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-sm font-semibold outline-none\"": 1
-      },
-      "kit-control": {
-        "<button type=\"button\" :class=\"cn('text-muted-foreground hover:text-foreground flex size-7 flex-none items-center justify-center rounded-md opacity-40 group-hover/header:opacity-100 focus-visible:opacity-100', menuOpen && 'opacity-100')\"": 1,
-        "<button type=\"button\" class=\"text-muted-foreground hover:text-foreground flex size-6 flex-none items-center justify-center rounded-md\"": 1
-      },
       "motion": {
         "class=\"absolute bottom-[-1px] left-0 h-px bg-[var(--tint,var(--primary))] transition-[width] duration-300 motion-reduce:transition-none\"": 2
       }
@@ -315,19 +231,11 @@
       }
     },
     "modules/todos/src/TaskRow.vue": {
-      "focus-ring": {
-        "class=\"block field-sizing-content w-full resize-none overflow-hidden border-0 bg-transparent px-1 py-1.5 font-(family-name:--todo-font) text-(length:--todo-text) leading-(--todo-leading) break-words outline-none\"": 1,
-        "class=\"placeholder:text-muted-foreground border-input focus-visible:border-ring field-sizing-content block max-h-60 min-h-20 w-full resize-none rounded-md border bg-transparent px-2 py-1.5 text-sm outline-none\"": 1
-      },
       "font-size": {
         "<p class=\"text-muted-foreground mt-1.5 px-0.5 text-[11px]\">{{ t(\"task.descriptionHint\") }}</p>": 1
       },
       "kit-control": {
-        "<button v-else type=\"button\" class=\"block w-full cursor-text rounded-sm px-1 py-1.5 text-left font-(family-name:--todo-font) text-(length:--todo-text) leading-(--todo-leading) break-words\"": 1,
-        "<button v-if=\"children.total\" type=\"button\"": 1,
-        "<input type=\"checkbox\" class=\"todo-check\"": 1,
-        "<textarea ref=\"descriptionInput\" v-model=\"description\"": 1,
-        "<textarea v-if=\"editing\" ref=\"titleInput\"": 1
+        "<button v-else type=\"button\" class=\"block w-full cursor-text rounded-sm px-1 py-1.5 text-left font-(family-name:--todo-font) text-(length:--todo-text) leading-(--todo-leading) break-words\"": 1
       }
     },
     "modules/todos/src/live.ts": {
@@ -366,10 +274,6 @@
       }
     },
     "modules/todos/src/style.css": {
-      "motion": {
-        "background-color 150ms ease,": 1,
-        "transition: transform 150ms ease;": 1
-      },
       "radius": {
         "border-radius: 1px;": 1
       }
@@ -388,15 +292,12 @@
     },
     "modules/whiteboard/src/App.vue": {
       "z-index": {
-        "<EmptyState v-if=\"boardState.empty\" :title=\"t('empty.hint')\" class=\"text-muted-foreground pointer-events-none absolute top-1/2 left-1/2 z-[1] w-max max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 border-0 bg-transparent p-0\" data-testid=\"empty-hint\" />": 1
+        "<EmptyState v-if=\"boardState.empty\" variant=\"bare\" :title=\"t('empty.hint')\" class=\"text-muted-foreground pointer-events-none absolute top-1/2 left-1/2 z-[1] w-max max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 bg-transparent p-0\" data-testid=\"empty-hint\" />": 1
       }
     },
     "modules/whiteboard/src/PictureLocks.vue": {
-      "kit-control": {
-        "<Button v-for=\"spot in spots\" :key=\"spot.id\"": 1
-      },
       "palette": {
-        "'picture-lock pointer-events-auto absolute size-6 -translate-x-1/2 -translate-y-1/2 bg-black/65 text-white opacity-0 transition-opacity hover:bg-black/80 hover:text-white hover:opacity-100 focus-visible:opacity-100',": 4
+        "'picture-lock pointer-events-auto absolute size-6 min-w-0 -translate-x-1/2 -translate-y-1/2 bg-black/65 text-white opacity-0 transition-opacity hover:bg-black/80 hover:text-white hover:opacity-100 focus-visible:opacity-100 data-[state=on]:bg-black/65 data-[state=on]:text-white data-[state=on]:hover:": 8
       },
       "z-index": {
         "<div v-if=\"spots.length > 0\" :class=\"LOCKS_CLASS\" class=\"pointer-events-none absolute inset-0 z-[2] overflow-hidden\">": 1

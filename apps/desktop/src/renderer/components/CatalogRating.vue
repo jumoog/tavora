@@ -5,8 +5,9 @@
 import { ChevronDown, MessageSquareText } from "@lucide/vue";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@tavora/official-ui/components/ui/dropdown-menu";
 import { CountTo } from "@tavora/official-ui/components/ui/count-to";
-import { Progress } from "@tavora/official-ui/components/ui/progress";
+import { Meter } from "@tavora/official-ui/components/ui/meter";
 import { StarRating } from "@tavora/official-ui/components/ui/star-rating";
+import { Button } from "@tavora/official-ui/components/ui/button";
 import { computed } from "vue";
 import { MIN_RATINGS_SHOWN, type CatalogRating } from "../../shared/host-api";
 import { useFloating } from "../host";
@@ -32,9 +33,9 @@ const rows = computed(() =>
   </span>
   <DropdownMenu v-else-if="shown" @update:open="track">
     <DropdownMenuTrigger as-child>
-      <button
-        type="button"
-        class="hover:text-foreground focus-visible:ring-ring data-[state=open]:text-foreground text-muted-foreground inline-flex items-center gap-1.5 rounded-sm text-xs outline-none focus-visible:ring-2"
+      <Button
+        variant="ghost"
+        class="hover:text-foreground data-[state=open]:text-foreground text-muted-foreground h-auto gap-1.5 rounded-sm p-0 text-xs font-normal hover:bg-transparent"
         :aria-label="`${t('catalog.rating.breakdown', { name })}: ${t('catalog.rating.label', { average })}, ${t('catalog.rating.count', { count: shown.count })}`"
         data-testid="catalog-rating"
       >
@@ -42,7 +43,7 @@ const rows = computed(() =>
         <StarRating :model-value="shown.average" size="sm" :label="t('catalog.rating.label', { average })" />
         <ChevronDown class="size-3.5" />
         <span class="tabular-nums">(<CountTo :value="shown.count" :format="formatNumber" />)</span>
-      </button>
+      </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" class="w-64" data-testid="catalog-rating-breakdown">
       <DropdownMenuLabel class="flex items-center gap-2 font-normal">
@@ -53,7 +54,7 @@ const rows = computed(() =>
       <ul class="space-y-1.5 px-2 pb-2">
         <li v-for="row in rows" :key="row.stars" class="grid grid-cols-[3.5rem_minmax(0,1fr)_2.5rem] items-center gap-2 text-xs">
           <span class="text-muted-foreground">{{ t("catalog.rating.stars", { count: row.stars }) }}</span>
-          <Progress :model-value="row.percent" :aria-label="t('catalog.rating.stars', { count: row.stars })" />
+          <Meter :model-value="row.percent" :aria-label="t('catalog.rating.stars', { count: row.stars })" />
           <span class="text-muted-foreground text-right tabular-nums"><CountTo :value="row.percent" :format="(n) => t('catalog.rating.percent', { percent: n })" /></span>
         </li>
       </ul>
