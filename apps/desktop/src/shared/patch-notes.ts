@@ -28,6 +28,17 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.26.0",
+    date: "2026-11-28",
+    title: "New module controls and a new look",
+    notes: [
+      "Many small fixes and clearer controls in the app, the modules and the overlays.",
+    ],
+    prs: [
+      { number: 1054, title: "Raise to 0.26.0 for the release" },
+    ],
+  },
+  {
     version: "0.25.77",
     date: "2026-11-28",
     title: "Dialogs and Path of Exile 2 cards",
