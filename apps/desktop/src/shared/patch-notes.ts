@@ -28,6 +28,19 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    version: "0.25.77",
+    date: "2026-11-28",
+    title: "Dialogs and Path of Exile 2 cards",
+    notes: [
+      "A dialog's message now sits under the title row, with the same room whether there's an icon or not.",
+      "Path of Exile 2 item cards get a new frame: a soft glow in the rarity colour, small diamonds on the corners and fading lines between sections.",
+    ],
+    prs: [
+      { number: 1053, title: "Kit: dialog header rule B, PoE card frame 4c" },
+    ],
+    tags: ["calculator", "clock-counter", "notes", "pdf-viewer", "system-monitor", "todos", "ui-kit", "whiteboard"],
+  },
+  {
     version: "0.25.76",
     date: "2026-11-28",
     title: "New frame for Path of Exile 2 item cards",

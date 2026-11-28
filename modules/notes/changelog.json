@@ -644,12 +644,5 @@
     "notes": [
       "The link dialog has an icon and a Close button in the corner, and it spaces things out more."
     ]
-  },
-  {
-    "version": "0.6.3",
-    "date": "2026-11-01",
-    "notes": [
-      "Menus and tooltips open out of the spot they belong to, and buttons dip a little when you press them."
-    ]
   }
 ]
